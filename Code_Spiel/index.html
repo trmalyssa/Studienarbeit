@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ocean Balance</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="style.css?v=8">
+</head>
+<body>
+
+  <!-- ===== Kopfleiste ===== -->
+  <header id="kopfleiste">
+    <div class="marke">
+      <svg class="marke-zeichen" viewBox="0 0 32 32" aria-hidden="true">
+        <circle cx="16" cy="16" r="15" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M6 13c3-3 5-3 8 0s5 3 8 0 4-2 4-2M6 19c3-3 5-3 8 0s5 3 8 0 4-2 4-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <span class="marke-name">Ocean Balance</span>
+    </div>
+
+    <div class="kopf-fortschritt">
+      <div class="kopf-zeile">
+        <span class="kopf-runde">Runde <strong id="anzeigeRunde">1</strong> von 12</span>
+        <span id="anzeigeLevel" class="kopf-level"></span>
+      </div>
+      <div id="rundenLeiste" class="runden-leiste" aria-hidden="true"></div>
+    </div>
+
+    <div class="kopf-wert">
+      <span class="kopf-label">Budget</span>
+      <span class="kopf-zahl">
+        <strong id="anzeigeBudget"></strong>
+        <button id="infoKnopf" class="info-knopf" type="button" aria-label="Zusammensetzung des Budgets erklären">i</button>
+      </span>
+    </div>
+
+    <div class="kopf-wert">
+      <span class="kopf-label">Akzeptanz</span>
+      <span class="kopf-zahl">
+        <span class="akz-balken" title="Unter 40 % sind einschränkende Maßnahmen gesperrt">
+          <span id="akzeptanzBalken" class="akz-fuellung"></span>
+          <span class="akz-sperre"></span>
+        </span>
+        <strong id="anzeigeAkzeptanz"></strong>
+      </span>
+    </div>
+
+    <div class="kopf-wert">
+      <span class="kopf-label">Strandmüll <span class="kopf-label-zusatz">Teile / 100 m</span></span>
+      <span class="kopf-zahl">
+        <span class="muell-mini" title="Grüne Marke: EU-Schwellenwert von 20 Teilen pro 100 m">
+          <span id="muellFuellung" class="muell-mini-fuellung"></span>
+          <span id="muellSchwelle" class="muell-mini-schwelle"></span>
+        </span>
+        <strong id="anzeigeMuell"></strong>
+        <button id="muellInfoKnopf" class="info-knopf" type="button" aria-label="Neuen Müll pro Runde und Müllbilanz anzeigen">i</button>
+      </span>
+    </div>
+
+    <button id="beendenKnopf" class="kopf-knopf" type="button">Spiel beenden</button>
+  </header>
+
+  <!-- ===== Spielfläche ===== -->
+  <!-- Links: Karte, Entscheidungen, Ziel. Rechts (mitlaufend): Zustand der Region und Rundenabschluss. -->
+  <main id="layout">
+    <div id="hauptspalte">
+
+      <section class="tafel karten-tafel" aria-labelledby="kartenTitel">
+        <div class="tafel-kopf">
+          <h2 id="kartenTitel">Karte deiner Küstenregion</h2>
+          <p id="kartenStatus" class="tafel-zusatz"></p>
+        </div>
+        <div class="karten-rahmen">
+          <div id="seekarte" class="seekarte" role="img"
+               aria-label="Karte der Küstenregion mit Strand, Fluss, Ort, Hafen und Meer. Sie zeigt Müll, Fische und Wasserqualität."></div>
+          <!-- Infopunkte und Personen mit Sprechblasen liegen als Knöpfe über der Karte -->
+          <div id="personen" class="personen-ebene"></div>
+        </div>
+        <ul id="kartenLegende" class="legende"></ul>
+      </section>
+
+      <section id="entscheidungen" class="tafel entscheidungs-tafel" aria-labelledby="massnahmenTitel">
+        <div class="tafel-kopf">
+          <h2 id="massnahmenTitel">Entscheidungen der Runde</h2>
+          <div id="regionFolge" class="region-folge"></div>
+        </div>
+        <p id="foerderHinweis" class="foerder-hinweis versteckt"></p>
+        <div id="massnahmenListe" class="saeulen-raster"></div>
+        <div id="auswahlDetail" class="auswahl-detail" aria-live="polite"></div>
+      </section>
+
+      <section class="tafel ziel-tafel" aria-labelledby="zielTitel">
+        <div class="tafel-kopf">
+          <h2 id="zielTitel">Ziel: guter Umweltzustand</h2>
+          <p id="zielZusatz" class="tafel-zusatz"></p>
+        </div>
+        <ul id="zielListe" class="ziel-liste"></ul>
+        <div class="score-zeile">
+          <div class="score-werte">
+            <span>Nachhaltigkeitsscore bisher: <strong id="anzeigeScore"></strong></span>
+            <span>Wissensscore bisher: <strong id="anzeigeWissen"></strong></span>
+          </div>
+          <button id="bewertungKnopf" class="text-knopf" type="button">So wird bewertet</button>
+        </div>
+      </section>
+    </div>
+
+    <aside id="seitenleiste">
+      <section id="kennzahlen" class="tafel" aria-labelledby="kennzahlenTitel">
+        <div class="tafel-kopf">
+          <h2 id="kennzahlenTitel">Zustand der Region</h2>
+        </div>
+        <div id="kennzahlenListe" class="kennzahlen-liste"></div>
+        <p class="kennzahl-legende"><span class="ziel-strich" aria-hidden="true"></span>Mindestwert für den guten Umweltzustand</p>
+        <p class="kennzahl-legende"><span class="kurs-strich" aria-hidden="true"></span>Sollkurs dieser Runde</p>
+      </section>
+
+      <section id="saeulenTafel" class="tafel" aria-labelledby="saeulenTitel">
+        <div class="tafel-kopf">
+          <h2 id="saeulenTitel">Die drei Säulen</h2>
+        </div>
+        <div id="saeulenListe" class="saeulen-liste"></div>
+        <p id="saeulenHinweis" class="saeulen-hinweis" aria-live="polite"></p>
+      </section>
+
+      <section class="tafel runden-abschluss" aria-label="Runde abschließen">
+        <div id="auswahlUebersicht" class="auswahl-uebersicht" aria-live="polite"></div>
+        <button id="naechsteRunde" class="haupt-knopf" type="button" aria-describedby="anhoerungHinweis">Runde beenden</button>
+        <p id="anhoerungHinweis" class="anhoerung-hinweis" aria-live="polite"></p>
+      </section>
+    </aside>
+  </main>
+
+  <!-- ===== Startbildschirm ===== -->
+  <!-- Aufbau wie ein Spiele-Hauptmenü: Titel oben, Knöpfe in der Mitte, Faktenfenster rechts.
+       Hintergrund: Fotos aus dem Ordner "bilder" (siehe HINTERGRUNDBILDER in script.js),
+       darunter eine gezeichnete Küstenszene als Ersatz. -->
+  <div id="startbildschirm">
+    <div class="start-hintergrund" aria-hidden="true">
+      <div id="startSzene" class="start-szene"></div>
+      <div id="startBilder" class="start-bilder"></div>
+      <div class="start-abdunkeln"></div>
+      <div id="startSonne" class="start-sonne"></div>
+    </div>
+
+    <div class="start-raster">
+      <header class="start-kopf">
+        <div class="start-logo">
+          <h1 class="start-titel">
+            <svg class="start-zeichen" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+              <circle cx="16" cy="16" r="15" fill="none" stroke="currentColor" stroke-width="1.6"/>
+              <path d="M6 13c3-3 5-3 8 0s5 3 8 0 4-2 4-2M6 19c3-3 5-3 8 0s5 3 8 0 4-2 4-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+            <span class="titel-duenn">Ocean</span><span class="titel-fett">Balance</span>
+          </h1>
+          <p id="startSplash" class="start-splash" aria-hidden="true"></p>
+        </div>
+        <p class="start-untertitel">Planspiel zum Meeresschutz an der Nordsee</p>
+      </header>
+
+      <nav class="start-menue" aria-label="Hauptmenü">
+        <button id="startNeuesSpiel" class="menue-knopf menue-primaer" type="button">Neues Spiel</button>
+        <button id="startLeaderboard" class="menue-knopf" type="button">Leaderboard</button>
+        <div class="menue-zeile">
+          <button id="startVollbild" class="menue-knopf menue-icon" type="button" aria-label="Vollbild">
+            <svg class="icon-auf" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <svg class="icon-zu" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button id="startUeber" class="menue-knopf" type="button">Spielinfo</button>
+          <button id="startFaktenUmschalten" class="menue-knopf menue-icon" type="button" aria-pressed="true" aria-label="Faktenfenster ausblenden">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+              <path d="M14 4.5v15" stroke="currentColor" stroke-width="1.8"/>
+              <path class="icon-fuellung" d="M14 4.5h4a2.5 2.5 0 0 1 2.5 2.5v10a2.5 2.5 0 0 1-2.5 2.5h-4z" fill="currentColor"/>
+            </svg>
+          </button>
+        </div>
+      </nav>
+
+      <aside id="faktenFenster" class="fakten-fenster" aria-labelledby="faktenLabel">
+        <div class="fakten-kopf">
+          <p id="faktenLabel" class="fakten-label">Wusstest du?</p>
+          <span id="faktNummer" class="fakt-nummer"></span>
+        </div>
+        <div id="faktKarte" class="fakt-karte">
+          <span id="faktKategorie" class="fakt-kategorie"></span>
+          <h2 id="faktTitel" class="fakt-titel"></h2>
+          <p id="faktText" class="fakt-text"></p>
+          <p class="fakt-quelle">Quelle: <a id="faktQuelle" href="#" target="_blank" rel="noopener noreferrer"></a></p>
+        </div>
+        <div class="fakt-leiste" aria-hidden="true"><span id="faktFortschritt"></span></div>
+        <div class="fakten-steuerung">
+          <button id="faktZurueck" class="fakt-knopf" type="button" aria-label="Vorheriger Fakt">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button id="faktPause" class="fakt-knopf" type="button" aria-pressed="false" aria-label="Automatischen Wechsel anhalten">
+            <svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 6v12M15 6v12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+            <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg>
+          </button>
+          <button id="faktWeiter" class="fakt-knopf" type="button" aria-label="Nächster Fakt">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      </aside>
+    </div>
+
+    <footer class="start-fuss">
+      <span id="startVersion"></span>
+      <div class="fuss-rechts">
+        <span id="bildNachweis"></span>
+        <button id="startQuellen" class="fuss-knopf" type="button">Quellen</button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ===== Pop-up: Über das Spiel ===== -->
+  <div class="overlay versteckt" id="popupUeber" role="dialog" aria-modal="true" aria-labelledby="ueberTitel">
+    <div class="popup popup-breit">
+      <div class="popup-kopf"><h2 id="ueberTitel">Über das Spiel</h2></div>
+      <div class="popup-inhalt">
+        <p>Ocean Balance ist ein Planspiel zum Meeresschutz. Du übernimmst eine vermüllte Küstenregion an der
+          Nordsee und bringst sie in zwölf Runden in einen guten Umweltzustand, ohne Wirtschaft und Rückhalt
+          der Bevölkerung zu verlieren. Nebenbei lernst du, was im Meer passiert.</p>
+        <ul class="liste-kompakt">
+          <li><strong>Drei Entscheidungen pro Runde:</strong> je eine für Ökologie, Ökonomie und Soziales.</li>
+          <li><strong>Knappes Budget:</strong> Nicht jede Maßnahme passt in jede Runde.</li>
+          <li><strong>Verzögerte Wirkungen:</strong> Vieles zeigt sich erst Runden später.</li>
+          <li><strong>Wissen zählt mit:</strong> Infopunkte und Quizfragen ergeben den Wissensscore.</li>
+        </ul>
+        <p class="klein">Entstanden als Studienarbeit zur spielerischen Vermittlung von Nachhaltigkeit.</p>
+        <section class="ueber-bewertung">
+          <h3 class="ueber-abschnitt">So wird bewertet</h3>
+          <div id="ueberBewertung"></div>
+        </section>
+      </div>
+      <div class="popup-fuss">
+        <button id="ueberSchliessen" class="knopf-primaer" type="button" data-fokus>Schließen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Pop-up: Quellen ===== -->
+  <div class="overlay versteckt" id="popupQuellen" role="dialog" aria-modal="true" aria-labelledby="quellenTitel">
+    <div class="popup popup-breit">
+      <div class="popup-kopf"><h2 id="quellenTitel">Quellen</h2></div>
+      <div class="popup-inhalt" id="quellenInhalt"></div>
+      <div class="popup-fuss">
+        <button id="quellenSchliessen" class="knopf-primaer" type="button" data-fokus>Schließen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Pop-up: Namenseingabe ===== -->
+  <div class="overlay versteckt" id="popupName" role="dialog" aria-modal="true" aria-labelledby="nameTitel">
+    <div class="popup">
+      <div class="popup-kopf"><h2 id="nameTitel">Wie heißt du?</h2></div>
+      <div class="popup-inhalt">
+        <label for="nameEingabe">Dein Name erscheint später im Leaderboard.</label>
+        <input type="text" id="nameEingabe" maxlength="20" placeholder="Dein Name" autocomplete="off">
+        <p id="nameFehler" class="fehlertext" role="alert"></p>
+      </div>
+      <div class="popup-fuss">
+        <button id="nameAbbrechen" class="knopf-sekundaer" type="button">Abbrechen</button>
+        <button id="nameOk" class="knopf-primaer" type="button">Weiter</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Pop-up: Einführung ===== -->
+  <div class="overlay versteckt" id="popupEinfuehrung" role="dialog" aria-modal="true" aria-labelledby="einfuehrungTitel">
+    <div class="popup">
+      <div class="popup-kopf"><h2 id="einfuehrungTitel"></h2></div>
+      <div class="popup-inhalt" id="einfuehrungInhalt"></div>
+      <div class="popup-fuss popup-fuss-verteilt">
+        <div id="einfuehrungPunkte" class="schritt-punkte" aria-hidden="true"></div>
+        <div class="popup-knoepfe">
+          <button id="einfuehrungZurueck" class="knopf-sekundaer" type="button">Zurück</button>
+          <button id="einfuehrungWeiter" class="knopf-primaer" type="button" data-fokus>Weiter</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Pop-up: Rundenbericht ===== -->
+  <div class="overlay versteckt" id="popupBericht" role="dialog" aria-modal="true" aria-labelledby="berichtTitel">
+    <div class="popup popup-breit">
+      <div class="popup-kopf"><h2 id="berichtTitel"></h2></div>
+      <div class="popup-inhalt" id="berichtInhalt"></div>
+      <div class="popup-fuss">
+        <button id="berichtWeiter" class="knopf-primaer" type="button" data-fokus>Weiter</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Pop-up: Ereignis ===== -->
+  <div class="overlay versteckt" id="popupEreignis" role="dialog" aria-modal="true" aria-labelledby="ereignisTitel">
+    <div class="popup popup-ereignis">
+      <div class="popup-kopf">
+        <p class="ereignis-marke">Ereignis</p>
+        <h2 id="ereignisTitel"></h2>
+      </div>
+      <div class="popup-inhalt"><p id="ereignisText"></p></div>
+      <div class="popup-fuss">
+        <button id="ereignisOk" class="knopf-primaer" type="button" data-fokus>Verstanden</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Pop-up: Anliegen einer Person (öffnet sich nur einmal) ===== -->
+  <div class="overlay versteckt" id="popupAnliegen" role="dialog" aria-modal="true" aria-labelledby="anliegenName">
+    <div class="popup popup-anliegen">
+      <div class="popup-kopf anliegen-kopf">
+        <span id="anliegenFigur" class="anliegen-figur" aria-hidden="true"></span>
+        <div>
+          <h2 id="anliegenName"></h2>
+          <p id="anliegenRolle" class="tafel-zusatz"></p>
+        </div>
+      </div>
+      <div class="popup-inhalt">
+        <p id="anliegenText" class="anliegen-text"></p>
+      </div>
+      <div class="popup-fuss popup-fuss-verteilt">
+        <p class="klein fuss-notiz">Dieses Anliegen kannst du nur einmal lesen.</p>
+        <button id="anliegenOk" class="knopf-primaer" type="button" data-fokus>Verstanden</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Pop-up: Infopunkt ===== -->
+  <div class="overlay versteckt" id="popupInfo" role="dialog" aria-modal="true" aria-labelledby="infoTitel">
+    <div class="popup popup-info">
+      <div class="popup-kopf">
+        <p id="infoArt" class="info-art"></p>
+        <h2 id="infoTitel"></h2>
+      </div>
+      <div class="popup-inhalt" id="infoInhalt"></div>
+      <div class="popup-fuss popup-fuss-verteilt">
+        <p id="infoNotiz" class="klein fuss-notiz"></p>
+        <button id="infoOk" class="knopf-primaer" type="button" data-fokus>Gelesen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Pop-up: Quiz (lässt sich erst nach der Antwort schließen) ===== -->
+  <div class="overlay versteckt" id="popupQuiz" role="dialog" aria-modal="true" aria-labelledby="quizTitel">
+    <div class="popup popup-quiz">
+      <div class="popup-kopf">
+        <h2 id="quizTitel"></h2>
+        <p id="quizFortschritt" class="tafel-zusatz"></p>
+      </div>
+      <div class="popup-inhalt">
+        <p id="quizFrage" class="quiz-frage"></p>
+        <div id="quizAntworten" class="quiz-antworten"></div>
+        <p id="quizErklaerung" class="quiz-erklaerung versteckt" aria-live="polite"></p>
+      </div>
+      <div class="popup-fuss">
+        <button id="quizWeiter" class="knopf-primaer" type="button" disabled>Nächste Frage</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Pop-up: Zwischenbilanz nach Runde 3, 6, 9 ===== -->
+  <div class="overlay versteckt" id="popupZwischenbilanz" role="dialog" aria-modal="true" aria-labelledby="zbTitel">
+    <div class="popup popup-breit">
+      <div class="popup-kopf"><h2 id="zbTitel"></h2></div>
+      <div class="popup-inhalt" id="zbInhalt"></div>
+      <div class="popup-fuss">
+        <button id="zbWeiter" class="knopf-primaer" type="button" data-fokus>Weiter</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Pop-up: Strandmüll und neuer Müll pro Runde ===== -->
+  <div class="overlay versteckt" id="popupMuell" role="dialog" aria-modal="true" aria-labelledby="muellTitel">
+    <div class="popup popup-breit">
+      <div class="popup-kopf"><h2 id="muellTitel">Strandmüll und neuer Müll pro Runde</h2></div>
+      <div class="popup-inhalt" id="muellInhalt"></div>
+      <div class="popup-fuss">
+        <button id="muellSchliessen" class="knopf-primaer" type="button" data-fokus>Schließen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Pop-up: Zusammensetzung des Budgets ===== -->
+  <div class="overlay versteckt" id="popupBudget" role="dialog" aria-modal="true" aria-labelledby="budgetTitel">
+    <div class="popup popup-breit">
+      <div class="popup-kopf"><h2 id="budgetTitel">So setzt sich dein Budget zusammen</h2></div>
+      <div class="popup-inhalt" id="budgetInhalt"></div>
+      <div class="popup-fuss">
+        <button id="budgetSchliessen" class="knopf-primaer" type="button" data-fokus>Schließen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Pop-up: Bewertung ===== -->
+  <div class="overlay versteckt" id="popupBewertung" role="dialog" aria-modal="true" aria-labelledby="bewertungTitel">
+    <div class="popup popup-breit">
+      <div class="popup-kopf"><h2 id="bewertungTitel">So wird bewertet</h2></div>
+      <div class="popup-inhalt" id="bewertungInhalt"></div>
+      <div class="popup-fuss">
+        <button id="bewertungSchliessen" class="knopf-primaer" type="button" data-fokus>Schließen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Pop-up: Spiel beenden ===== -->
+  <div class="overlay versteckt" id="popupBeenden" role="dialog" aria-modal="true" aria-labelledby="beendenTitel">
+    <div class="popup">
+      <div class="popup-kopf"><h2 id="beendenTitel">Spiel beenden?</h2></div>
+      <div class="popup-inhalt">
+        <p>Dein Fortschritt geht verloren. Ins Leaderboard kommen nur Spiele, die bis Runde 12 gespielt
+          wurden, damit alle Ergebnisse vergleichbar sind.</p>
+      </div>
+      <div class="popup-fuss">
+        <button id="beendenAbbrechen" class="knopf-sekundaer" type="button" data-fokus>Weiterspielen</button>
+        <button id="beendenOk" class="knopf-gefahr" type="button">Spiel beenden</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Pop-up: Endauswertung ===== -->
+  <div class="overlay versteckt" id="popupAuswertung" role="dialog" aria-modal="true" aria-labelledby="auswertungTitel">
+    <div class="popup popup-sehr-breit">
+      <div class="popup-kopf"><h2 id="auswertungTitel">Auswertung nach 12 Runden</h2></div>
+      <div class="popup-inhalt" id="auswertungInhalt"></div>
+      <div class="popup-fuss">
+        <button id="auswertungStart" class="knopf-sekundaer" type="button">Zum Startbildschirm</button>
+        <button id="auswertungLeaderboard" class="knopf-sekundaer" type="button">Leaderboard</button>
+        <button id="auswertungNeu" class="knopf-primaer" type="button" data-fokus>Neues Spiel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Pop-up: Leaderboard ===== -->
+  <div class="overlay overlay-oben versteckt" id="popupLeaderboard" role="dialog" aria-modal="true" aria-labelledby="leaderboardTitel">
+    <div class="popup popup-sehr-breit">
+      <div class="popup-kopf">
+        <h2 id="leaderboardTitel">Leaderboard</h2>
+        <p class="tafel-zusatz">Zuerst zählt der gute Umweltzustand, dann das Endergebnis.</p>
+      </div>
+      <div class="popup-inhalt">
+        <p id="leaderboardStatus" class="info-status"></p>
+        <div id="leaderboardTabelle" class="tabellen-rahmen"></div>
+      </div>
+      <div class="popup-fuss">
+        <button id="leaderboardSchliessen" class="knopf-primaer" type="button" data-fokus>Schließen</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js?v=8"></script>
+</body>
+</html>
