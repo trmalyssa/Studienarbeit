@@ -4,7 +4,7 @@
 
 /* ===== Grundwerte (zentral änderbar) ===== */
 :root {
-  --layout-version: 8;       /* script.js prüft diesen Wert, damit HTML, CSS und JS zusammenpassen */
+  --layout-version: 9;       /* script.js prüft diesen Wert, damit HTML, CSS und JS zusammenpassen */
   --tinte: #12304A;          /* Linien und Text wie auf einer Seekarte */
   --tinte-2: #3E5A70;        /* zweitrangiger Text */
   --tinte-3: #687F91;        /* Hinweise */
@@ -1237,11 +1237,64 @@ button {
   inset: 0;
 }
 
+/* --- Bewegter Hintergrund der gezeichneten Szene --- */
+.start-wolken {
+  position: absolute;
+  inset: 0;
+}
+
+.start-wolken { overflow: hidden; }
+
+/* Meer (Glitzern, Brandung, Möwen) und Strandhafer: Canvas, die script.js zeichnet (szeneZeichnen) */
+.start-leinwand {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Windsack: Lage und Größe setzt script.js (windsackPlatzieren) */
+.start-windsack { position: absolute; }
+.start-windsack svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Band mit den Wolken zweimal nebeneinander: wandert eine Bildschirmbreite nach rechts, dann von vorn */
+.wolken-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -100%;
+  width: 200%;
+  animation: wolken-zug 150s linear infinite;
+  will-change: transform;
+}
+
+@keyframes wolken-zug {
+  from { transform: translateX(0); }
+  to   { transform: translateX(50%); }
+}
+
+/* Windsack flattert */
+.windsack-teil { animation: windsack-flattern 1.7s ease-in-out infinite; }
+
+@keyframes windsack-flattern {
+  0%, 100% { transform: rotate(var(--von, -3deg)); }
+  50%      { transform: rotate(var(--bis, 3deg)); }
+}
+
+/* Mit Fotos ist die gezeichnete Szene verdeckt: Bewegung anhalten, spart Rechenleistung */
+#startbildschirm.mit-fotos .wolken-band,
+#startbildschirm.mit-fotos .start-windsack * { animation-play-state: paused; }
+
 /* Sobald eigene Fotos geladen sind, gehört die gezeichnete Sonne nicht mehr dazu */
 #startbildschirm.mit-fotos .start-sonne { display: none; }
 
 .start-szene svg,
-.start-sonne svg {
+.start-sonne svg,
+.wolken-band svg {
   display: block;
   width: 100%;
   height: 100%;

@@ -1361,7 +1361,7 @@ const HINTERGRUNDBILDER = [
 
 const START_FAKT_DAUER = 12000;   // ms, so lange steht ein Fakt im Faktenfenster
 const START_BILD_DAUER = 16000;   // ms, so lange steht ein Hintergrundbild
-const START_VERSION = "Version 8";
+const START_VERSION = "Version 9";
 
 // Kurze Zusatzzeile neben dem Titel; bei jedem Öffnen des Startbildschirms eine andere
 const START_SPLASH = [
@@ -4561,7 +4561,12 @@ const start = {
 const START_FAKTEN_SCHLUESSEL = "oceanBalanceFaktenSichtbar";
 
 function startbildschirmVorbereiten() {
-  el("startSzene").innerHTML = kuestenSzeneSvg();
+  const szene = kuestenSzene();
+  el("startSzene").innerHTML = szene.basis;
+  el("startWolken").innerHTML = szene.wolken;
+  el("startWindsack").innerHTML = szene.windsack;
+  szeneVorbereiten(szene);
+  window.addEventListener("resize", startGroesseAnpassen);
   el("startSonne").innerHTML = sonneSvg();
   el("startVersion").textContent = "Ocean Balance · " + START_VERSION;
   start.fakten = MEERESFAKTEN.slice();
@@ -4594,6 +4599,8 @@ function startbildschirmZeigen() {
   el("startSplash").textContent = START_SPLASH[Math.floor(Math.random() * START_SPLASH.length)];
   faktZeigen(start.faktIndex);
   bildTimerStarten();
+  startGroesseAnpassen();
+  szeneStarten();
 }
 
 // Beim Spielstart: Startbildschirm ausblenden und alle Wechsel anhalten
@@ -4602,6 +4609,7 @@ function startbildschirmVerbergen() {
   start.aktiv = false;
   clearTimeout(start.faktTimer);
   clearTimeout(start.bildTimer);
+  szeneAnhalten();
 }
 
 // ---------- Faktenfenster ----------
@@ -4682,6 +4690,7 @@ function faktenSichtbarSetzen(sichtbar) {
   } else {
     clearTimeout(start.faktTimer);
   }
+  windsackPlatzieren();
 }
 
 // ---------- Hintergrundbilder ----------
@@ -4807,10 +4816,45 @@ function sonneSvg() {
 }
 
 // Himmel, Nordsee, Strand und Dünen mit Strandhafer, angelehnt an einen Blick von der Düne aufs Meer.
-function kuestenSzeneSvg() {
+// Die Szene besteht aus mehreren Ebenen, damit nur das neu gezeichnet wird, was sich bewegt:
+//   basis    = stehender Hintergrund (Himmel, Lichtstrahlen, Meer, Strand, Dünen), SVG mit Weichzeichner
+//   wolken   = Wolkenband, zieht als Ganzes von links nach rechts (CSS-Transform, kaum Rechenlast)
+//   meer     = Glitzern, Brandung und Möwen (Canvas)
+//   windsack = kleines SVG, flattert per CSS
+//   halme    = Strandhafer im Wind (Canvas)
+const UFER = "M0,700 C320,646 720,604 1110,584 C1310,574 1480,569 1600,567";
+
+// Möwe als Silhouette: kurzer linker Flügel, langer, nach oben geschwungener rechter Flügel (Mitte = Körper)
+const VOGEL_PFAD = "M-62,-4 C-44,-20 -20,-16 -2,6 C14,-14 40,-34 66,-38 C44,-26 24,-8 8,14 " +
+  "C3,19 -4,19 -8,13 C-22,-2 -42,-12 -62,-4 Z";
+
+// Vögel am Himmel, links und rechts neben dem Titel: x, y, Größe, Dauer des Auf und Ab in s, Verzögerung in s
+const START_VOEGEL = [
+  [190, 335, 0.5, 5.2, 0],
+  [292, 292, 0.36, 4.4, -1.8],
+  [1420, 272, 0.44, 5.8, -3.1]
+];
+
+// Windsack: eigenes kleines SVG (Mast bei x = 0, Mastspitze bei y = 0, Fuß bei y = 252).
+// Steht rechts etwas hinter dem Faktenfenster auf der Düne, siehe windsackPlatzieren().
+const WINDSACK_BOX = { x: -8, y: -6, breite: 232, hoehe: 264, mast: 252 };
+
+// Oberkante der rechten Düne (zwei Bézierkurven aus der Szene)
+const DUENE_RECHTS = [
+  [[540, 900], [760, 800], [990, 700], [1240, 662]],
+  [[1240, 662], [1400, 640], [1520, 644], [1600, 654]]
+];
+
+function kuestenSzene() {
   const r = zufallsfolge(23);
   const zahl1 = function (x) { return x.toFixed(1); };
-  let s = '<svg viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice" focusable="false">';
+  const svgKopf = function (breite, verhaeltnis) {
+    return '<svg viewBox="0 0 ' + breite + ' 900" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="' +
+      verhaeltnis + '" focusable="false">';
+  };
+
+  // ===== Ebene 1: stehender Hintergrund =====
+  let s = svgKopf(1600, "xMidYMid slice");
   s += "<defs>" +
     '<linearGradient id="szHimmel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2F6EA8"/>' +
     '<stop offset="0.6" stop-color="#86B5D8"/><stop offset="1" stop-color="#D9E8EF"/></linearGradient>' +
@@ -4820,7 +4864,6 @@ function kuestenSzeneSvg() {
     '<stop offset="1" stop-color="#D6C296"/></linearGradient>' +
     '<linearGradient id="szDuene" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B8A477"/>' +
     '<stop offset="1" stop-color="#7F6F4E"/></linearGradient>' +
-    '<filter id="szWeich" x="-30%" y="-80%" width="160%" height="260%"><feGaussianBlur stdDeviation="20"/></filter>' +
     "</defs>";
 
   // Himmel
@@ -4844,37 +4887,61 @@ function kuestenSzeneSvg() {
   });
   s += "</g>";
 
-  // Weitere weiche Wolkenbänke. Hinter Titel und Untertitel bleibt der Himmel frei.
-  [[1260, 150, 1], [1430, 340, 0.8], [480, 380, 0.7], [1020, 420, 0.6]].forEach(function (w) {
-    s += '<g filter="url(#szWeich)" fill="#FFFFFF" opacity="0.8">';
-    for (let i = 0; i < 5; i++) {
-      s += '<ellipse cx="' + zahl1(w[0] + (r() - 0.5) * 240 * w[2]) + '" cy="' + zahl1(w[1] + (r() - 0.5) * 40 * w[2]) +
-        '" rx="' + zahl1((80 + r() * 90) * w[2]) + '" ry="' + zahl1((26 + r() * 22) * w[2]) + '"/>';
-    }
-    s += "</g>";
-  });
-
-  // Meer mit Lichtreflexen
+  // Meer, Strand, ferner Brandungssaum und Dünen
   s += '<rect y="520" width="1600" height="380" fill="url(#szMeer)"/>';
+  s += '<path d="' + UFER + ' L1600,900 L0,900 Z" fill="url(#szSand)"/>';
+  s += '<path d="M0,684 C320,632 720,592 1110,574 C1310,565 1480,561 1600,559" fill="none" stroke="#FFFFFF" stroke-opacity="0.22" stroke-width="3"/>';
+  s += '<path d="M540,900 C760,800 990,700 1240,662 C1400,640 1520,644 1600,654 L1600,900 Z" fill="url(#szDuene)"/>';
+  s += '<path d="M0,830 C120,800 250,808 370,846 C430,866 470,884 490,900 L0,900 Z" fill="url(#szDuene)"/>';
+  s += "</svg>";
+  const basis = s;
+
+  // ===== Ebene 2: Wolkenband =====
+  // Das Band ist doppelt so breit wie der Bildschirm und enthält dieselben Wolken zweimal.
+  // Es wandert um eine Bildschirmbreite nach rechts und springt dann unsichtbar zurück.
+  // Die Wolken liegen über und unter dem Titel, damit er lesbar bleibt.
+  const rw = zufallsfolge(41);
+  const wolken = [
+    // x, y, Größe, Deckkraft
+    [250, 62, 0.62, 0.55], [1020, 48, 0.5, 0.5],
+    [620, 405, 0.8, 0.78], [1340, 382, 0.9, 0.8], [130, 452, 0.55, 0.7], [960, 462, 0.62, 0.68]
+  ].map(function (w) {
+    const teile = [];
+    for (let i = 0; i < 5; i++) {
+      teile.push([(rw() - 0.5) * 240 * w[2], (rw() - 0.5) * 34 * w[2], (80 + rw() * 90) * w[2], (22 + rw() * 18) * w[2]]);
+    }
+    return { x: w[0], y: w[1], deckkraft: w[3], teile: teile };
+  });
+  let sw = svgKopf(3200, "none");
+  sw += '<defs><filter id="szWolkeWeich" x="-30%" y="-80%" width="160%" height="260%"><feGaussianBlur stdDeviation="20"/></filter></defs>';
+  [0, 1600].forEach(function (versatz) {
+    wolken.forEach(function (w) {
+      sw += '<g filter="url(#szWolkeWeich)" fill="#FFFFFF" opacity="' + w.deckkraft + '">';
+      w.teile.forEach(function (t) {
+        sw += '<ellipse cx="' + zahl1(versatz + w.x + t[0]) + '" cy="' + zahl1(w.y + t[1]) +
+          '" rx="' + zahl1(t[2]) + '" ry="' + zahl1(t[3]) + '"/>';
+      });
+      sw += "</g>";
+    });
+  });
+  sw += "</svg>";
+
+  // ===== Ebene 3: bewegte Teile (werden auf zwei Canvas gezeichnet, siehe szeneZeichnen) =====
+  // Viele bewegte SVG-Teile auf voller Bildschirmgröße wären zu langsam, weil das ganze SVG
+  // bei jeder Bewegung neu gerastert wird. Hier werden nur die Daten vorbereitet.
+
+  // Lichtreflexe auf dem Meer: drei Gruppen, die abwechselnd aufleuchten und leicht treiben
+  const glitzer = [[], [], []];
   for (let i = 0; i < 46; i++) {
     const y = 528 + Math.pow(r(), 1.5) * 130;
     const x = r() * 1600;
     const l = 20 + r() * 90;
-    s += '<line x1="' + zahl1(x) + '" y1="' + zahl1(y) + '" x2="' + zahl1(x + l) + '" y2="' + zahl1(y) +
-      '" stroke="#FFFFFF" stroke-opacity="' + (0.08 + r() * 0.14).toFixed(2) + '" stroke-width="2" stroke-linecap="round"/>';
+    glitzer[i % 3].push({ x: x, y: y, l: l, deckkraft: 0.08 + r() * 0.14 });
   }
 
-  // Strand mit Brandungssaum
-  const ufer = "M0,700 C320,646 720,604 1110,584 C1310,574 1480,569 1600,567";
-  s += '<path d="' + ufer + ' L1600,900 L0,900 Z" fill="url(#szSand)"/>';
-  s += '<path d="' + ufer + '" fill="none" stroke="#FFFFFF" stroke-opacity="0.6" stroke-width="5"/>';
-  s += '<path d="M0,684 C320,632 720,592 1110,574 C1310,565 1480,561 1600,559" fill="none" stroke="#FFFFFF" stroke-opacity="0.22" stroke-width="3"/>';
-
-  // Dünen im Vordergrund
-  s += '<path d="M540,900 C760,800 990,700 1240,662 C1400,640 1520,644 1600,654 L1600,900 Z" fill="url(#szDuene)"/>';
-  s += '<path d="M0,830 C120,800 250,808 370,846 C430,866 470,884 490,900 L0,900 Z" fill="url(#szDuene)"/>';
-
-  // Strandhafer: viele Halme, hinten kleiner, vorne größer
+  // Strandhafer: viele Halme, hinten kleiner, vorne größer.
+  // Gespeichert werden Fußpunkt, Kontroll- und Endpunkt relativ zum Fuß, Farbe, Breite und Windverhalten.
+  const rh = zufallsfolge(57);
   const kammRechts = function (x) {
     return x >= 1240 ? 662 : 662 + 238 * Math.pow((1240 - x) / 700, 1.6);
   };
@@ -4892,15 +4959,326 @@ function kuestenSzeneSvg() {
   }
   halme.sort(function (a, b) { return a.y - b.y; });
   const farben = ["#A8A05E", "#8D8A4B", "#C3B67C", "#6E7442", "#B4A86A"];
-  halme.forEach(function (h) {
+  const halmDaten = halme.map(function (h) {
     const tiefe = (h.y - 640) / 260;                     // 0 = hinten, 1 = vorne
     const hoehe = (40 + r() * 80) * (0.6 + tiefe * 1.1);
     const neigung = (r() - 0.35) * hoehe * 0.55;
-    s += '<path d="M' + zahl1(h.x) + "," + zahl1(h.y) + " Q" + zahl1(h.x + neigung * 0.25) + "," + zahl1(h.y - hoehe * 0.6) +
-      " " + zahl1(h.x + neigung) + "," + zahl1(h.y - hoehe) + '" fill="none" stroke="' + farben[Math.floor(r() * farben.length)] +
-      '" stroke-width="' + (1.4 + tiefe * 2.2).toFixed(1) + '" stroke-linecap="round" opacity="0.9"/>';
+    return {
+      x: h.x, y: h.y,
+      qx: neigung * 0.25, qy: -hoehe * 0.6,              // Kontrollpunkt relativ zum Fuß
+      ex: neigung, ey: -hoehe,                           // Spitze relativ zum Fuß
+      farbe: farben[Math.floor(r() * farben.length)],
+      breite: 1.4 + tiefe * 2.2,
+      versatz: (h.x / 1600) * 1.6 + rh() * 0.7,          // s; die Böe erreicht rechte Halme später
+      ausschlag: 2.5 + rh() * 3                          // Grad nach rechts
+    };
   });
-  s += "</svg>";
+
+  const windsack = '<svg viewBox="' + WINDSACK_BOX.x + " " + WINDSACK_BOX.y + " " + WINDSACK_BOX.breite + " " +
+    WINDSACK_BOX.hoehe + '" xmlns="http://www.w3.org/2000/svg" focusable="false">' +
+    windsackSvg(0, WINDSACK_BOX.mast, 0) + "</svg>";
+
+  return { basis: basis, wolken: sw, windsack: windsack, glitzer: glitzer, halme: halmDaten };
+}
+
+// ---------- Bewegte Szene: Meer (Glitzern, Brandung, Vögel) und Strandhafer ----------
+// Zwei Canvas: "startMeer" liegt unter dem Windsack, "startHalme" davor.
+// Gezeichnet wird mit etwa 30 Bildern pro Sekunde, nur solange der Startbildschirm sichtbar ist.
+const HALM_BOE = 4.2;                                    // s, Strandhafer einmal hin und zurück
+const WELLE_DAUER = 7;                                   // s, eine Welle läuft hoch und wieder ab
+const WELLEN_VERSATZ = [0, 3.5];                         // s, zwei Wellen im Wechsel
+const GLITZER_DAUER = 12.6;                              // s, Reflexe einmal hell und wieder schwach
+const szeneAnim = {
+  glitzer: [], halme: [], meer: null, gras: null,
+  k: 1, dx: 0, dy: 0, dpr: 1, schleife: 0, zuletzt: 0,
+  ufer: null, vogel: null
+};
+
+// Umrechnung Szene (1600 × 900, wie "xMidYMid slice") → Bildschirmpixel
+function szenenMassstab() {
+  const b = window.innerWidth;
+  const h = window.innerHeight;
+  const k = Math.max(b / 1600, h / 900);
+  return { b: b, h: h, k: k, dx: (b - 1600 * k) / 2, dy: (h - 900 * k) / 2 };
+}
+
+function szeneVorbereiten(szene) {
+  szeneAnim.glitzer = szene.glitzer;
+  szeneAnim.halme = szene.halme;
+  szeneAnim.ufer = new Path2D(UFER);
+  szeneAnim.vogel = new Path2D(VOGEL_PFAD);
+}
+
+function szeneGroesseAnpassen() {
+  const m = szenenMassstab();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  szeneAnim.k = m.k;
+  szeneAnim.dx = m.dx;
+  szeneAnim.dy = m.dy;
+  szeneAnim.dpr = dpr;
+  [["startMeer", "meer"], ["startHalme", "gras"]].forEach(function (paar) {
+    const leinwand = el(paar[0]);
+    leinwand.width = Math.round(m.b * dpr);
+    leinwand.height = Math.round(m.h * dpr);
+    szeneAnim[paar[1]] = leinwand.getContext("2d");
+  });
+  szeneZeichnen(performance.now());
+}
+
+// Leert ein Canvas und stellt es auf Szenenkoordinaten um
+function leinwandVorbereiten(c) {
+  const d = szeneAnim.dpr;
+  const k = szeneAnim.k * d;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.clearRect(0, 0, c.canvas.width, c.canvas.height);
+  c.setTransform(k, 0, 0, k, szeneAnim.dx * d, szeneAnim.dy * d);
+  c.lineCap = "round";
+}
+
+// weicher Übergang 0 … 1
+function weich(t) {
+  return t * t * (3 - 2 * t);
+}
+
+// Lage und Deckkraft einer Welle im Verlauf p (0 … 1):
+// läuft bis 42 % den Strand hinauf, dann langsamer zurück und löst sich dabei auf
+function welleZustand(p) {
+  const verschiebung = p < 0.42 ? -12 + 28 * weich(p / 0.42) : 16 - 28 * weich((p - 0.42) / 0.58);
+  let deckkraft;
+  if (p < 0.12) deckkraft = p / 0.12;
+  else if (p < 0.42) deckkraft = 1;
+  else if (p < 0.8) deckkraft = 1 - 0.5 * (p - 0.42) / 0.38;
+  else deckkraft = 0.5 * (1 - (p - 0.8) / 0.2);
+  // nasser Sand: wird dunkel, wenn die Welle oben ist, und trocknet langsam
+  let nass = 0;
+  if (p >= 0.3 && p < 0.45) nass = (p - 0.3) / 0.15;
+  else if (p >= 0.45) nass = Math.pow(1 - (p - 0.45) / 0.55, 1.6);
+  return { dy: verschiebung, deckkraft: deckkraft, nass: nass };
+}
+
+function uferStrich(c, dy, farbe, deckkraft, breite) {
+  c.save();
+  c.translate(0, dy);
+  c.globalAlpha = deckkraft;
+  c.strokeStyle = farbe;
+  c.lineWidth = breite;
+  c.stroke(szeneAnim.ufer);
+  c.restore();
+}
+
+function meerZeichnen(t) {
+  const c = szeneAnim.meer;
+  if (!c) return;
+  leinwandVorbereiten(c);
+
+  // Lichtreflexe
+  c.strokeStyle = "#FFFFFF";
+  c.lineWidth = 2;
+  szeneAnim.glitzer.forEach(function (gruppe, i) {
+    const phase = 0.5 - 0.5 * Math.cos(2 * Math.PI * (t + i * 2.1) / GLITZER_DAUER);   // 0 … 1
+    const hell = 1 - 0.7 * phase;
+    const drift = 10 * phase;
+    gruppe.forEach(function (g) {
+      c.globalAlpha = g.deckkraft * hell;
+      c.beginPath();
+      c.moveTo(g.x + drift, g.y);
+      c.lineTo(g.x + g.l + drift, g.y);
+      c.stroke();
+    });
+  });
+
+  // Brandung: nasser Sand, flaches Wasser, Schaumkante, Schaumspuren
+  WELLEN_VERSATZ.forEach(function (versatz) {
+    const p = (((t + versatz) % WELLE_DAUER) + WELLE_DAUER) % WELLE_DAUER / WELLE_DAUER;
+    const w = welleZustand(p);
+    if (w.nass > 0) uferStrich(c, 13, "#B59C6C", 0.55 * w.nass, 22);
+    if (w.deckkraft <= 0) return;
+    uferStrich(c, w.dy - 8, "#9CCDE6", 0.4 * w.deckkraft, 30);
+    uferStrich(c, w.dy + 5, "#FFFFFF", 0.8 * w.deckkraft, 4.5);
+    c.setLineDash([46, 20, 14, 28]);
+    uferStrich(c, w.dy - 1, "#FFFFFF", 0.4 * w.deckkraft, 2);
+    c.setLineDash([]);
+  });
+
+  // Möwen: gleiten auf und ab und kippen dabei leicht
+  c.fillStyle = "#172A3A";
+  c.globalAlpha = 0.85;
+  START_VOEGEL.forEach(function (v) {
+    const phase = 0.5 - 0.5 * Math.cos(2 * Math.PI * (t + v[4]) / v[3]);              // 0 … 1
+    c.save();
+    c.translate(v[0], v[1]);
+    c.scale(v[2], v[2]);
+    c.translate(0, -12 + 26 * phase);
+    c.rotate((-3 + 6 * phase) * Math.PI / 180);
+    c.fill(szeneAnim.vogel);
+    c.restore();
+  });
+  c.globalAlpha = 1;
+}
+
+// Strandhafer: jeder Halm neigt sich um seinen Fußpunkt zwischen leicht links und deutlich rechts
+function halmeZeichnen(t) {
+  const c = szeneAnim.gras;
+  if (!c) return;
+  leinwandVorbereiten(c);
+  c.globalAlpha = 0.9;
+  const grad = Math.PI / 180;
+  szeneAnim.halme.forEach(function (h) {
+    const welle = 0.5 - 0.5 * Math.cos(2 * Math.PI * (t - h.versatz) / HALM_BOE);     // 0 … 1, weich
+    const winkel = (-1.5 + (h.ausschlag + 1.5) * welle) * grad;
+    const cos = Math.cos(winkel);
+    const sin = Math.sin(winkel);
+    c.beginPath();
+    c.moveTo(h.x, h.y);
+    c.quadraticCurveTo(h.x + h.qx * cos - h.qy * sin, h.y + h.qx * sin + h.qy * cos,
+      h.x + h.ex * cos - h.ey * sin, h.y + h.ex * sin + h.ey * cos);
+    c.strokeStyle = h.farbe;
+    c.lineWidth = h.breite;
+    c.stroke();
+  });
+}
+
+function szeneZeichnen(zeit) {
+  const t = zeit / 1000;
+  meerZeichnen(t);
+  halmeZeichnen(t);
+}
+
+function szeneSchleife(zeit) {
+  szeneAnim.schleife = 0;
+  if (!start.aktiv || el("startbildschirm").classList.contains("mit-fotos")) return;   // Fotos verdecken die Szene
+  if (zeit - szeneAnim.zuletzt >= 32) {
+    szeneAnim.zuletzt = zeit;
+    szeneZeichnen(zeit);
+  }
+  szeneAnim.schleife = requestAnimationFrame(szeneSchleife);
+}
+
+function szeneStarten() {
+  szeneZeichnen(performance.now());
+  const ruhig = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!ruhig && !szeneAnim.schleife) szeneAnim.schleife = requestAnimationFrame(szeneSchleife);
+}
+
+function szeneAnhalten() {
+  cancelAnimationFrame(szeneAnim.schleife);
+  szeneAnim.schleife = 0;
+}
+
+function startGroesseAnpassen() {
+  if (!start.aktiv) return;
+  szeneGroesseAnpassen();
+  windsackPlatzieren();
+}
+
+// Höhe der Dünenkante an der Stelle x (Koordinaten der Szene 1600 × 900)
+function duenenKante(x) {
+  const kurve = x < 1240 ? DUENE_RECHTS[0] : DUENE_RECHTS[1];
+  const punkt = function (t, i) {
+    const u = 1 - t;
+    return u * u * u * kurve[0][i] + 3 * u * u * t * kurve[1][i] + 3 * u * t * t * kurve[2][i] + t * t * t * kurve[3][i];
+  };
+  let a = 0;
+  let b = 1;
+  for (let i = 0; i < 30; i++) {                         // x(t) steigt stetig: Intervall halbieren
+    const m = (a + b) / 2;
+    if (punkt(m, 0) < x) a = m; else b = m;
+  }
+  return punkt((a + b) / 2, 1);
+}
+
+// Stellt den Windsack rechts neben bzw. etwas hinter das Faktenfenster, mit dem Fuß auf die Düne.
+// Die Szene wird mit "slice" skaliert, das Menü aber in Pixeln gesetzt. Deshalb wird die Lage
+// bei jeder Größenänderung neu berechnet.
+function windsackPlatzieren() {
+  if (!start.aktiv) return;
+  const ebene = el("startWindsack");
+  const m = szenenMassstab();
+  const b = m.b;
+  const k = m.k;
+  const dx = m.dx;
+  const dy = m.dy;
+  const rahmen = el("faktenFenster").getBoundingClientRect();
+  const nebenMenue = faktenSichtbar() && rahmen.width > 0 && rahmen.left > b / 2;
+  // Mast knapp rechts vom Fenster; reicht der Platz nicht, rückt er dahinter und nur der Sack schaut heraus.
+  // Steht das Faktenfenster unter dem Menü oder ist es ausgeblendet: rechts auf der Düne.
+  const sackRechts = (WINDSACK_BOX.breite + WINDSACK_BOX.x) * k;
+  const mastX = Math.min(nebenMenue ? rahmen.right + 12 * k : dx + 1380 * k, b - sackRechts - 12);
+  const fussY = dy + (duenenKante((mastX - dx) / k) + 6) * k;
+  ebene.style.left = (mastX + WINDSACK_BOX.x * k).toFixed(1) + "px";
+  ebene.style.top = (fussY - (WINDSACK_BOX.mast - WINDSACK_BOX.y) * k).toFixed(1) + "px";
+  ebene.style.width = (WINDSACK_BOX.breite * k).toFixed(1) + "px";
+  ebene.style.height = (WINDSACK_BOX.hoehe * k).toFixed(1) + "px";
+}
+
+// Rot-weißer Windsack an einem Mast. Der Wind weht von links, der Sack zeigt nach rechts.
+// Er besteht aus drei ineinander gesteckten Teilen, die leicht versetzt flattern.
+function windsackSvg(mastX, boden, oben) {
+  const zahl1 = function (x) { return x.toFixed(1); };
+  const holz = "#4E3B3B";
+  const oeffnungX = mastX + 34;                          // Mitte des Rings
+  const oeffnungY = oben + 34;
+  const laenge = 176;
+  const h0 = 31;                                         // halbe Höhe an der Öffnung
+  const mitte = function (t) { return oeffnungY + 12 * t * t; };            // Mittellinie hängt zur Spitze leicht durch
+  const halb = function (t) { return h0 * (1 - 0.52 * t); };
+  const xBei = function (t) { return oeffnungX + laenge * t; };
+  const grenzen = [0, 0.2, 0.4, 0.6, 0.8, 1];
+  const farben = ["#E0504D", "#FBE3E1", "#E0504D", "#FBE3E1", "#E0504D"];
+
+  const segment = function (i) {
+    const t1 = grenzen[i];
+    const t2 = grenzen[i + 1] + (i < 4 ? 0.006 : 0);      // minimal überlappen, damit keine Fugen entstehen
+    const tm = (t1 + t2) / 2;
+    const ausbeulung = 2.5;
+    let p = '<path d="M' + zahl1(xBei(t1)) + "," + zahl1(mitte(t1) - halb(t1)) +
+      " Q" + zahl1(xBei(tm)) + "," + zahl1(mitte(tm) - halb(tm) - ausbeulung) + " " + zahl1(xBei(t2)) + "," + zahl1(mitte(t2) - halb(t2)) +
+      " L" + zahl1(xBei(t2)) + "," + zahl1(mitte(t2) + halb(t2)) +
+      " Q" + zahl1(xBei(tm)) + "," + zahl1(mitte(tm) + halb(tm) + ausbeulung) + " " + zahl1(xBei(t1)) + "," + zahl1(mitte(t1) + halb(t1)) +
+      ' Z" fill="' + farben[i] + '"/>';
+    // Schatten an der Unterseite
+    p += '<path d="M' + zahl1(xBei(t1)) + "," + zahl1(mitte(t1) + halb(t1) * 0.35) +
+      " L" + zahl1(xBei(t2)) + "," + zahl1(mitte(t2) + halb(t2) * 0.35) +
+      " L" + zahl1(xBei(t2)) + "," + zahl1(mitte(t2) + halb(t2)) +
+      " Q" + zahl1(xBei(tm)) + "," + zahl1(mitte(tm) + halb(tm) + ausbeulung) + " " + zahl1(xBei(t1)) + "," + zahl1(mitte(t1) + halb(t1)) +
+      ' Z" fill="#6B1E1C" fill-opacity="0.16"/>';
+    // Glanzlicht auf den hinteren Segmenten
+    if (i >= 2) {
+      const a = t1 + (t2 - t1) * 0.25;
+      const b = t1 + (t2 - t1) * 0.7;
+      p += '<path d="M' + zahl1(xBei(a)) + "," + zahl1(mitte(a) + halb(a) * 0.12) + " L" + zahl1(xBei(b)) + "," +
+        zahl1(mitte(b) + halb(b) * 0.02) + '" stroke="#FFFFFF" stroke-opacity="' + (i % 2 ? 0.9 : 0.4) +
+        '" stroke-width="3" stroke-linecap="round"/>';
+    }
+    return p;
+  };
+
+  // Ein flatterndes Teil dreht sich um seinen Anfangspunkt
+  const teilAuf = function (t, verzoegerung, von, bis) {
+    return '<g class="windsack-teil" style="transform-origin:' + zahl1(xBei(t)) + "px " + zahl1(mitte(t)) + "px;animation-delay:" +
+      verzoegerung + "s;--von:" + von + "deg;--bis:" + bis + 'deg">';
+  };
+
+  let s = '<g class="windsack">';
+  // Mast
+  s += '<line x1="' + mastX + '" y1="' + boden + '" x2="' + mastX + '" y2="' + (oben + 4) +
+    '" stroke="' + holz + '" stroke-width="7" stroke-linecap="round"/>';
+  // Drei Streben vom Mast zum Ring
+  s += '<path d="M' + mastX + "," + oeffnungY + " L" + (oeffnungX + 2) + "," + (oeffnungY - h0 + 1) +
+    " M" + mastX + "," + oeffnungY + " L" + (oeffnungX + 6) + "," + oeffnungY +
+    " M" + mastX + "," + oeffnungY + " L" + (oeffnungX + 2) + "," + (oeffnungY + h0 - 1) +
+    '" fill="none" stroke="' + holz + '" stroke-width="3.5" stroke-linecap="round"/>';
+  // Sack: Öffnung mit zwei Segmenten, darin die Mitte, darin die Spitze
+  s += teilAuf(0, 0, -3, 2.5);
+  s += segment(0) + segment(1);
+  s += teilAuf(0.4, -0.25, -3.5, 4);
+  s += segment(2);
+  s += teilAuf(0.6, -0.5, -5, 6);
+  s += segment(3) + segment(4);
+  s += "</g></g>";
+  // Ring an der Öffnung
+  s += '<ellipse cx="' + oeffnungX + '" cy="' + oeffnungY + '" rx="6.5" ry="' + h0 + '" fill="#A93A37"/>';
+  s += "</g></g>";
   return s;
 }
 
@@ -5173,12 +5551,12 @@ function oberflaecheVerbinden() {
 const BENOETIGTE_ELEMENTE = ["anzeigeWissen", "auswahlUebersicht", "popupInfo", "infoOk", "popupQuiz",
   "quizWeiter", "popupZwischenbilanz", "zbWeiter", "massnahmenListe", "personen", "muellInfoKnopf",
   "popupMuell", "muellInhalt", "muellSchliessen", "entscheidungen", "startSzene", "startBilder", "faktenFenster",
-  "faktKarte", "faktFortschritt", "startFaktenUmschalten", "startVollbild", "popupQuellen", "popupUeber", "bildNachweis", "ueberBewertung", "startSonne",
+  "faktKarte", "faktFortschritt", "startFaktenUmschalten", "startVollbild", "popupQuellen", "popupUeber", "bildNachweis", "ueberBewertung", "startSonne", "startWolken", "startMeer", "startWindsack", "startHalme",
   "saeulenListe", "saeulenHinweis", "zielZusatz"];
 
 function versionPruefen() {
   const fehlend = BENOETIGTE_ELEMENTE.filter(function (id) { return !document.getElementById(id); });
-  const cssNeu = getComputedStyle(document.documentElement).getPropertyValue("--layout-version").trim() === "8";
+  const cssNeu = getComputedStyle(document.documentElement).getPropertyValue("--layout-version").trim() === "9";
   if (!fehlend.length && cssNeu) return true;
   const hinweis = document.createElement("div");
   hinweis.setAttribute("role", "alert");
