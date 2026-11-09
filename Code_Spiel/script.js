@@ -1359,9 +1359,29 @@ const HINTERGRUNDBILDER = [
   { datei: "bilder/start-4.jpg", nachweis: "" }
 ];
 
-const START_FAKT_DAUER = 12000;   // ms, so lange steht ein Fakt im Faktenfenster
 const START_BILD_DAUER = 16000;   // ms, so lange steht ein Hintergrundbild
-const START_VERSION = "Version 9";
+const START_VERSION = "Version 10";
+
+// Ladebildschirm nach Namenseingabe und Spielstart (siehe Abschnitt „Ladebildschirm“ unten).
+// Der Balken ist in faktenProLadung gleich große Abschnitte geteilt (bei 3: 0–33 %, 33–66 %, 66–100 %).
+// Wie lange ein Abschnitt braucht, hängt von der Länge des Fakts ab:
+//   Dauer = max(minDauer, Zeichen / zeichenProSekunde)
+// Kurze Fakten füllen ihren Abschnitt also schnell, lange langsamer.
+const LADEBILDSCHIRM = {
+  faktenProLadung: 3,
+  zeichenProSekunde: 22,   // Lesetempo (CPS), entspricht etwa 200 Wörtern pro Minute
+  minDauer: 3000,          // ms, Untergrenze für sehr kurze Fakten
+  sprungDauer: 150,        // ms, Ease-out-Sprung ans Abschnittsende beim Überspringen
+  abschlussPause: 450,     // ms, so lange steht „100 %“, bevor das Spiel beginnt
+  maxSchritt: 100          // ms, größter Zeitschritt pro Bild: ist der Tab versteckt, ruht der Balken
+};
+
+// Statuszeile unter dem Balken, eine pro Abschnitt
+const LADE_STATUS = [
+  "Küstenabschnitt wird vermessen …",
+  "Müllfunde werden gezählt …",
+  "Region wird übergeben …"
+];
 
 // Kurze Zusatzzeile neben dem Titel; bei jedem Öffnen des Startbildschirms eine andere
 const START_SPLASH = [
@@ -1382,7 +1402,7 @@ const FAKT_KATEGORIEN = {
   weltmeer:   { name: "Weltmeer",     farbe: "#A9D3EE" }
 };
 
-// Fakten für das Faktenfenster. Jeder Fakt hat eine überprüfbare Quelle.
+// Fakten für den Ladebildschirm. Jeder Fakt hat eine überprüfbare Quelle.
 const MEERESFAKTEN = [
   {
     id: "schweinswal-ostsee", kategorie: "bedroht", titel: "Der letzte Wal vor der Haustür",
@@ -4551,14 +4571,13 @@ function zumStartbildschirm() {
   startbildschirmZeigen();
 }
 
-// ---------- Startbildschirm: Hintergrund, Faktenfenster, Splash ----------
-// Aufbau wie ein Spiele-Hauptmenü: Titel oben, Knöpfe in der Mitte, Faktenfenster rechts.
+// ---------- Startbildschirm: Hintergrund, Splash ----------
+// Aufbau wie ein Spiele-Hauptmenü: Titel oben, Knöpfe in der Mitte.
+// Die Meeresfakten erscheinen im Ladebildschirm (siehe unten).
 const start = {
   aktiv: false,
-  fakten: [], faktIndex: 0, faktTimer: null, pausiert: false, angehalten: false,
   bilder: [], bildIndex: -1, bildTimer: null
 };
-const START_FAKTEN_SCHLUESSEL = "oceanBalanceFaktenSichtbar";
 
 function startbildschirmVorbereiten() {
   const szene = kuestenSzene();
@@ -4569,27 +4588,11 @@ function startbildschirmVorbereiten() {
   window.addEventListener("resize", startGroesseAnpassen);
   el("startSonne").innerHTML = sonneSvg();
   el("startVersion").textContent = "Ocean Balance · " + START_VERSION;
-  start.fakten = MEERESFAKTEN.slice();
-  mischen(start.fakten, Math.random);
-
-  // Fakten halten an, solange die Maus darauf liegt oder ein Knopf darin den Fokus hat
-  const fenster = el("faktenFenster");
-  const anhalten = function () { start.angehalten = true; faktTimerStarten(); };
-  const weiter = function () {
-    if (fenster.matches(":hover") || fenster.contains(document.activeElement)) return;
-    start.angehalten = false;
-    faktTimerStarten();
-  };
-  fenster.addEventListener("mouseenter", anhalten);
-  fenster.addEventListener("mouseleave", weiter);
-  fenster.addEventListener("focusin", anhalten);
-  fenster.addEventListener("focusout", function () { setTimeout(weiter, 0); });
 
   if (!document.fullscreenEnabled) el("startVollbild").classList.add("versteckt");
   document.addEventListener("fullscreenchange", vollbildKnopfAktualisieren);
   vollbildKnopfAktualisieren();
 
-  faktenSichtbarSetzen(gespeicherteSichtbarkeit());
   bilderLaden();
 }
 
@@ -4597,7 +4600,6 @@ function startbildschirmZeigen() {
   el("startbildschirm").classList.remove("versteckt");
   start.aktiv = true;
   el("startSplash").textContent = START_SPLASH[Math.floor(Math.random() * START_SPLASH.length)];
-  faktZeigen(start.faktIndex);
   bildTimerStarten();
   startGroesseAnpassen();
   szeneStarten();
@@ -4607,90 +4609,225 @@ function startbildschirmZeigen() {
 function startbildschirmVerbergen() {
   el("startbildschirm").classList.add("versteckt");
   start.aktiv = false;
-  clearTimeout(start.faktTimer);
   clearTimeout(start.bildTimer);
   szeneAnhalten();
 }
 
-// ---------- Faktenfenster ----------
-function faktZeigen(index) {
-  const n = start.fakten.length;
-  start.faktIndex = (index + n) % n;
-  const f = start.fakten[start.faktIndex];
+// ---------- Ladebildschirm ----------
+// Ablauf: Name bestätigen → ladebildschirmStarten() → 3 Fakten nacheinander, der Balken füllt
+// je Fakt einen gleich großen Abschnitt → bei 100 % startet das Spiel (Einführung).
+//
+// Datenstruktur eines Abschnitts (ladeSegmenteBerechnen):
+//   { fakt, von: 0, bis: 1/3, dauer: ms }   von/bis als Anteil 0…1 des ganzen Balkens
+//
+// Zustand während des Ladens (lade):
+//   segmente     die Abschnitte dieser Ladung
+//   index        aktueller Abschnitt
+//   verstrichen  ms, die der aktuelle Abschnitt schon läuft
+//   fortschritt  Füllstand des Balkens (0…1), wird jedes Bild neu gezeichnet
+//   sprung       null oder { von, bis, verstrichen }: läuft gerade ein Überspringen?
+//   stapel       gemischte Fakten; gezogen wird von oben, leer → neu mischen.
+//                So wiederholt sich kein Fakt, bevor alle einmal dran waren.
+const lade = {
+  aktiv: false, abgeschlossen: false,
+  segmente: [], index: 0, verstrichen: 0, fortschritt: 0, sprung: null,
+  zuletzt: 0, schleife: 0, abschlussTimer: null, prozent: -1,
+  stapel: [], fertig: null
+};
+
+// Lesedauer eines Fakts in ms: Dauer = max(Min_Time, Textlänge / CPS).
+// Gezählt werden Titel und Text, denn beides wird gelesen.
+function faktLesedauer(fakt, einstellung) {
+  const e = einstellung || LADEBILDSCHIRM;
+  const zeichen = (fakt.titel + " " + fakt.text).length;
+  return Math.max(e.minDauer, zeichen / e.zeichenProSekunde * 1000);
+}
+
+// Teilt den Balken in gleich große Abschnitte, einen pro Fakt.
+// Die Breite ist immer gleich, nur die Dauer hängt vom Text ab.
+function ladeSegmenteBerechnen(fakten, einstellung) {
+  const breite = 1 / fakten.length;
+  return fakten.map(function (fakt, i) {
+    return {
+      fakt: fakt,
+      von: i * breite,
+      bis: i === fakten.length - 1 ? 1 : (i + 1) * breite,   // letzter Abschnitt endet exakt bei 100 %
+      dauer: faktLesedauer(fakt, einstellung)
+    };
+  });
+}
+
+// Füllstand zu einem Zeitpunkt im Abschnitt: linear von "von" bis "bis"
+function segmentFortschritt(segment, verstrichen) {
+  const anteil = Math.min(1, Math.max(0, verstrichen / segment.dauer));
+  return segment.von + (segment.bis - segment.von) * anteil;
+}
+
+// Ease-out (kubisch): schneller Start, weiches Abbremsen am Ziel
+function easeOutKubisch(t) {
+  return 1 - Math.pow(1 - t, 3);
+}
+
+// Zieht verschiedene Fakten vom gemischten Stapel
+function faktenZiehen(anzahl, zufall) {
+  const n = Math.min(anzahl, MEERESFAKTEN.length);
+  const gezogen = [];
+  while (gezogen.length < n) {
+    if (!lade.stapel.length) {
+      lade.stapel = MEERESFAKTEN.slice();
+      mischen(lade.stapel, zufall || Math.random);
+    }
+    const fakt = lade.stapel.pop();
+    if (gezogen.indexOf(fakt) === -1) gezogen.push(fakt);
+  }
+  return gezogen;
+}
+
+// Öffnet den Ladebildschirm. fertig() läuft einmal, sobald der Balken 100 % erreicht hat.
+function ladebildschirmStarten(fertig) {
+  cancelAnimationFrame(lade.schleife);
+  clearTimeout(lade.abschlussTimer);
+  lade.segmente = ladeSegmenteBerechnen(faktenZiehen(LADEBILDSCHIRM.faktenProLadung));
+  lade.index = 0;
+  lade.verstrichen = 0;
+  lade.fortschritt = 0;
+  lade.sprung = null;
+  lade.prozent = -1;
+  lade.fertig = fertig;
+  lade.abgeschlossen = false;
+  lade.aktiv = true;
+
+  ladeMarkenSetzen(lade.segmente.length);
+  el("startbildschirm").classList.add("laedt");          // Menü ausblenden, Hintergrund läuft weiter
+  el("ladebildschirm").classList.remove("versteckt");
+  ladeFaktZeigen(0);
+  ladeBalkenZeichnen();
+  el("ladeWeiter").focus();
+
+  lade.zuletzt = performance.now();
+  lade.schleife = requestAnimationFrame(ladeSchleife);
+}
+
+// Trennstriche zwischen den Abschnitten
+function ladeMarkenSetzen(anzahl) {
+  let html = "";
+  for (let i = 1; i < anzahl; i++) {
+    html += '<span class="lade-marke" style="left: ' + (i / anzahl * 100).toFixed(3) + '%"></span>';
+  }
+  el("ladeMarken").innerHTML = html;
+}
+
+function ladeFaktZeigen(index) {
+  const f = lade.segmente[index].fakt;
   const kat = FAKT_KATEGORIEN[f.kategorie];
-  const karte = el("faktKarte");
+  const karte = el("ladeKarte");
   karte.classList.remove("fakt-ein");
   void karte.offsetWidth;                          // Einblendung neu starten
-  const chip = el("faktKategorie");
+  const chip = el("ladeKategorie");
   chip.textContent = kat.name;
   chip.style.setProperty("--kat", kat.farbe);
-  el("faktTitel").textContent = f.titel;
-  el("faktText").textContent = f.text;
-  const quelle = el("faktQuelle");
+  el("ladeTitel").textContent = f.titel;
+  el("ladeText").textContent = f.text;
+  const quelle = el("ladeQuelle");
   quelle.textContent = f.quelle.name;
   quelle.href = f.quelle.url;
-  el("faktNummer").textContent = (start.faktIndex + 1) + " / " + n;
+  el("ladeNummer").textContent = (index + 1) + " / " + lade.segmente.length;
+  el("ladeStatus").textContent = LADE_STATUS[index % LADE_STATUS.length];
   karte.classList.add("fakt-ein");
-  faktTimerStarten();
 }
 
-function faktenSichtbar() {
-  return !el("startbildschirm").classList.contains("ohne-fakten");
+// Eine Runde pro Bild: Zeit fortschreiben, Füllstand berechnen, zeichnen
+function ladeSchleife(zeit) {
+  if (!lade.aktiv || lade.abgeschlossen) return;
+  // Zeitschritt begrenzen: Nach einem versteckten Tab springt der Balken nicht nach vorn
+  const dt = Math.min(Math.max(0, zeit - lade.zuletzt), LADEBILDSCHIRM.maxSchritt);
+  lade.zuletzt = zeit;
+  const segment = lade.segmente[lade.index];
+
+  if (lade.sprung) {
+    // Überspringen: Ease-out vom aktuellen Stand bis zum Ende des Abschnitts
+    lade.sprung.verstrichen += dt;
+    const t = Math.min(1, lade.sprung.verstrichen / LADEBILDSCHIRM.sprungDauer);
+    lade.fortschritt = lade.sprung.von + (lade.sprung.bis - lade.sprung.von) * easeOutKubisch(t);
+    if (t >= 1) {
+      lade.sprung = null;
+      ladeSegmentBeenden();
+    }
+  } else {
+    lade.verstrichen += dt;
+    lade.fortschritt = segmentFortschritt(segment, lade.verstrichen);
+    if (lade.verstrichen >= segment.dauer) ladeSegmentBeenden();
+  }
+
+  ladeBalkenZeichnen();
+  if (lade.aktiv && !lade.abgeschlossen) lade.schleife = requestAnimationFrame(ladeSchleife);
 }
 
-// Startet den Countdown bis zum nächsten Fakt; der Balken zeigt die Restzeit
-function faktTimerStarten() {
-  clearTimeout(start.faktTimer);
-  const balken = el("faktFortschritt");
-  if (!start.aktiv || !faktenSichtbar()) return;
-  if (start.pausiert || start.angehalten) {
-    balken.style.animationPlayState = "paused";
+// Abschnitt ist voll: nächsten Fakt sofort starten oder Laden abschließen
+function ladeSegmentBeenden() {
+  const segment = lade.segmente[lade.index];
+  lade.fortschritt = segment.bis;
+  if (lade.index < lade.segmente.length - 1) {
+    lade.index += 1;
+    lade.verstrichen = 0;
+    ladeFaktZeigen(lade.index);
     return;
   }
-  balken.style.animation = "none";
-  void balken.offsetWidth;
-  balken.style.animation = "fakt-lauf " + START_FAKT_DAUER + "ms linear forwards";
-  start.faktTimer = setTimeout(function () { faktZeigen(start.faktIndex + 1); }, START_FAKT_DAUER);
+  lade.abgeschlossen = true;
+  el("ladeStatus").textContent = "Bereit!";
+  el("ladeWeiter").disabled = true;
+  lade.abschlussTimer = setTimeout(ladebildschirmBeenden, LADEBILDSCHIRM.abschlussPause);
 }
 
-function faktPauseUmschalten() {
-  start.pausiert = !start.pausiert;
-  const knopf = el("faktPause");
-  knopf.setAttribute("aria-pressed", start.pausiert ? "true" : "false");
-  knopf.setAttribute("aria-label", start.pausiert ? "Automatischen Wechsel fortsetzen" : "Automatischen Wechsel anhalten");
-  knopf.classList.toggle("pausiert", start.pausiert);
-  if (start.pausiert) {
-    faktTimerStarten();
-  } else {
-    faktZeigen(start.faktIndex);                    // Restzeit beginnt neu
-  }
+function ladeBalkenZeichnen() {
+  el("ladeFuellung").style.transform = "scaleX(" + lade.fortschritt.toFixed(4) + ")";
+  const prozent = Math.round(lade.fortschritt * 100);
+  if (prozent === lade.prozent) return;                 // Text und ARIA nur bei Änderung
+  lade.prozent = prozent;
+  el("ladeProzent").textContent = prozent + " %";
+  el("ladeBalken").setAttribute("aria-valuenow", String(prozent));
 }
 
-function gespeicherteSichtbarkeit() {
-  try {
-    return localStorage.getItem(START_FAKTEN_SCHLUESSEL) !== "nein";
-  } catch (fehler) {
-    return true;
-  }
+// Aktuellen Fakt überspringen: Balken springt weich ans Abschnittsende, dann folgt sofort der nächste.
+// Während eines Sprungs zählt ein weiterer Klick nicht, damit kein Fakt ungewollt verloren geht.
+function ladeUeberspringen() {
+  if (!lade.aktiv || lade.abgeschlossen || lade.sprung) return;
+  const segment = lade.segmente[lade.index];
+  lade.sprung = { von: lade.fortschritt, bis: segment.bis, verstrichen: 0 };
 }
 
-function faktenSichtbarSetzen(sichtbar) {
-  el("startbildschirm").classList.toggle("ohne-fakten", !sichtbar);
-  const knopf = el("startFaktenUmschalten");
-  knopf.setAttribute("aria-pressed", sichtbar ? "true" : "false");
-  knopf.setAttribute("aria-label", sichtbar ? "Faktenfenster ausblenden" : "Faktenfenster einblenden");
-  knopf.title = sichtbar ? "Faktenfenster ausblenden" : "Faktenfenster einblenden";
-  try {
-    localStorage.setItem(START_FAKTEN_SCHLUESSEL, sichtbar ? "ja" : "nein");
-  } catch (fehler) {
-    // Speichern nicht möglich: Einstellung gilt nur bis zum Neuladen
-  }
-  if (sichtbar) {
-    faktTimerStarten();
-  } else {
-    clearTimeout(start.faktTimer);
-  }
-  windsackPlatzieren();
+function ladebildschirmBeenden() {
+  cancelAnimationFrame(lade.schleife);
+  clearTimeout(lade.abschlussTimer);
+  lade.aktiv = false;
+  el("ladebildschirm").classList.add("versteckt");
+  el("startbildschirm").classList.remove("laedt");
+  el("ladeWeiter").disabled = false;
+  const fertig = lade.fertig;
+  lade.fertig = null;
+  if (fertig) fertig();
+}
+
+// Klick irgendwo auf den Ladebildschirm (auch auf „Weiter“) überspringt den Fakt.
+// Ausnahmen: der Quellenlink soll sich einfach öffnen, und wer Text markiert, will nicht weiter.
+function ladeKlick(ereignis) {
+  if (ereignis.target.closest && ereignis.target.closest("a")) return;
+  if (window.getSelection && String(window.getSelection()) !== "") return;
+  ladeUeberspringen();
+}
+
+// Leertaste, Enter oder Pfeil rechts überspringen den Fakt.
+// Liegt der Fokus auf einem Knopf oder Link, löst der Browser bei Leertaste/Enter selbst einen
+// Klick aus; dann hier nichts tun, sonst würde doppelt übersprungen.
+// defaultPrevented: Das Enter aus der Namenseingabe startet das Laden und darf nicht gleich überspringen.
+function ladeTaste(ereignis) {
+  if (!lade.aktiv || ereignis.defaultPrevented || ereignis.repeat) return;
+  const taste = ereignis.key;
+  if (taste !== " " && taste !== "Enter" && taste !== "ArrowRight") return;
+  const ziel = ereignis.target;
+  if (taste !== "ArrowRight" && ziel.closest && ziel.closest("button, a")) return;
+  ereignis.preventDefault();
+  ladeUeberspringen();
 }
 
 // ---------- Hintergrundbilder ----------
@@ -4755,7 +4892,7 @@ function vollbildKnopfAktualisieren() {
 
 // ---------- Pop-up: Quellen ----------
 function quellenZeigen() {
-  let html = "<h3>Fakten im Startbildschirm</h3><ol class=\"quellen-liste\">";
+  let html = "<h3>Fakten im Ladebildschirm</h3><ol class=\"quellen-liste\">";
   MEERESFAKTEN.forEach(function (f) {
     html += "<li><strong>" + escapeHtml(f.titel) + "</strong><br>" +
       '<a href="' + escapeHtml(f.quelle.url) + '" target="_blank" rel="noopener noreferrer">' +
@@ -4836,7 +4973,7 @@ const START_VOEGEL = [
 ];
 
 // Windsack: eigenes kleines SVG (Mast bei x = 0, Mastspitze bei y = 0, Fuß bei y = 252).
-// Steht rechts etwas hinter dem Faktenfenster auf der Düne, siehe windsackPlatzieren().
+// Steht rechts auf der Düne, siehe windsackPlatzieren().
 const WINDSACK_BOX = { x: -8, y: -6, breite: 232, hoehe: 264, mast: 252 };
 
 // Oberkante der rechten Düne (zwei Bézierkurven aus der Szene)
@@ -5187,7 +5324,7 @@ function duenenKante(x) {
   return punkt((a + b) / 2, 1);
 }
 
-// Stellt den Windsack rechts neben bzw. etwas hinter das Faktenfenster, mit dem Fuß auf die Düne.
+// Stellt den Windsack rechts auf die Düne, mit dem Fuß auf der Dünenkante.
 // Die Szene wird mit "slice" skaliert, das Menü aber in Pixeln gesetzt. Deshalb wird die Lage
 // bei jeder Größenänderung neu berechnet.
 function windsackPlatzieren() {
@@ -5198,12 +5335,9 @@ function windsackPlatzieren() {
   const k = m.k;
   const dx = m.dx;
   const dy = m.dy;
-  const rahmen = el("faktenFenster").getBoundingClientRect();
-  const nebenMenue = faktenSichtbar() && rahmen.width > 0 && rahmen.left > b / 2;
-  // Mast knapp rechts vom Fenster; reicht der Platz nicht, rückt er dahinter und nur der Sack schaut heraus.
-  // Steht das Faktenfenster unter dem Menü oder ist es ausgeblendet: rechts auf der Düne.
+  // Mast rechts auf der Düne; bei schmalem Fenster so weit nach links, dass der Sack ganz zu sehen ist
   const sackRechts = (WINDSACK_BOX.breite + WINDSACK_BOX.x) * k;
-  const mastX = Math.min(nebenMenue ? rahmen.right + 12 * k : dx + 1380 * k, b - sackRechts - 12);
+  const mastX = Math.min(dx + 1380 * k, b - sackRechts - 12);
   const fussY = dy + (duenenKante((mastX - dx) / k) + 6) * k;
   ebene.style.left = (mastX + WINDSACK_BOX.x * k).toFixed(1) + "px";
   ebene.style.top = (fussY - (WINDSACK_BOX.mast - WINDSACK_BOX.y) * k).toFixed(1) + "px";
@@ -5297,7 +5431,7 @@ function nameBestaetigen() {
     return;
   }
   popupSchliessen("popupName");
-  neuesSpielStarten(name);
+  ladebildschirmStarten(function () { neuesSpielStarten(name); });
 }
 
 // ==========================================================
@@ -5519,11 +5653,7 @@ function oberflaecheVerbinden() {
     auswertungStart: zumStartbildschirm,
     startUeber: spielinfoZeigen,
     startQuellen: quellenZeigen,
-    startVollbild: vollbildUmschalten,
-    startFaktenUmschalten: function () { faktenSichtbarSetzen(!faktenSichtbar()); },
-    faktZurueck: function () { faktZeigen(start.faktIndex - 1); },
-    faktWeiter: function () { faktZeigen(start.faktIndex + 1); },
-    faktPause: faktPauseUmschalten
+    startVollbild: vollbildUmschalten
   };
   // Knopf → Pop-up, das er nur schließt
   const schliessen = {
@@ -5544,19 +5674,23 @@ function oberflaecheVerbinden() {
     ereignis.preventDefault();
     if (!ereignis.repeat) nameBestaetigen();
   });
+
+  // Ladebildschirm: Klick oder Taste überspringt den aktuellen Fakt
+  el("ladebildschirm").addEventListener("click", ladeKlick);
+  document.addEventListener("keydown", ladeTaste);
 }
 
 // Prüft, ob index.html und style.css zur Version dieses Skripts passen.
 // Passt etwas nicht (z. B. alte Datei oder Browser-Cache), erscheint ein Hinweis statt einer kaputten Seite.
 const BENOETIGTE_ELEMENTE = ["anzeigeWissen", "auswahlUebersicht", "popupInfo", "infoOk", "popupQuiz",
   "quizWeiter", "popupZwischenbilanz", "zbWeiter", "massnahmenListe", "personen", "muellInfoKnopf",
-  "popupMuell", "muellInhalt", "muellSchliessen", "entscheidungen", "startSzene", "startBilder", "faktenFenster",
-  "faktKarte", "faktFortschritt", "startFaktenUmschalten", "startVollbild", "popupQuellen", "popupUeber", "bildNachweis", "ueberBewertung", "startSonne", "startWolken", "startMeer", "startWindsack", "startHalme",
+  "popupMuell", "muellInhalt", "muellSchliessen", "entscheidungen", "startSzene", "startBilder", "ladebildschirm",
+  "ladeKarte", "ladeFuellung", "ladeBalken", "ladeMarken", "ladeWeiter", "startVollbild", "popupQuellen", "popupUeber", "bildNachweis", "ueberBewertung", "startSonne", "startWolken", "startMeer", "startWindsack", "startHalme",
   "saeulenListe", "saeulenHinweis", "zielZusatz"];
 
 function versionPruefen() {
   const fehlend = BENOETIGTE_ELEMENTE.filter(function (id) { return !document.getElementById(id); });
-  const cssNeu = getComputedStyle(document.documentElement).getPropertyValue("--layout-version").trim() === "9";
+  const cssNeu = getComputedStyle(document.documentElement).getPropertyValue("--layout-version").trim() === "10";
   if (!fehlend.length && cssNeu) return true;
   const hinweis = document.createElement("div");
   hinweis.setAttribute("role", "alert");
@@ -5589,7 +5723,10 @@ if (typeof module !== "undefined" && module.exports) {
     MASSNAHMEN: MASSNAHMEN, RUNDEN: RUNDEN, SAEULEN: SAEULEN, ZURUECKSTELLEN: ZURUECKSTELLEN,
     angebot: angebot, kostenBerechnen: kostenBerechnen, quizFuerRunde: quizFuerRunde,
     abschlussFragen: abschlussFragen, quizAntwortWerten: quizAntwortWerten, FRAGEN: FRAGEN, INFOPUNKTE: INFOPUNKTE,
-    istUmgesetzt: istUmgesetzt, einnahmenBerechnen: einnahmenBerechnen
+    istUmgesetzt: istUmgesetzt, einnahmenBerechnen: einnahmenBerechnen,
+    MEERESFAKTEN: MEERESFAKTEN, LADEBILDSCHIRM: LADEBILDSCHIRM, faktLesedauer: faktLesedauer,
+    ladeSegmenteBerechnen: ladeSegmenteBerechnen, segmentFortschritt: segmentFortschritt,
+    easeOutKubisch: easeOutKubisch, faktenZiehen: faktenZiehen
   };
 
 }

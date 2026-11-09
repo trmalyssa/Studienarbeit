@@ -135,14 +135,15 @@
   </main>
 
   <!-- ===== Startbildschirm ===== -->
-  <!-- Aufbau wie ein Spiele-Hauptmenü: Titel oben, Knöpfe in der Mitte, Faktenfenster rechts.
+  <!-- Aufbau wie ein Spiele-Hauptmenü: Titel oben, Knöpfe in der Mitte.
+       Die Meeresfakten stehen im Ladebildschirm (nach Namenseingabe und Spielstart).
        Hintergrund: Fotos aus dem Ordner "bilder" (siehe HINTERGRUNDBILDER in script.js),
        darunter eine gezeichnete Küstenszene als Ersatz. -->
   <div id="startbildschirm">
     <div class="start-hintergrund" aria-hidden="true">
       <div id="startSzene" class="start-szene"></div>
       <!-- Bewegter Hintergrund: Wolkenband (zieht nach rechts), Glitzern, Brandung und Möwen (Canvas),
-           Windsack (vom Skript neben das Faktenfenster gestellt), Strandhafer im Wind (Canvas) -->
+           Windsack (vom Skript rechts auf die Düne gestellt), Strandhafer im Wind (Canvas) -->
       <div class="start-wolken"><div id="startWolken" class="wolken-band"></div></div>
       <canvas id="startMeer" class="start-leinwand"></canvas>
       <div id="startWindsack" class="start-windsack"></div>
@@ -180,41 +181,9 @@
             </svg>
           </button>
           <button id="startUeber" class="menue-knopf" type="button">Spielinfo</button>
-          <button id="startFaktenUmschalten" class="menue-knopf menue-icon" type="button" aria-pressed="true" aria-label="Faktenfenster ausblenden">
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
-              <path d="M14 4.5v15" stroke="currentColor" stroke-width="1.8"/>
-              <path class="icon-fuellung" d="M14 4.5h4a2.5 2.5 0 0 1 2.5 2.5v10a2.5 2.5 0 0 1-2.5 2.5h-4z" fill="currentColor"/>
-            </svg>
-          </button>
         </div>
       </nav>
 
-      <aside id="faktenFenster" class="fakten-fenster" aria-labelledby="faktenLabel">
-        <div class="fakten-kopf">
-          <p id="faktenLabel" class="fakten-label">Wusstest du?</p>
-          <span id="faktNummer" class="fakt-nummer"></span>
-        </div>
-        <div id="faktKarte" class="fakt-karte">
-          <span id="faktKategorie" class="fakt-kategorie"></span>
-          <h2 id="faktTitel" class="fakt-titel"></h2>
-          <p id="faktText" class="fakt-text"></p>
-          <p class="fakt-quelle">Quelle: <a id="faktQuelle" href="#" target="_blank" rel="noopener noreferrer"></a></p>
-        </div>
-        <div class="fakt-leiste" aria-hidden="true"><span id="faktFortschritt"></span></div>
-        <div class="fakten-steuerung">
-          <button id="faktZurueck" class="fakt-knopf" type="button" aria-label="Vorheriger Fakt">
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-          <button id="faktPause" class="fakt-knopf" type="button" aria-pressed="false" aria-label="Automatischen Wechsel anhalten">
-            <svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 6v12M15 6v12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
-            <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg>
-          </button>
-          <button id="faktWeiter" class="fakt-knopf" type="button" aria-label="Nächster Fakt">
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-        </div>
-      </aside>
     </div>
 
     <footer class="start-fuss">
@@ -224,6 +193,49 @@
         <button id="startQuellen" class="fuss-knopf" type="button">Quellen</button>
       </div>
     </footer>
+  </div>
+
+  <!-- ===== Ladebildschirm ===== -->
+  <!-- Erscheint nach Namenseingabe und Spielstart über dem bewegten Hintergrund des Startbildschirms.
+       Pro Ladevorgang 3 zufällige Meeresfakten (MEERESFAKTEN in script.js). Der Ladebalken hat 3 gleich
+       große Abschnitte; wie lange ein Abschnitt braucht, hängt von der Textlänge des Fakts ab.
+       Klick, Leertaste, Enter oder Pfeil rechts überspringen den aktuellen Fakt. -->
+  <div id="ladebildschirm" class="versteckt" role="region" aria-label="Spiel wird geladen">
+    <div class="lade-inhalt">
+      <div class="lade-fenster">
+        <div class="fakten-kopf">
+          <p class="fakten-label">Wusstest du?</p>
+          <span id="ladeNummer" class="fakt-nummer"></span>
+        </div>
+        <div id="ladeKarte" class="fakt-karte lade-karte" aria-live="polite">
+          <span id="ladeKategorie" class="fakt-kategorie"></span>
+          <h2 id="ladeTitel" class="fakt-titel"></h2>
+          <p id="ladeText" class="fakt-text"></p>
+          <p class="fakt-quelle">Quelle: <a id="ladeQuelle" href="#" target="_blank" rel="noopener noreferrer"></a></p>
+        </div>
+      </div>
+
+      <div class="lade-balken-bereich">
+        <div id="ladeBalken" class="lade-balken" role="progressbar" aria-label="Ladefortschritt"
+             aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <span id="ladeFuellung" class="lade-fuellung"></span>
+          <!-- Trennstriche zwischen den Abschnitten setzt das Skript (ladeMarkenSetzen) -->
+          <span id="ladeMarken" class="lade-marken"></span>
+        </div>
+        <div class="lade-zeile">
+          <span id="ladeStatus" class="lade-status"></span>
+          <span id="ladeProzent" class="lade-prozent">0 %</span>
+        </div>
+      </div>
+
+      <div class="lade-steuerung">
+        <button id="ladeWeiter" class="lade-weiter" type="button" aria-label="Fakt überspringen">
+          <span>Weiter</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <p class="lade-hinweis">Klick, Leertaste oder Enter überspringt den Fakt</p>
+      </div>
+    </div>
   </div>
 
   <!-- ===== Pop-up: Über das Spiel ===== -->

@@ -4,7 +4,7 @@
 
 /* ===== Grundwerte (zentral änderbar) ===== */
 :root {
-  --layout-version: 9;       /* script.js prüft diesen Wert, damit HTML, CSS und JS zusammenpassen */
+  --layout-version: 10;       /* script.js prüft diesen Wert, damit HTML, CSS und JS zusammenpassen */
   --tinte: #12304A;          /* Linien und Text wie auf einer Seekarte */
   --tinte-2: #3E5A70;        /* zweitrangiger Text */
   --tinte-3: #687F91;        /* Hinweise */
@@ -1195,7 +1195,8 @@ button {
 }
 
 /* ===== Startbildschirm ===== */
-/* Aufbau wie ein Spiele-Hauptmenü: Titel oben, Knopfstapel in der Mitte, Faktenfenster rechts.
+/* Aufbau wie ein Spiele-Hauptmenü: Titel oben, Knopfstapel in der Mitte.
+   Die Meeresfakten stehen im Ladebildschirm (siehe „Ladebildschirm“ weiter unten).
    Hintergrund: Foto mit langsamem Zoom, darüber eine Abdunklung, damit nichts vom Menü ablenkt. */
 #startbildschirm {
   --start-glas: rgba(9, 28, 45, 0.58);
@@ -1204,7 +1205,6 @@ button {
   --start-text-2: rgba(255, 255, 255, 0.82);
   --start-text-3: rgba(255, 255, 255, 0.62);
   --start-menue-breite: 420px;
-  --start-fakten-breite: 360px;
   position: fixed;
   inset: 0;
   z-index: 500;              /* über Spiel und Kopfleiste, unter den Pop-ups */
@@ -1328,7 +1328,7 @@ button {
       rgba(6, 22, 36, 0.32) 62%, rgba(6, 22, 36, 0.82) 100%);
 }
 
-/* --- Raster: Titel über alles, darunter Menü (Mitte) und Faktenfenster (rechts) --- */
+/* --- Raster: Titel über alles, darunter das Menü in der Mitte --- */
 .start-raster {
   position: relative;
   flex: 1 0 auto;
@@ -1482,10 +1482,10 @@ button {
   border-color: rgba(255, 255, 255, 0.28);
 }
 
-/* untere Zeile: Vollbild | Spielinfo | Faktenfenster */
+/* untere Zeile: Vollbild | Spielinfo */
 .menue-zeile {
   display: grid;
-  grid-template-columns: 54px minmax(0, 1fr) 54px;
+  grid-template-columns: 54px minmax(0, 1fr);
   gap: 12px;
 }
 
@@ -1502,33 +1502,173 @@ button {
   height: 22px;
 }
 
-/* Symbol Faktenfenster: rechte Hälfte gefüllt = eingeblendet */
-#startFaktenUmschalten[aria-pressed="false"] .icon-fuellung { opacity: 0; }
-
 #startVollbild .icon-zu,
 #startVollbild.ist-vollbild .icon-auf { display: none; }
 #startVollbild.ist-vollbild .icon-zu { display: block; }
 
-/* --- Faktenfenster --- */
-.fakten-fenster {
-  grid-column: 3;
-  align-self: start;
-  justify-self: start;
+/* ===== Ladebildschirm ===== */
+/* Liegt nach dem Spielstart über dem weiterlaufenden Hintergrund des Startbildschirms
+   (Menü und Fußzeile sind dann ausgeblendet). Oben der Fakt, darunter der Ladebalken
+   mit gleich großen Abschnitten, einer pro Fakt. */
+#ladebildschirm {
+  --start-text-2: rgba(255, 255, 255, 0.82);
+  --start-text-3: rgba(255, 255, 255, 0.62);
+  --lade-akzent: #9CCBE5;
+  position: fixed;
+  inset: 0;
+  z-index: 600;              /* über dem Startbildschirm, unter den Pop-ups */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  overflow-y: auto;
+  color: #fff;
+  background: radial-gradient(ellipse at center, rgba(6, 22, 36, 0.35) 0%, rgba(6, 22, 36, 0.7) 100%);
+  cursor: pointer;           /* Klick irgendwo überspringt den Fakt */
+  animation: lade-ein 0.35s ease both;
+}
+
+@keyframes lade-ein {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Menü und Fußzeile weg, solange geladen wird; Hintergrund und Titel-Animationen laufen weiter */
+#startbildschirm.laedt .start-raster,
+#startbildschirm.laedt .start-fuss { visibility: hidden; }
+
+.lade-inhalt {
   display: flex;
   flex-direction: column;
+  gap: 22px;
   width: 100%;
-  max-width: var(--start-fakten-breite);
-  padding: 20px 22px 16px;
-  background: rgba(9, 28, 45, 0.66);
-  border: 1px solid var(--start-rand);
+  max-width: 640px;
+  margin: auto 0;
+}
+
+.lade-fenster {
+  padding: 22px 26px 20px;
+  background: rgba(9, 28, 45, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 14px;
   box-shadow: 0 16px 40px rgba(4, 18, 30, 0.3);
   -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
 }
 
-#startbildschirm.ohne-fakten .fakten-fenster { display: none; }
+.lade-karte .fakt-titel { font-size: 1.5rem; }
+.lade-karte .fakt-text { font-size: 1.02rem; }
 
+/* --- Ladebalken --- */
+.lade-balken-bereich {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lade-balken {
+  position: relative;
+  height: 12px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+}
+
+/* Füllung über transform statt width: flüssig, ohne Layout-Neuberechnung */
+.lade-fuellung {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #4FA3D1 0%, var(--lade-akzent) 100%);
+  border-radius: inherit;
+  transform: scaleX(0);
+  transform-origin: left center;
+  will-change: transform;
+}
+
+.lade-marken {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Trennstrich zwischen zwei Abschnitten */
+.lade-marke {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: rgba(9, 28, 45, 0.55);
+}
+
+.lade-zeile {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.86rem;
+  color: var(--start-text-2);
+}
+
+.lade-prozent {
+  font-weight: 600;
+  color: #fff;
+}
+
+/* --- Überspringen --- */
+.lade-steuerung {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+
+.lade-weiter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px 0 20px;
+  font-family: var(--schrift);
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(9, 28, 45, 0.58);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  cursor: pointer;
+  transition: background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.lade-weiter:hover {
+  background: rgba(22, 52, 78, 0.72);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.lade-weiter:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.lade-weiter svg {
+  width: 18px;
+  height: 18px;
+}
+
+.lade-hinweis {
+  font-size: 0.82rem;
+  color: var(--start-text-3);
+}
+
+#ladebildschirm :focus-visible {
+  outline: 3px solid #FFD166;
+  outline-offset: 3px;
+}
+
+/* --- Faktkarte (Ladebildschirm) --- */
 .fakten-kopf {
   display: flex;
   align-items: baseline;
@@ -1555,7 +1695,7 @@ button {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  min-height: 17.5em;        /* gleich hoch für kurze und lange Fakten: kein Springen */
+  min-height: 15em;          /* gleich hoch für kurze und lange Fakten: kein Springen */
   padding-top: 14px;
 }
 
@@ -1618,60 +1758,6 @@ button {
 }
 
 .fakt-quelle a:hover { text-decoration-color: currentColor; }
-
-/* Restzeit bis zum nächsten Fakt */
-.fakt-leiste {
-  height: 3px;
-  margin-top: 14px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.14);
-  border-radius: 2px;
-}
-
-.fakt-leiste span {
-  display: block;
-  width: 0;
-  height: 100%;
-  background: #9CCBE5;
-  border-radius: 2px;
-}
-
-@keyframes fakt-lauf {
-  from { width: 0; }
-  to   { width: 100%; }
-}
-
-.fakten-steuerung {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.fakt-knopf {
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  padding: 0;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  cursor: pointer;
-  transition: background-color 0.18s ease;
-}
-
-.fakt-knopf:hover { background: rgba(255, 255, 255, 0.2); }
-
-.fakt-knopf svg {
-  width: 18px;
-  height: 18px;
-}
-
-#faktPause .icon-play,
-#faktPause.pausiert .icon-pause { display: none; }
-#faktPause.pausiert .icon-play { display: block; }
 
 /* --- Fußzeile wie im Spiele-Hauptmenü: Version links, Bildnachweis rechts --- */
 .start-fuss {
@@ -2497,20 +2583,14 @@ p + .info-tabelle { margin-top: 10px; }
 }
 
 /* ===== Startbildschirm: kleinere Bildschirme ===== */
-/* Unter 1100 px: Faktenfenster unter das Menü */
+/* Unter 1100 px: eine Spalte */
 @media (max-width: 1100px) {
   .start-raster {
     grid-template-columns: minmax(0, var(--start-menue-breite));
     justify-content: center;
     row-gap: 28px;
   }
-  .start-menue,
-  .fakten-fenster { grid-column: 1; }
-  .fakten-fenster {
-    justify-self: stretch;
-    max-width: none;
-  }
-  .fakt-karte { min-height: 15em; }
+  .start-menue { grid-column: 1; }
 }
 
 @media (max-width: 560px) {
@@ -2520,9 +2600,12 @@ p + .info-tabelle { margin-top: 10px; }
   .start-untertitel { letter-spacing: 0.12em; }
   .start-untertitel::before,
   .start-untertitel::after { display: none; }
-  .menue-zeile { grid-template-columns: 48px minmax(0, 1fr) 48px; gap: 8px; }
+  .menue-zeile { grid-template-columns: 48px minmax(0, 1fr); gap: 8px; }
   .menue-zeile .menue-knopf { font-size: 0.88rem; }
-  .fakt-karte { min-height: 0; }
+  .lade-fenster { padding: 18px 18px 16px; }
+  .lade-karte { min-height: 0; }
+  .lade-karte .fakt-titel { font-size: 1.3rem; }
+  .lade-steuerung { justify-content: center; text-align: center; }
 }
 
 /* Ohne Bewegung: kein Zoom, kein Pulsieren */
