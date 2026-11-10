@@ -4062,10 +4062,7 @@ let aktuellerBericht = null;
 
 function berichtZeigen(bericht) {
   aktuellerBericht = bericht;
-  const v = bericht.vorher;
-  const n = bericht.nachher;
   const rw = bericht.richtwerte;
-  const mb = bericht.muell;
   let html = "";
 
   // Entscheidungen der drei Säulen
@@ -4082,35 +4079,13 @@ function berichtZeigen(bericht) {
   });
   html += "</section>";
 
-  // Veränderungen mit Richtwerten
-  const zeilen = KENNZAHLEN.concat([{ id: "akzeptanz", name: "Akzeptanz" }]).map(function (k) {
-    return { name: k.name, a: v[k.id], b: n[k.id], rw: rw[k.id] + " %", einheit: " %", besser: true };
-  }).concat([
-    { name: "Strandmüll", a: v.strandmuell, b: n.strandmuell, rw: "unter " + MUELL_SCHWELLE, einheit: "", besser: false },
-    { name: "Budget", a: v.budget, b: n.budget, rw: "", einheit: "€", besser: true }
-  ]);
-  html += '<section class="bericht-block"><h3>Was sich verändert hat</h3>' +
-    '<table class="bericht-tabelle"><thead><tr><th>Kennzahl</th><th>vorher</th><th>jetzt</th>' +
-    '<th>Änderung</th><th>strebt zu</th></tr></thead><tbody>';
-  zeilen.forEach(function (z) {
-    const diff = z.b - z.a;
-    const fmt = function (x) { return z.einheit === "€" ? euro(x) : zahl(x) + z.einheit; };
-    const diffText = z.einheit === "€" ? (diff >= 0 ? "+" : "−") + euro(Math.abs(diff)) : vorzeichen(diff);
-    const klasse = diff === 0 ? "" : ((diff > 0) === z.besser ? "trend-gut" : "trend-schlecht");
-    html += "<tr><th scope=\"row\">" + z.name + "</th><td>" + fmt(z.a) + "</td><td><strong>" + fmt(z.b) +
-      "</strong></td><td class=\"" + klasse + "\">" + diffText + "</td><td>" + z.rw + "</td></tr>";
-  });
-  html += "</tbody></table>" +
+  // Veränderungen: Balken wie im Spiel, die von „vorher“ nach „jetzt“ wandern
+  html += '<section class="bericht-block"><h3>Was sich verändert hat</h3>' + veraenderungHtml(bericht) +
+    '<p class="vb-legende"><span><span class="ziel-strich" aria-hidden="true"></span>Mindestwert</span>' +
+    '<span><span class="vb-richtwert-zeichen" aria-hidden="true"></span>Richtwert, auf den die Kennzahl zustrebt</span>' +
+    '<span><span class="vb-vorher-zeichen" aria-hidden="true"></span>Stand vorher</span></p>' +
     '<p class="klein">Jede Kennzahl bewegt sich pro Runde höchstens ' + MAX_AENDERUNG +
     " Punkte auf ihren Richtwert zu. Der Richtwert ergibt sich aus dem Zustand der Region.</p></section>";
-
-  // Die drei Säulen: Abstand zum Sollkurs und Konflikte dieser Runde
-  html += '<section class="bericht-block"><h3>Die drei Säulen</h3>' + saeulenBerichtHtml(bericht) + "</section>";
-
-  // Müllbilanz
-  html += '<section class="bericht-block"><h3>Müllbilanz am Strand</h3>' + bilanzHtml(mb) +
-    '<p class="klein">Eintrag: Strandbesucher ' + zahl(mb.eintrag.strand, 1) + ", Fischerei und Schifffahrt " +
-    zahl(mb.eintrag.meer, 1) + ", Flüsse und Hinterland " + zahl(mb.eintrag.land, 1) + " Teile pro 100 m.</p></section>";
 
   // Belastungen der Meeresgesundheit
   const b = rw.belastungen;
@@ -4157,14 +4132,6 @@ function berichtZeigen(bericht) {
     html += "</ul></section>";
   }
 
-  // Einnahmen
-  const ein = bericht.einnahmen;
-  html += '<section class="bericht-block"><h3>Einnahmen dieser Runde: ' + euro(ein.summe) + "</h3>" +
-    '<p class="klein">Grundeinkommen ' + euro(ein.grund) + ", Tourismus × Wirtschaft " + euro(ein.anteil) +
-    (ein.zusatz ? ", Abgaben (Kurtaxe) " + euro(ein.zusatz) : "") +
-    (ein.foerderung ? ", Förderprogramme " + euro(ein.foerderung) : "") +
-    (ein.laufend.summe ? ", laufende Kosten −" + euro(ein.laufend.summe) : "") + ".</p></section>";
-
   el("berichtTitel").textContent = "Bericht zu Runde " + bericht.runde;
   el("berichtInhalt").innerHTML = html;
   el("berichtInhalt").scrollTop = 0;
@@ -4172,40 +4139,165 @@ function berichtZeigen(bericht) {
     ? "Zum Abschlussquiz"
     : bericht.zwischenbilanz ? "Zur Zwischenbilanz" : "Weiter zu Runde " + zustand.runde;
   popupOeffnen("popupBericht");
+  berichtAnimieren(el("berichtInhalt"));
 }
 
-// Säulen vor und nach der Runde, mit Konflikthinweis, wenn eine Säule deutlich nachgegeben hat
-function saeulenBerichtHtml(bericht) {
-  const verlauf = zustand.verlauf;
-  const jetzt = verlauf[verlauf.length - 1];
-  const davor = verlauf[verlauf.length - 2];
-  let html = '<table class="bericht-tabelle"><thead><tr><th>Säule</th><th>Runde ' + davor.runde + "</th><th>Runde " +
-    jetzt.runde + '</th><th>Änderung</th><th>Hinter dem Kurs</th></tr></thead><tbody>';
-  SAEULEN.forEach(function (sa) {
-    const diff = jetzt.saeulen[sa.id] - davor.saeulen[sa.id];
-    const rueck = rueckstaende(jetzt, sa.id).map(function (r) { return r.name; }).join(", ");
-    html += '<tr><th scope="row">' + sa.name + "</th><td>" + zahl(davor.saeulen[sa.id]) + "</td><td><strong>" +
-      zahl(jetzt.saeulen[sa.id]) + '</strong></td><td class="' + (diff === 0 ? "" : diff > 0 ? "trend-gut" : "trend-schlecht") +
-      '">' + vorzeichen(Math.round(diff * 10) / 10) + "</td><td>" + (rueck || "–") + "</td></tr>";
-  });
-  html += "</tbody></table>" +
-    '<p class="klein">Rundenscore ' + zahl(jetzt.score, 1) + " (Runde " + davor.runde + ": " + zahl(davor.score, 1) +
-    "). Er besteht zu " + Math.round((1 - SAEULEN_SCHWAECHSTE) * 100) + " % aus dem Mittelwert der drei Säulen und zu " +
-    Math.round(SAEULEN_SCHWAECHSTE * 100) + " % aus der schwächsten.</p>";
+// ---------- Rundenbericht: animierte Balken ----------
+// Jede Zeile beschreibt ihre Animation als Folge von Schritten { v: Wert, w: Breite in %, f: Farbe }.
+// Kennzahlen haben zwei Schritte (vorher → jetzt), der Strandmüll einen Schritt je Posten der Müllbilanz.
 
-  const gefallen = SAEULEN.filter(function (sa) { return davor.saeulen[sa.id] - jetzt.saeulen[sa.id] >= 8; });
-  if (gefallen.length) {
-    const sa = gefallen[0];
-    const gewaehlt = bericht.entscheidungen.filter(function (e) { return e.massnahme; }).map(function (e) {
-      return e.massnahme.name;
+function vbZeileHtml(o) {
+  const erster = o.schritte[0];
+  const letzter = o.schritte[o.schritte.length - 1];
+  const diff = letzter.v - erster.v;
+  const klasse = diff === 0 ? "" : ((diff > 0) === o.besser ? "trend-gut" : "trend-schlecht");
+  return '<div class="vb-zeile' + (o.zusatzKlasse ? " " + o.zusatzKlasse : "") + '" data-schritte=\'' +
+      JSON.stringify(o.schritte) + "' data-einheit=\"" + o.einheit + '">' +
+    '<div class="vb-kopf">' +
+      '<span class="vb-name">' + o.name + "</span>" +
+      '<span class="vb-werte">' +
+        '<span class="vb-alt">' + zahl(erster.v) + o.einheit + "</span>" +
+        '<span class="vb-pfeil" aria-hidden="true">→</span>' +
+        '<strong class="vb-zahl" aria-hidden="true">' + zahl(erster.v) + o.einheit + "</strong>" +
+        '<span class="sr-only">jetzt ' + zahl(letzter.v) + o.einheit + "</span>" +
+        '<span class="vb-diff ' + klasse + '">' + vorzeichen(diff) + "</span>" +
+      "</span>" +
+    "</div>" +
+    '<div class="balken vb-balken">' +
+      '<div class="vb-vorher" style="width:' + erster.w + '%"></div>' +
+      '<div class="balken-fuellung vb-fuellung" style="width:' + erster.w + "%;background-color:" + erster.f + '"></div>' +
+      '<div class="vb-vorher-strich" style="left:' + erster.w + '%"></div>' +
+      o.marken +
+    "</div>" +
+    (o.fuss ? '<p class="vb-fuss">' + o.fuss + "</p>" : "") +
+    "</div>";
+}
+
+function veraenderungHtml(bericht) {
+  const v = bericht.vorher;
+  const n = bericht.nachher;
+  const rw = bericht.richtwerte;
+  const mb = bericht.muell;
+  let html = '<div class="vb-liste">';
+
+  // Kennzahlen und Akzeptanz: Ampelfarbe wie in der Seitenleiste und der Kopfleiste
+  const reihen = KENNZAHLEN.map(function (k) {
+    return { id: k.id, name: k.name, marke: k.mindest, markeTitel: "Mindestwert " + k.mindest + " %",
+      farbe: function (x) { return ampelFarbe(x, k.mindest); } };
+  }).concat([{ id: "akzeptanz", name: "Akzeptanz", marke: AKZEPTANZ_SPERRE,
+    markeTitel: "Unter " + AKZEPTANZ_SPERRE + " % sind einschränkende Maßnahmen gesperrt", farbe: akzeptanzFarbe }]);
+  reihen.forEach(function (k) {
+    const richtwert = begrenzen(rw[k.id], 0, 100);
+    html += vbZeileHtml({
+      name: k.name, einheit: " %", besser: true,
+      schritte: [v[k.id], n[k.id]].map(function (x) { return { v: x, w: begrenzen(x, 0, 100), f: k.farbe(x) }; }),
+      marken: '<div class="balken-ziel" style="left:' + k.marke + '%" title="' + k.markeTitel + '"></div>' +
+        '<div class="vb-richtwert" style="left:' + richtwert + '%" title="Richtwert ' + rw[k.id] + ' %"></div>',
+      fuss: "strebt zu " + rw[k.id] + " %"
     });
-    html += '<p class="vergleich-kasten"><strong>Zielkonflikt:</strong> ' + sa.name + " ist in dieser Runde um " +
-      zahl(Math.round(davor.saeulen[sa.id] - jetzt.saeulen[sa.id])) + " Punkte gesunken" +
-      (gewaehlt.length ? ". Gewählt hast du: " + gewaehlt.join(", ") + ". " : ". ") +
-      "Maßnahmen, die eine Säule voranbringen, belasten oft eine andere. Prüfe, ob du den Rückstand mit einer " +
-      "Maßnahme der betroffenen Säule ausgleichen kannst.</p>";
-  }
-  return html;
+  });
+
+  // Strandmüll: Der Balken läuft die Müllbilanz Posten für Posten ab
+  const muellSchritt = function (x) {
+    return { v: x, w: muellProzent(x), f: x < MUELL_SCHWELLE ? AMPEL.gruen : AMPEL.rot };
+  };
+  const posten = [
+    { titel: "Reinigung", wert: -mb.entfernt, art: "gut" },
+    { titel: "natürlicher Abtrag", wert: -mb.abtrag, art: "gut" },
+    { titel: "neuer Eintrag", wert: mb.neu - (mb.bestand - mb.entfernt - mb.abtrag), art: "schlecht" }
+  ];
+  const schritte = [muellSchritt(mb.bestand)];
+  let stand = mb.bestand;
+  posten.forEach(function (p, i) {
+    stand += p.wert;
+    if (p.wert) {
+      p.schritt = schritte.length;
+      schritte.push(Object.assign(muellSchritt(stand), { posten: i }));
+    }
+  });
+  html += vbZeileHtml({
+    name: "Strandmüll", einheit: "", besser: false, zusatzKlasse: "vb-muell",
+    schritte: schritte,
+    marken: '<div class="vb-schwelle" style="left:' + muellProzent(MUELL_SCHWELLE) +
+      '%" title="EU-Schwellenwert: unter ' + MUELL_SCHWELLE + ' Teile"></div>',
+    fuss: "Teile pro 100 m Strand, Ziel unter " + MUELL_SCHWELLE
+  });
+  // Müllbilanz: einmal, direkt am Strandmüll-Balken; der aktive Posten leuchtet während der Animation auf
+  html += '<div class="vb-muellbilanz">' + posten.map(function (p, i) {
+    const text = p.wert > 0 ? "+" + zahl(p.wert) : p.wert < 0 ? "−" + zahl(-p.wert) : "0";
+    return '<span class="vb-posten ' + p.art + '" data-posten="' + i + '"><strong>' + text + "</strong>" +
+      p.titel + "</span>";
+  }).join("") + "</div>" +
+    '<p class="klein vb-eintrag">Eintrag: Strandbesucher ' + zahl(mb.eintrag.strand, 1) + ", Fischerei und Schifffahrt " +
+    zahl(mb.eintrag.meer, 1) + ", Flüsse und Hinterland " + zahl(mb.eintrag.land, 1) + " Teile pro 100 m.</p>";
+
+  // Budget: ohne Balken
+  const bDiff = n.budget - v.budget;
+  html += '<div class="vb-zeile vb-budget"><div class="vb-kopf">' +
+    '<span class="vb-name">Budget</span>' +
+    '<span class="vb-werte"><span class="vb-alt">' + euro(v.budget) + "</span>" +
+    '<span class="vb-pfeil" aria-hidden="true">→</span><strong>' + euro(n.budget) + "</strong>" +
+    '<span class="vb-diff ' + (bDiff === 0 ? "" : bDiff > 0 ? "trend-gut" : "trend-schlecht") + '">' +
+    (bDiff >= 0 ? "+" : "−") + euro(Math.abs(bDiff)) + "</span></span></div></div>";
+
+  return html + "</div>";
+}
+
+// Startet die Balkenanimation im Rundenbericht. Ein neuer Aufruf bricht eine laufende Animation ab.
+const VB_DAUER = 900;      // ms pro Schritt
+const VB_VERSATZ = 160;    // ms Versatz zwischen den Zeilen
+let vbLauf = 0;
+
+function berichtAnimieren(container) {
+  const lauf = ++vbLauf;
+  const ruhig = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const zeilen = Array.prototype.slice.call(container.querySelectorAll(".vb-zeile[data-schritte]"));
+  zeilen.forEach(function (zeile, i) {
+    const schritte = JSON.parse(zeile.getAttribute("data-schritte"));
+    const einheit = zeile.getAttribute("data-einheit");
+    const fuellung = zeile.querySelector(".vb-fuellung");
+    const zahlFeld = zeile.querySelector(".vb-zahl");
+    const zeigen = function (wert) { zahlFeld.textContent = zahl(wert) + einheit; };
+    const posten = function (s) {
+      container.querySelectorAll(".vb-posten").forEach(function (p) {
+        p.classList.toggle("aktiv", s.posten !== undefined && +p.getAttribute("data-posten") === s.posten);
+      });
+    };
+    const ende = function () {
+      const s = schritte[schritte.length - 1];
+      fuellung.style.width = s.w + "%";
+      fuellung.style.backgroundColor = s.f;
+      zeigen(s.v);
+      zeile.classList.add("fertig");
+      if (zeile.classList.contains("vb-muell")) posten({});
+    };
+    if (ruhig || schritte.length < 2) { ende(); return; }
+
+    const schritt = function (k) {
+      if (lauf !== vbLauf) return;
+      if (k >= schritte.length) { ende(); return; }
+      const von = schritte[k - 1].v;
+      const s = schritte[k];
+      fuellung.style.transitionDuration = VB_DAUER + "ms";
+      fuellung.style.width = s.w + "%";
+      fuellung.style.backgroundColor = s.f;
+      if (zeile.classList.contains("vb-muell")) posten(s);
+      const t0 = performance.now();
+      const zaehlen = function (t) {
+        if (lauf !== vbLauf) return;
+        const x = Math.min(1, (t - t0) / VB_DAUER);
+        const weich = 1 - Math.pow(1 - x, 3);
+        zeigen(Math.round(von + (s.v - von) * weich));
+        if (x < 1) {
+          requestAnimationFrame(zaehlen);
+        } else {
+          setTimeout(function () { schritt(k + 1); }, 150);
+        }
+      };
+      requestAnimationFrame(zaehlen);
+    };
+    setTimeout(function () { schritt(1); }, 350 + i * VB_VERSATZ);
+  });
 }
 
 function bilanzFeld(titel, wert, art) {
