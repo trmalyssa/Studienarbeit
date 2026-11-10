@@ -6173,7 +6173,7 @@ const BENOETIGTE_ELEMENTE = ["anzeigeWissen", "auswahlUebersicht", "popupInfo", 
 
 function versionPruefen() {
   const fehlend = BENOETIGTE_ELEMENTE.filter(function (id) { return !document.getElementById(id); });
-  const cssNeu = getComputedStyle(document.documentElement).getPropertyValue("--layout-version").trim() === "12";
+  const cssNeu = getComputedStyle(document.documentElement).getPropertyValue("--layout-version").trim() === "13";
   if (!fehlend.length && cssNeu) return true;
   const hinweis = document.createElement("div");
   hinweis.setAttribute("role", "alert");

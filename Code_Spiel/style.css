@@ -4,7 +4,7 @@
 
 /* ===== Grundwerte (zentral änderbar) ===== */
 :root {
-  --layout-version: 12;       /* script.js prüft diesen Wert, damit HTML, CSS und JS zusammenpassen */
+  --layout-version: 13;       /* script.js prüft diesen Wert, damit HTML, CSS und JS zusammenpassen */
   --tinte: #12304A;          /* Linien und Text wie auf einer Seekarte */
   --tinte-2: #3E5A70;        /* zweitrangiger Text */
   --tinte-3: #687F91;        /* Hinweise */
