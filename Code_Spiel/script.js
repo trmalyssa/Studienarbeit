@@ -1363,20 +1363,16 @@ const START_BILD_DAUER = 16000;   // ms, so lange steht ein Hintergrundbild
 const START_VERSION = "Version 10";
 
 // Ladebildschirm nach Namenseingabe und Spielstart (siehe Abschnitt „Ladebildschirm“ unten).
-// Der Balken ist in faktenProLadung gleich große Abschnitte geteilt (bei 3: 0–33 %, 33–66 %, 66–100 %).
-// Wie lange ein Abschnitt braucht, hängt von der Länge des Fakts ab:
-//   Dauer = max(minDauer, Zeichen / zeichenProSekunde)
-// Kurze Fakten füllen ihren Abschnitt also schnell, lange langsamer.
+// Feste Gesamtdauer: Der Ladebildschirm steht immer genau gesamtDauer ms, egal wie oft übersprungen wird.
+// Ohne Eingriff wechselt der Fakt alle faktDauer ms (bei 12 s / 4 s also 3 Fakten).
+// Überspringen (Enter, Leertaste, Maustaste) zeigt sofort den nächsten Fakt und startet nur die
+// Faktuhr neu, die Gesamtuhr läuft unverändert weiter.
 const LADEBILDSCHIRM = {
-  faktenProLadung: 3,
-  zeichenProSekunde: 22,   // Lesetempo (CPS), entspricht etwa 200 Wörtern pro Minute
-  minDauer: 3000,          // ms, Untergrenze für sehr kurze Fakten
-  sprungDauer: 150,        // ms, Ease-out-Sprung ans Abschnittsende beim Überspringen
-  abschlussPause: 450,     // ms, so lange steht „100 %“, bevor das Spiel beginnt
-  maxSchritt: 100          // ms, größter Zeitschritt pro Bild: ist der Tab versteckt, ruht der Balken
+  gesamtDauer: 12000,      // ms, feste Gesamtlaufzeit des Ladebildschirms
+  faktDauer: 4000          // ms, so lange steht ein Fakt, wenn niemand überspringt
 };
 
-// Statuszeile unter dem Balken, eine pro Abschnitt
+// Statuszeile unter dem Balken, eine pro Drittel der Gesamtzeit
 const LADE_STATUS = [
   "Küstenabschnitt wird vermessen …",
   "Müllfunde werden gezählt …",
@@ -1399,10 +1395,15 @@ const FAKT_KATEGORIEN = {
   bedroht:    { name: "Bedroht",      farbe: "#F2867A" },
   entdeckt:   { name: "Neu entdeckt", farbe: "#B9A3F0" },
   rueckkehr:  { name: "Rückkehr",     farbe: "#FFD166" },
-  weltmeer:   { name: "Weltmeer",     farbe: "#A9D3EE" }
+  weltmeer:   { name: "Weltmeer",     farbe: "#A9D3EE" },
+  muell:      { name: "Meeresmüll",   farbe: "#F4A261" },
+  klima:      { name: "Klima & Meer", farbe: "#F7A8C8" }
 };
 
-// Fakten für den Ladebildschirm. Jeder Fakt hat eine überprüfbare Quelle.
+// Fakten für den Ladebildschirm. Jeder Fakt hat eine überprüfbare Quelle (Name + Link), die im
+// Ladebildschirm unter dem Text und im Pop-up „Quellen“ erscheint.
+// Pro Ladung werden ohne Eingriff 3 Fakten gezeigt; der Rest ist Puffer fürs Überspringen.
+// Erst wenn alle Fakten einmal dran waren, wird neu gemischt (siehe naechsterFakt).
 const MEERESFAKTEN = [
   {
     id: "schweinswal-ostsee", kategorie: "bedroht", titel: "Der letzte Wal vor der Haustür",
@@ -1495,6 +1496,108 @@ const MEERESFAKTEN = [
       "selten. Inzwischen tauchen sie im Spätsommer und Herbst wieder auf. Forschende haben 18 Tiere mit " +
       "Satellitensendern markiert, um ihre Wanderungen zu verfolgen.",
     quelle: { name: "Aarestrup et al., Scientific Reports 2022", url: "https://doi.org/10.1038/s41598-022-15819-x" }
+  },
+  // ----- Erweiterung: Meeresmüll, Klima, Wattenmeer -----
+  {
+    id: "plastik-eintrag", kategorie: "muell", titel: "Millionen Tonnen Plastik pro Jahr",
+    text: "Aus 192 Küstenländern gelangten im Jahr 2010 schätzungsweise 4,8 bis 12,7 Millionen Tonnen " +
+      "Plastikmüll ins Meer. Grundlage der Schätzung sind Daten zu Abfallmengen, Bevölkerungsdichte und " +
+      "Abfallentsorgung der einzelnen Länder.",
+    quelle: { name: "Jambeck et al., Science 2015", url: "https://doi.org/10.1126/science.1260352" }
+  },
+  {
+    id: "geisternetze", kategorie: "muell", titel: "Geisternetze im Müllstrudel",
+    text: "Im Großen Pazifischen Müllteppich treiben auf 1,6 Millionen Quadratkilometern mindestens 79.000 " +
+      "Tonnen Plastik. Mindestens 46 % dieser Masse sind verlorene oder zurückgelassene Fischernetze, " +
+      "sogenannte Geisternetze.",
+    quelle: { name: "Lebreton et al., Scientific Reports 2018", url: "https://doi.org/10.1038/s41598-018-22939-w" }
+  },
+  {
+    id: "tiefsee-tuete", kategorie: "muell", titel: "Plastik am tiefsten Punkt",
+    text: "Im Marianengraben filmte ein Tauchroboter eine Plastiktüte in 10.898 Metern Tiefe. Eine " +
+      "Auswertung von 30 Jahren Tiefseeaufnahmen zeigte außerdem: 89 % der gefundenen Plastikteile " +
+      "waren Einwegprodukte.",
+    quelle: { name: "Chiba et al., Marine Policy 2018", url: "https://doi.org/10.1016/j.marpol.2018.03.022" }
+  },
+  {
+    id: "spuelsaum", kategorie: "muell", titel: "Müll im Spülsaum",
+    text: "Auf 100 Metern Nordseestrand finden sich im Mittel knapp 400 Müllteile, an der Ostsee sind es " +
+      "rund 70. Mindestens 70 % davon sind Kunststoffe.",
+    quelle: { name: "Umweltbundesamt, Runder Tisch Meeresmüll",
+      url: "https://www.umweltbundesamt.de/presse/pressemitteilungen/runder-tisch-gegen-meeresmuell-geht-in-die-zweite" }
+  },
+  {
+    id: "reifenabrieb", kategorie: "muell", titel: "Mikroplastik von der Straße",
+    text: "Reifenabrieb ist die größte Quelle für Mikroplastik in Deutschland. Fachleute schätzen die Menge " +
+      "auf 60.000 bis 100.000 Tonnen im Jahr, rechnerisch rund 1 Kilogramm pro Kopf. Über Luft und " +
+      "Regenwasser gelangt er in Flüsse und schließlich ins Meer.",
+    quelle: { name: "Fraunhofer UMSICHT, 2024", url: "https://idw-online.de/de/news826927" }
+  },
+  {
+    id: "sauerstoff", kategorie: "weltmeer", titel: "Jeder zweite Atemzug",
+    text: "Etwa die Hälfte des Sauerstoffs, der auf der Erde entsteht, stammt aus dem Meer. Den größten " +
+      "Teil produziert Plankton, also winzige Algen, Pflanzen und Bakterien, die im Wasser treiben und " +
+      "Photosynthese betreiben.",
+    quelle: { name: "NOAA Ocean Service", url: "https://oceanservice.noaa.gov/facts/ocean-oxygen.html" }
+  },
+  {
+    id: "versauerung", kategorie: "klima", titel: "Das Meer wird saurer",
+    text: "Das Meer nimmt rund 30 % des Kohlendioxids auf, das in die Atmosphäre gelangt. Dadurch ist der " +
+      "pH-Wert an der Meeresoberfläche seit Beginn der Industrialisierung um etwa 0,1 gesunken. Das " +
+      "entspricht rund 30 % mehr Säure und erschwert Muscheln und Korallen den Bau ihrer Kalkschalen.",
+    quelle: { name: "NOAA, Ocean Acidification",
+      url: "https://www.noaa.gov/education/resource-collections/ocean-coasts/ocean-acidification" }
+  },
+  {
+    id: "ozeanwaerme", kategorie: "klima", titel: "Der größte Wärmespeicher",
+    text: "Rund 90 % der zusätzlichen Wärme, die durch den menschengemachten Treibhauseffekt entsteht, hat " +
+      "das Meer aufgenommen. Das meiste davon steckt in den oberen 700 Metern.",
+    quelle: { name: "NASA, Vital Signs: Ocean Warming", url: "https://climate.nasa.gov/vital-signs/ocean-warming/" }
+  },
+  {
+    id: "seegras", kategorie: "klima", titel: "Klimaschützer am Meeresgrund",
+    text: "Seegraswiesen bedecken nur etwa 0,2 % des Meeresbodens, speichern aber rund 10 % des im Meer " +
+      "gebundenen Kohlenstoffs. Pro Fläche können sie Kohlenstoff bis zu 35-mal schneller binden als " +
+      "tropischer Regenwald. Auch im Wattenmeer wachsen Seegraswiesen.",
+    quelle: { name: "UN-Umweltprogramm (UNEP)",
+      url: "https://www.unep.org/news-and-stories/story/seagrass-secret-weapon-fight-against-global-heating" }
+  },
+  {
+    id: "watt-weltrekord", kategorie: "wattenmeer", titel: "Das größte Watt der Welt",
+    text: "Das Wattenmeer von Dänemark, Deutschland und den Niederlanden ist das größte zusammenhängende " +
+      "System aus Sand- und Schlickwatt der Erde. Es gehört zu den letzten großen Gezeitenlandschaften, " +
+      "in denen natürliche Prozesse weitgehend ungestört ablaufen.",
+    quelle: { name: "UNESCO-Welterbezentrum", url: "https://whc.unesco.org/en/list/1314" }
+  },
+  {
+    id: "kegelrobbe", kategorie: "rueckkehr", titel: "Rekord bei den Kegelrobben",
+    text: "Die Kegelrobbe ist das größte Raubtier Deutschlands. Im Frühjahr 2024 zählten Fachleute im " +
+      "Wattenmeer und auf Helgoland 11.515 Tiere, 9 % mehr als im Vorjahr. Im Winter davor kamen 2.547 " +
+      "Jungtiere zur Welt.",
+    quelle: { name: "Gemeinsames Wattenmeersekretariat, 2024", url: "https://waddensea-worldheritage.org/node/2239" }
+  },
+  {
+    id: "schutzgebiete", kategorie: "nordsee", titel: "Fast die Hälfte geschützt",
+    text: "Rund 45 % der deutschen Meeresgebiete in Nord- und Ostsee sind als Schutzgebiete ausgewiesen, " +
+      "in der Nordsee etwa 43 %, in der Ostsee etwa 51 % (Stand April 2024). Die küstenfernen Gebiete " +
+      "gehören zum europäischen Schutzgebietsnetz Natura 2000.",
+    quelle: { name: "Bundesamt für Naturschutz, Hintergrundpapier 2026",
+      url: "https://www.bfn.de/sites/default/files/2026-01/2026%2001%2016%20Hintergrund%20Meere_Schutzgebiete_aktualisiert_pac.pdf" }
+  },
+  {
+    id: "kabeljau", kategorie: "nordsee", titel: "Der Kabeljau zieht nach Norden",
+    text: "Mit dem wärmeren Wasser verändert sich die Nordsee: Kälteliebende Fische wie der Kabeljau weichen " +
+      "nach Norden aus, wärmeliebende Arten aus dem Süden wandern ein. Am Südrand seines Verbreitungsgebiets " +
+      "ist der Kabeljau inzwischen fast verschwunden.",
+    quelle: { name: "Umweltbundesamt, Monitoringbericht Klimaanpassung",
+      url: "https://www.umweltbundesamt.de/monitoring-zur-das/handlungsfelder/fischerei/fi-i-1/indikator" }
+  },
+  {
+    id: "tiefsee-gesehen", kategorie: "entdeckt", titel: "Kaum ein Blick in die Tiefe",
+    text: "Weniger als 0,001 % des Tiefseebodens haben Menschen bisher mit eigenen Augen oder Kameras " +
+      "gesehen. Das entspricht etwa der Fläche des kleinsten US-Bundesstaats Rhode Island.",
+    quelle: { name: "NPR nach Bell et al., Science Advances 2025",
+      url: "https://www.npr.org/2025/05/07/nx-s1-5387502/deep-seafloor-ocean-mapped-rhode-island" }
   }
 ];
 
@@ -4614,102 +4717,121 @@ function startbildschirmVerbergen() {
 }
 
 // ---------- Ladebildschirm ----------
-// Ablauf: Name bestätigen → ladebildschirmStarten() → 3 Fakten nacheinander, der Balken füllt
-// je Fakt einen gleich großen Abschnitt → bei 100 % startet das Spiel (Einführung).
+// Ablauf: Name bestätigen → ladebildschirmStarten() → genau LADEBILDSCHIRM.gesamtDauer (12 s) lang
+// Meeresfakten → danach startet das Spiel (Einführung).
 //
-// Datenstruktur eines Abschnitts (ladeSegmenteBerechnen):
-//   { fakt, von: 0, bis: 1/3, dauer: ms }   von/bis als Anteil 0…1 des ganzen Balkens
+// Zwei voneinander unabhängige Uhren:
+//   1. Gesamtuhr  (gesamtDauer, 12 s): startet einmal und wird NIE verlängert oder verkürzt.
+//                 Sie steuert den großen Ladebalken und das Ende des Ladebildschirms.
+//   2. Faktuhr    (faktDauer, 4 s): läuft pro Fakt. Ist sie abgelaufen, erscheint der nächste Fakt.
+//                 Beim Überspringen startet sie sofort neu. Ohne Eingriff: Fakt 1 bei 0 s,
+//                 Fakt 2 bei 4 s, Fakt 3 bei 8 s, Ende bei 12 s.
+//
+// Die Uhren laufen über setTimeout und Zeitstempel (performance.now), nicht über die Bildrate.
+// requestAnimationFrame zeichnet nur die Balken. So bleiben die 12 s auch bei ruckelnder
+// Darstellung oder einem Tab im Hintergrund exakt (der Browser pausiert dort nur das Zeichnen).
+//
+// Alle Eingabe-Listener hängen an einem AbortController: Ein einziges abort() beim Beenden
+// entfernt sie vollständig, damit nach dem Laden keine Listener (Memory Leaks, Geister-Skips) übrig bleiben.
 //
 // Zustand während des Ladens (lade):
-//   segmente     die Abschnitte dieser Ladung
-//   index        aktueller Abschnitt
-//   verstrichen  ms, die der aktuelle Abschnitt schon läuft
-//   fortschritt  Füllstand des Balkens (0…1), wird jedes Bild neu gezeichnet
-//   sprung       null oder { von, bis, verstrichen }: läuft gerade ein Überspringen?
+//   aktiv        läuft der Ladebildschirm gerade?
+//   startZeit    performance.now() beim Start; Ende = startZeit + gesamtDauer
+//   faktStart    performance.now(), seit der aktuelle Fakt steht
+//   fakt         der angezeigte Fakt
+//   anzahl       wie viele Fakten in dieser Ladung schon gezeigt wurden (für „Fakt 2“)
+//   endeTimer    setTimeout-ID der Gesamtuhr
+//   faktTimer    setTimeout-ID der Faktuhr
+//   schleife     requestAnimationFrame-ID der Zeichenschleife
+//   abbruch      AbortController der Eingabe-Listener
 //   stapel       gemischte Fakten; gezogen wird von oben, leer → neu mischen.
 //                So wiederholt sich kein Fakt, bevor alle einmal dran waren.
+//   fertig       Rückruf, der genau einmal nach Ablauf der 12 s läuft
 const lade = {
-  aktiv: false, abgeschlossen: false,
-  segmente: [], index: 0, verstrichen: 0, fortschritt: 0, sprung: null,
-  zuletzt: 0, schleife: 0, abschlussTimer: null, prozent: -1,
+  aktiv: false,
+  startZeit: 0, faktStart: 0,
+  fakt: null, anzahl: 0,
+  endeTimer: null, faktTimer: null, schleife: 0,
+  abbruch: null,
+  prozent: -1, phase: -1,
   stapel: [], fertig: null
 };
 
-// Lesedauer eines Fakts in ms: Dauer = max(Min_Time, Textlänge / CPS).
-// Gezählt werden Titel und Text, denn beides wird gelesen.
-function faktLesedauer(fakt, einstellung) {
+// Anteil 0…1 der verstrichenen Gesamtzeit (für den großen Balken)
+function ladeGesamtFortschritt(verstrichen, einstellung) {
   const e = einstellung || LADEBILDSCHIRM;
-  const zeichen = (fakt.titel + " " + fakt.text).length;
-  return Math.max(e.minDauer, zeichen / e.zeichenProSekunde * 1000);
+  return Math.min(1, Math.max(0, verstrichen / e.gesamtDauer));
 }
 
-// Teilt den Balken in gleich große Abschnitte, einen pro Fakt.
-// Die Breite ist immer gleich, nur die Dauer hängt vom Text ab.
-function ladeSegmenteBerechnen(fakten, einstellung) {
-  const breite = 1 / fakten.length;
-  return fakten.map(function (fakt, i) {
-    return {
-      fakt: fakt,
-      von: i * breite,
-      bis: i === fakten.length - 1 ? 1 : (i + 1) * breite,   // letzter Abschnitt endet exakt bei 100 %
-      dauer: faktLesedauer(fakt, einstellung)
-    };
-  });
+// Anteil 0…1 der verstrichenen Zeit des aktuellen Fakts (für die Faktuhr in der Karte)
+function faktFortschritt(seitFaktStart, einstellung) {
+  const e = einstellung || LADEBILDSCHIRM;
+  return Math.min(1, Math.max(0, seitFaktStart / e.faktDauer));
 }
 
-// Füllstand zu einem Zeitpunkt im Abschnitt: linear von "von" bis "bis"
-function segmentFortschritt(segment, verstrichen) {
-  const anteil = Math.min(1, Math.max(0, verstrichen / segment.dauer));
-  return segment.von + (segment.bis - segment.von) * anteil;
+// Phase 0, 1 oder 2 der Gesamtzeit (je ein Drittel); bestimmt die Statuszeile unter dem Balken.
+// Hängt nur an der Gesamtuhr, Überspringen ändert sie also nicht.
+function ladePhase(verstrichen, einstellung) {
+  const anzahl = LADE_STATUS.length;
+  return Math.min(anzahl - 1, Math.floor(ladeGesamtFortschritt(verstrichen, einstellung) * anzahl));
 }
 
-// Ease-out (kubisch): schneller Start, weiches Abbremsen am Ziel
-function easeOutKubisch(t) {
-  return 1 - Math.pow(1 - t, 3);
+// Zieht den nächsten Fakt vom gemischten Stapel. Ist der Stapel leer, wird neu gemischt.
+// "ausser": dieser Fakt darf nicht direkt noch einmal kommen (Übergang zwischen zwei Mischungen).
+function naechsterFakt(ausser, zufall) {
+  if (!lade.stapel.length) {
+    lade.stapel = MEERESFAKTEN.slice();
+    mischen(lade.stapel, zufall || Math.random);
+    const oben = lade.stapel.length - 1;
+    if (ausser && lade.stapel.length > 1 && lade.stapel[oben] === ausser) {
+      lade.stapel[oben] = lade.stapel[0];          // Doppelten nach unten tauschen
+      lade.stapel[0] = ausser;
+    }
+  }
+  return lade.stapel.pop();
 }
 
-// Zieht verschiedene Fakten vom gemischten Stapel
+// Zieht mehrere verschiedene Fakten (z. B. für Tests oder eine Vorschau)
 function faktenZiehen(anzahl, zufall) {
   const n = Math.min(anzahl, MEERESFAKTEN.length);
   const gezogen = [];
   while (gezogen.length < n) {
-    if (!lade.stapel.length) {
-      lade.stapel = MEERESFAKTEN.slice();
-      mischen(lade.stapel, zufall || Math.random);
-    }
-    const fakt = lade.stapel.pop();
+    const fakt = naechsterFakt(gezogen[gezogen.length - 1], zufall);
     if (gezogen.indexOf(fakt) === -1) gezogen.push(fakt);
   }
   return gezogen;
 }
 
-// Öffnet den Ladebildschirm. fertig() läuft einmal, sobald der Balken 100 % erreicht hat.
+// Öffnet den Ladebildschirm. fertig() läuft genau einmal, nach exakt gesamtDauer ms.
 function ladebildschirmStarten(fertig) {
-  cancelAnimationFrame(lade.schleife);
-  clearTimeout(lade.abschlussTimer);
-  lade.segmente = ladeSegmenteBerechnen(faktenZiehen(LADEBILDSCHIRM.faktenProLadung));
-  lade.index = 0;
-  lade.verstrichen = 0;
-  lade.fortschritt = 0;
-  lade.sprung = null;
-  lade.prozent = -1;
+  ladeAufraeumen();                                // falls noch ein alter Durchlauf hängt
   lade.fertig = fertig;
-  lade.abgeschlossen = false;
   lade.aktiv = true;
+  lade.anzahl = 0;
+  lade.fakt = null;
+  lade.prozent = -1;
+  lade.phase = -1;
 
-  ladeMarkenSetzen(lade.segmente.length);
-  el("startbildschirm").classList.add("laedt");          // Menü ausblenden, Hintergrund läuft weiter
+  ladeMarkenSetzen();
+  el("startbildschirm").classList.add("laedt");    // Menü ausblenden, Hintergrund läuft weiter
   el("ladebildschirm").classList.remove("versteckt");
-  ladeFaktZeigen(0);
-  ladeBalkenZeichnen();
-  el("ladeWeiter").focus();
+  el("ladeWeiter").disabled = false;
 
-  lade.zuletzt = performance.now();
+  lade.startZeit = performance.now();
+  ladeListenerAnmelden();
+  ladeNaechsterFakt();                             // Fakt 1, startet auch die Faktuhr
+
+  // Gesamtuhr: einmal gestellt, durch Überspringen nie verändert
+  lade.endeTimer = setTimeout(ladebildschirmBeenden, LADEBILDSCHIRM.gesamtDauer);
+
+  ladeZeichnen(lade.startZeit);
+  el("ladeWeiter").focus();
   lade.schleife = requestAnimationFrame(ladeSchleife);
 }
 
-// Trennstriche zwischen den Abschnitten
-function ladeMarkenSetzen(anzahl) {
+// Trennstriche im großen Balken: dort wechselt der Fakt, wenn niemand überspringt (4 s, 8 s)
+function ladeMarkenSetzen() {
+  const anzahl = Math.round(LADEBILDSCHIRM.gesamtDauer / LADEBILDSCHIRM.faktDauer);
   let html = "";
   for (let i = 1; i < anzahl; i++) {
     html += '<span class="lade-marke" style="left: ' + (i / anzahl * 100).toFixed(3) + '%"></span>';
@@ -4717,8 +4839,19 @@ function ladeMarkenSetzen(anzahl) {
   el("ladeMarken").innerHTML = html;
 }
 
-function ladeFaktZeigen(index) {
-  const f = lade.segmente[index].fakt;
+// Zeigt den nächsten Fakt und stellt die Faktuhr neu (4 s ab jetzt).
+// Wird von der Faktuhr selbst und vom Überspringen aufgerufen.
+function ladeNaechsterFakt() {
+  if (!lade.aktiv) return;
+  clearTimeout(lade.faktTimer);                    // laufende Faktuhr verwerfen (Reset beim Skip)
+  lade.fakt = naechsterFakt(lade.fakt);
+  lade.anzahl += 1;
+  lade.faktStart = performance.now();
+  ladeFaktZeigen(lade.fakt, lade.anzahl);
+  lade.faktTimer = setTimeout(ladeNaechsterFakt, LADEBILDSCHIRM.faktDauer);
+}
+
+function ladeFaktZeigen(f, nummer) {
   const kat = FAKT_KATEGORIEN[f.kategorie];
   const karte = el("ladeKarte");
   karte.classList.remove("fakt-ein");
@@ -4731,101 +4864,120 @@ function ladeFaktZeigen(index) {
   const quelle = el("ladeQuelle");
   quelle.textContent = f.quelle.name;
   quelle.href = f.quelle.url;
-  el("ladeNummer").textContent = (index + 1) + " / " + lade.segmente.length;
-  el("ladeStatus").textContent = LADE_STATUS[index % LADE_STATUS.length];
+  quelle.title = f.quelle.url;                     // volle Adresse beim Überfahren
+  el("ladeNummer").textContent = "Fakt " + nummer;
   karte.classList.add("fakt-ein");
 }
 
-// Eine Runde pro Bild: Zeit fortschreiben, Füllstand berechnen, zeichnen
+// Zeichenschleife: rechnet nichts fort, sondern liest nur die Uhren ab
 function ladeSchleife(zeit) {
-  if (!lade.aktiv || lade.abgeschlossen) return;
-  // Zeitschritt begrenzen: Nach einem versteckten Tab springt der Balken nicht nach vorn
-  const dt = Math.min(Math.max(0, zeit - lade.zuletzt), LADEBILDSCHIRM.maxSchritt);
-  lade.zuletzt = zeit;
-  const segment = lade.segmente[lade.index];
+  if (!lade.aktiv) return;
+  ladeZeichnen(zeit);
+  lade.schleife = requestAnimationFrame(ladeSchleife);
+}
 
-  if (lade.sprung) {
-    // Überspringen: Ease-out vom aktuellen Stand bis zum Ende des Abschnitts
-    lade.sprung.verstrichen += dt;
-    const t = Math.min(1, lade.sprung.verstrichen / LADEBILDSCHIRM.sprungDauer);
-    lade.fortschritt = lade.sprung.von + (lade.sprung.bis - lade.sprung.von) * easeOutKubisch(t);
-    if (t >= 1) {
-      lade.sprung = null;
-      ladeSegmentBeenden();
-    }
-  } else {
-    lade.verstrichen += dt;
-    lade.fortschritt = segmentFortschritt(segment, lade.verstrichen);
-    if (lade.verstrichen >= segment.dauer) ladeSegmentBeenden();
+// Zeichnet großen Balken, Prozentzahl, Statuszeile und Faktuhr für den Zeitpunkt "jetzt"
+function ladeZeichnen(jetzt) {
+  const verstrichen = jetzt - lade.startZeit;
+  const gesamt = ladeGesamtFortschritt(verstrichen);
+  el("ladeFuellung").style.transform = "scaleX(" + gesamt.toFixed(4) + ")";
+  el("ladeFaktUhr").style.transform = "scaleX(" + (1 - faktFortschritt(jetzt - lade.faktStart)).toFixed(4) + ")";
+
+  const prozent = Math.round(gesamt * 100);
+  if (prozent !== lade.prozent) {                  // Text und ARIA nur bei Änderung anfassen
+    lade.prozent = prozent;
+    el("ladeProzent").textContent = prozent + " %";
+    el("ladeBalken").setAttribute("aria-valuenow", String(prozent));
   }
-
-  ladeBalkenZeichnen();
-  if (lade.aktiv && !lade.abgeschlossen) lade.schleife = requestAnimationFrame(ladeSchleife);
-}
-
-// Abschnitt ist voll: nächsten Fakt sofort starten oder Laden abschließen
-function ladeSegmentBeenden() {
-  const segment = lade.segmente[lade.index];
-  lade.fortschritt = segment.bis;
-  if (lade.index < lade.segmente.length - 1) {
-    lade.index += 1;
-    lade.verstrichen = 0;
-    ladeFaktZeigen(lade.index);
-    return;
+  const phase = ladePhase(verstrichen);
+  if (phase !== lade.phase) {
+    lade.phase = phase;
+    el("ladeStatus").textContent = LADE_STATUS[phase];
   }
-  lade.abgeschlossen = true;
-  el("ladeStatus").textContent = "Bereit!";
-  el("ladeWeiter").disabled = true;
-  lade.abschlussTimer = setTimeout(ladebildschirmBeenden, LADEBILDSCHIRM.abschlussPause);
 }
 
-function ladeBalkenZeichnen() {
-  el("ladeFuellung").style.transform = "scaleX(" + lade.fortschritt.toFixed(4) + ")";
-  const prozent = Math.round(lade.fortschritt * 100);
-  if (prozent === lade.prozent) return;                 // Text und ARIA nur bei Änderung
-  lade.prozent = prozent;
-  el("ladeProzent").textContent = prozent + " %";
-  el("ladeBalken").setAttribute("aria-valuenow", String(prozent));
-}
-
-// Aktuellen Fakt überspringen: Balken springt weich ans Abschnittsende, dann folgt sofort der nächste.
-// Während eines Sprungs zählt ein weiterer Klick nicht, damit kein Fakt ungewollt verloren geht.
+// Aktuellen Fakt überspringen: sofort der nächste Fakt, Faktuhr startet neu.
+// Die Gesamtuhr bleibt unberührt, das Ende nach 12 s verschiebt sich also nicht.
 function ladeUeberspringen() {
-  if (!lade.aktiv || lade.abgeschlossen || lade.sprung) return;
-  const segment = lade.segmente[lade.index];
-  lade.sprung = { von: lade.fortschritt, bis: segment.bis, verstrichen: 0 };
+  if (!lade.aktiv) return;
+  ladeNaechsterFakt();
 }
 
+// Nach Ablauf der Gesamtuhr: Balken auf 100 %, alles abbauen, dann das Spiel starten
 function ladebildschirmBeenden() {
-  cancelAnimationFrame(lade.schleife);
-  clearTimeout(lade.abschlussTimer);
-  lade.aktiv = false;
+  if (!lade.aktiv) return;
+  ladeZeichnen(lade.startZeit + LADEBILDSCHIRM.gesamtDauer);   // sichtbar voll, auch wenn ein Bild fehlte
+  el("ladeStatus").textContent = "Bereit!";
+  ladeAufraeumen();
   el("ladebildschirm").classList.add("versteckt");
   el("startbildschirm").classList.remove("laedt");
-  el("ladeWeiter").disabled = false;
   const fertig = lade.fertig;
   lade.fertig = null;
   if (fertig) fertig();
 }
 
-// Klick irgendwo auf den Ladebildschirm (auch auf „Weiter“) überspringt den Fakt.
-// Ausnahmen: der Quellenlink soll sich einfach öffnen, und wer Text markiert, will nicht weiter.
+// Gibt alles frei, was der Ladebildschirm belegt: beide Uhren, die Zeichenschleife und
+// sämtliche Eingabe-Listener. Mehrfacher Aufruf ist unschädlich.
+function ladeAufraeumen() {
+  lade.aktiv = false;
+  clearTimeout(lade.endeTimer);
+  clearTimeout(lade.faktTimer);
+  cancelAnimationFrame(lade.schleife);
+  lade.endeTimer = null;
+  lade.faktTimer = null;
+  lade.schleife = 0;
+  if (lade.abbruch) {
+    lade.abbruch.abort();                          // entfernt alle Listener aus ladeListenerAnmelden
+    lade.abbruch = null;
+  }
+}
+
+// Meldet die Eingaben an, die einen Fakt überspringen. Nur solange der Ladebildschirm läuft.
+//   Enter / Leertaste        keydown auf document
+//   linke Maustaste, Tippen  click
+//   mittlere Maustaste       auxclick (mousedown verhindert vorher das Auto-Scrollen)
+//   rechte Maustaste         contextmenu (das Browsermenü wird unterdrückt)
+function ladeListenerAnmelden() {
+  lade.abbruch = new AbortController();
+  const optionen = { signal: lade.abbruch.signal };
+  const flaeche = el("ladebildschirm");
+  document.addEventListener("keydown", ladeTaste, optionen);
+  flaeche.addEventListener("click", ladeKlick, optionen);
+  flaeche.addEventListener("auxclick", ladeKlick, optionen);
+  flaeche.addEventListener("mousedown", ladeMittelklickVorbereiten, optionen);
+  flaeche.addEventListener("contextmenu", ladeKlick, optionen);
+}
+
+// Klick mit einer Maustaste irgendwo auf den Ladebildschirm (auch auf „Weiter“) überspringt den Fakt.
+// Ausnahmen: Der Quellenlink soll sich normal öffnen, und wer Text markiert, will nicht weiter.
 function ladeKlick(ereignis) {
   if (ereignis.target.closest && ereignis.target.closest("a")) return;
-  if (window.getSelection && String(window.getSelection()) !== "") return;
+  // Rechtsklick kommt als contextmenu; das zusätzliche auxclick der rechten Taste ignorieren,
+  // sonst würde ein Rechtsklick zwei Fakten überspringen
+  if (ereignis.type === "auxclick" && ereignis.button !== 1) return;
+  if (ereignis.type === "contextmenu") ereignis.preventDefault();
+  else if (window.getSelection && String(window.getSelection()) !== "") return;
   ladeUeberspringen();
 }
 
-// Leertaste, Enter oder Pfeil rechts überspringen den Fakt.
+// Mittlere Maustaste: Auto-Scrollen des Browsers verhindern, damit der Klick als auxclick ankommt
+function ladeMittelklickVorbereiten(ereignis) {
+  if (ereignis.button === 1 && !(ereignis.target.closest && ereignis.target.closest("a"))) {
+    ereignis.preventDefault();
+  }
+}
+
+// Leertaste oder Enter überspringen den Fakt.
 // Liegt der Fokus auf einem Knopf oder Link, löst der Browser bei Leertaste/Enter selbst einen
 // Klick aus; dann hier nichts tun, sonst würde doppelt übersprungen.
 // defaultPrevented: Das Enter aus der Namenseingabe startet das Laden und darf nicht gleich überspringen.
+// repeat: Gedrückt gehaltene Tasten zählen nur einmal.
 function ladeTaste(ereignis) {
   if (!lade.aktiv || ereignis.defaultPrevented || ereignis.repeat) return;
   const taste = ereignis.key;
-  if (taste !== " " && taste !== "Enter" && taste !== "ArrowRight") return;
+  if (taste !== " " && taste !== "Enter") return;
   const ziel = ereignis.target;
-  if (taste !== "ArrowRight" && ziel.closest && ziel.closest("button, a")) return;
+  if (ziel.closest && ziel.closest("button, a")) return;
   ereignis.preventDefault();
   ladeUeberspringen();
 }
@@ -5675,9 +5827,8 @@ function oberflaecheVerbinden() {
     if (!ereignis.repeat) nameBestaetigen();
   });
 
-  // Ladebildschirm: Klick oder Taste überspringt den aktuellen Fakt
-  el("ladebildschirm").addEventListener("click", ladeKlick);
-  document.addEventListener("keydown", ladeTaste);
+  // Ladebildschirm: Die Listener fürs Überspringen meldet ladebildschirmStarten() selbst an
+  // und ladeAufraeumen() nach Ablauf der 12 s wieder ab (siehe ladeListenerAnmelden).
 }
 
 // Prüft, ob index.html und style.css zur Version dieses Skripts passen.
@@ -5685,7 +5836,7 @@ function oberflaecheVerbinden() {
 const BENOETIGTE_ELEMENTE = ["anzeigeWissen", "auswahlUebersicht", "popupInfo", "infoOk", "popupQuiz",
   "quizWeiter", "popupZwischenbilanz", "zbWeiter", "massnahmenListe", "personen", "muellInfoKnopf",
   "popupMuell", "muellInhalt", "muellSchliessen", "entscheidungen", "startSzene", "startBilder", "ladebildschirm",
-  "ladeKarte", "ladeFuellung", "ladeBalken", "ladeMarken", "ladeWeiter", "startVollbild", "popupQuellen", "popupUeber", "bildNachweis", "ueberBewertung", "startSonne", "startWolken", "startMeer", "startWindsack", "startHalme",
+  "ladeKarte", "ladeFuellung", "ladeBalken", "ladeMarken", "ladeFaktUhr", "ladeWeiter", "startVollbild", "popupQuellen", "popupUeber", "bildNachweis", "ueberBewertung", "startSonne", "startWolken", "startMeer", "startWindsack", "startHalme",
   "saeulenListe", "saeulenHinweis", "zielZusatz"];
 
 function versionPruefen() {
@@ -5724,9 +5875,9 @@ if (typeof module !== "undefined" && module.exports) {
     angebot: angebot, kostenBerechnen: kostenBerechnen, quizFuerRunde: quizFuerRunde,
     abschlussFragen: abschlussFragen, quizAntwortWerten: quizAntwortWerten, FRAGEN: FRAGEN, INFOPUNKTE: INFOPUNKTE,
     istUmgesetzt: istUmgesetzt, einnahmenBerechnen: einnahmenBerechnen,
-    MEERESFAKTEN: MEERESFAKTEN, LADEBILDSCHIRM: LADEBILDSCHIRM, faktLesedauer: faktLesedauer,
-    ladeSegmenteBerechnen: ladeSegmenteBerechnen, segmentFortschritt: segmentFortschritt,
-    easeOutKubisch: easeOutKubisch, faktenZiehen: faktenZiehen
+    MEERESFAKTEN: MEERESFAKTEN, FAKT_KATEGORIEN: FAKT_KATEGORIEN, LADEBILDSCHIRM: LADEBILDSCHIRM,
+    ladeGesamtFortschritt: ladeGesamtFortschritt, faktFortschritt: faktFortschritt, ladePhase: ladePhase,
+    naechsterFakt: naechsterFakt, faktenZiehen: faktenZiehen
   };
 
 }
