@@ -2735,7 +2735,7 @@ function bereichSymbolSvg(region) {
   return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + inhalt + "</svg>";
 }
 
-// Kopf der Ökologie-Spalte: Bereich dieser Runde, dazu der Anteil seiner Müllquelle am neuen Müll
+// Kopf des Entscheidungsfensters: Bereich dieser Runde, dazu der Anteil seiner Müllquelle am neuen Müll
 function bereichBannerHtml(z, region) {
   const stil = BEREICH_STIL[region];
   const quelle = QUELLEN.find(function (q) { return q.id === region; });
@@ -2746,9 +2746,9 @@ function bereichBannerHtml(z, region) {
         '<span class="bereich-label">Bereich dieser Runde</span>' +
         '<strong class="bereich-name">' + bereichName(region) + "</strong>" +
       "</span>" +
-    "</div>" +
-    (anteil === null ? "" : '<p class="bereich-quelle">Müllquelle hier: ' + quelle.name + ", " + anteil +
-      " % des neuen Mülls</p>");
+      (anteil === null ? "" : '<span class="bereich-quelle">Müllquelle hier: ' + quelle.name + ",<br>" + anteil +
+        " % des neuen Mülls</span>") +
+    "</div>";
 }
 
 function massnahmenAnzeigen() {
@@ -2767,6 +2767,9 @@ function massnahmenAnzeigen() {
     hinweis.classList.add("versteckt");
   }
 
+  // Bereich dieser Runde steht im Kopf über allen drei Spalten
+  el("bereichAnzeige").innerHTML = z.beendet ? "" : bereichBannerHtml(z, region);
+
   const liste = el("massnahmenListe");
   liste.innerHTML = "";
 
@@ -2783,11 +2786,7 @@ function massnahmenAnzeigen() {
     titel.appendChild(elementBauen("span", "saeule-status " + (entschieden ? "fertig" : "offen"),
       entschieden ? "entschieden" : "offen"));
     kopf.appendChild(titel);
-    if (s.id === "oeko" && !z.beendet) {
-      kopf.insertAdjacentHTML("beforeend", bereichBannerHtml(z, region));
-    } else {
-      kopf.appendChild(elementBauen("p", "saeule-untertitel", s.untertitel));
-    }
+    kopf.appendChild(elementBauen("p", "saeule-untertitel", s.untertitel));
     gruppe.appendChild(kopf);
 
     const stapel = elementBauen("div", "saeule-optionen");
