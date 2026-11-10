@@ -1368,7 +1368,7 @@ const START_VERSION = "Version 10";
 // Überspringen (Enter, Leertaste, Maustaste) zeigt sofort den nächsten Fakt und startet nur die
 // Faktuhr neu, die Gesamtuhr läuft unverändert weiter.
 const LADEBILDSCHIRM = {
-  gesamtDauer: 12000,      // ms, feste Gesamtlaufzeit des Ladebildschirms
+  gesamtDauer: 9000,      // ms, feste Gesamtlaufzeit des Ladebildschirms
   faktDauer: 4000          // ms, so lange steht ein Fakt, wenn niemand überspringt
 };
 
