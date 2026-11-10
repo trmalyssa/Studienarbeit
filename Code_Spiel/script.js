@@ -1365,11 +1365,11 @@ const START_VERSION = "Version 9";
 
 // Kurze Zusatzzeile neben dem Titel; bei jedem Öffnen des Startbildschirms eine andere
 const START_SPLASH = [
-  "12 Runden. 3 Säulen. 1 Küste.",
+  "Schütze das Watt, rette die Zukunft!",
   "Wie viel Müll verträgt ein Strand?",
-  "Jetzt mit Abschlussquiz!",
+  "Deine Küste. Deine Verantwortung.",
   "Weniger als 20 Teile auf 100 m!",
-  "Die Nordsee wartet auf dich.",
+  "Nachhaltigkeit ist kein Zufallsprodukt!",
   "Vorbeugen schlägt Aufräumen."
 ];
 
