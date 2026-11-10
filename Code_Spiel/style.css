@@ -4,7 +4,7 @@
 
 /* ===== Grundwerte (zentral änderbar) ===== */
 :root {
-  --layout-version: 10;       /* script.js prüft diesen Wert, damit HTML, CSS und JS zusammenpassen */
+  --layout-version: 11;       /* script.js prüft diesen Wert, damit HTML, CSS und JS zusammenpassen */
   --tinte: #12304A;          /* Linien und Text wie auf einer Seekarte */
   --tinte-2: #3E5A70;        /* zweitrangiger Text */
   --tinte-3: #687F91;        /* Hinweise */
@@ -453,6 +453,71 @@ button {
   border-radius: 3px;
 }
 
+/* Otter: taucht unten links im Meer auf; seine Sprechblase ist weiß mit „!“ (freiwillig, kein Anliegen) */
+.person.otter { animation: auftauchen 0.9s ease-out both; }
+
+.otter-figur {
+  display: block;
+  width: calc(var(--figur) * 1.9);
+  height: calc(var(--figur) * 1.56);
+  animation: schaukeln 3.2s ease-in-out infinite;
+}
+
+.person.otter .person-blase {
+  color: var(--orange);
+  background: #fff;
+}
+
+.person.otter.ungelesen:hover .person-blase {
+  color: #fff;
+  background: var(--orange);
+}
+
+.person.otter.gelesen .person-blase { color: var(--gruen); }
+
+@keyframes auftauchen {
+  from { opacity: 0; transform: translate(-50%, -80%); }
+  to   { opacity: 1; transform: translate(-50%, -100%); }
+}
+
+@keyframes schaukeln {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(1.5px) rotate(-2deg); }
+}
+
+.anliegen-figur .otter-figur {
+  width: 40px;
+  height: 33px;
+  animation: none;
+}
+
+.otter-satz { font-size: 1.02rem; }
+
+.otter-liste {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.otter-liste li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  padding: 6px 10px;
+  background: #FBF3DF;
+  border-left: 3px solid var(--gelb);
+  border-radius: 3px;
+}
+
+.otter-soll {
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: var(--tinte-2);
+}
+
 /* Ungelesene Sprechblasen wippen leicht */
 .person.ungelesen .person-blase { animation: wippen 1.6s ease-in-out infinite; }
 
@@ -844,19 +909,6 @@ button {
   background: var(--tinte);
 }
 
-/* Sollkurs dieser Runde: kleines Dreieck über dem Balken, wandert mit dem Spielverlauf */
-.balken-kurs {
-  position: absolute;
-  top: -8px;
-  width: 0;
-  height: 0;
-  margin-left: -5px;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-top: 7px solid var(--orange);
-  transition: left 0.5s ease;
-}
-
 .kennzahl-legende {
   margin-top: 14px;
   display: flex;
@@ -874,75 +926,6 @@ button {
 }
 
 .kennzahl-legende + .kennzahl-legende { margin-top: 6px; }
-
-.kurs-strich {
-  display: inline-block;
-  width: 0;
-  height: 0;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-top: 7px solid var(--orange);
-}
-
-/* ===== Die drei Säulen (Seitenleiste) ===== */
-#saeulenTafel { padding: 14px 18px 14px; }
-
-.saeulen-liste {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 10px;
-}
-
-.sz-kopf {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 4px;
-  font-size: 0.92rem;
-}
-
-.sz-name { font-weight: 600; }
-.sz-name::before {
-  content: "";
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  margin-right: 7px;
-  border-radius: 50%;
-  background: var(--sz-farbe, var(--tinte-3));
-}
-
-.sz-balken {
-  height: 8px;
-  background: #E6EEF2;
-  border-radius: 2px;
-}
-
-.sz-fuellung {
-  height: 100%;
-  border-radius: 2px;
-  transition: width 0.5s ease, background-color 0.5s ease;
-}
-
-.sz-zeile.schwaechste .sz-name { color: var(--rot); }
-
-.saeulen-hinweis {
-  margin: 10px 0 0;
-  font-size: 0.84rem;
-  line-height: 1.4;
-  color: var(--tinte-2);
-}
-
-/* Vorschau auf das Angebot der nächsten Runde (unter den Entscheidungen) */
-.vorschau-naechste {
-  margin: 8px 0 0;
-  font-size: 0.8rem;
-  line-height: 1.35;
-  color: var(--tinte-3);
-}
-
-.vorschau-naechste strong { color: var(--tinte-2); font-weight: 600; }
 
 /* ===== Bericht: Säulen, Konflikte, Kompetenzprofil ===== */
 .saeulen-bericht { margin: 0 0 10px; }
@@ -1015,39 +998,16 @@ button {
 .entscheidungs-tafel { padding: 16px 18px 4px; }
 .entscheidungs-tafel .tafel-kopf { align-items: center; }
 
-/* drei Säulen nebeneinander */
+/* drei Säulen nebeneinander, alle gleich hoch. Jede Säule belegt drei Zeilen (Kopf, Maßnahmen,
+   „Nichts tun“); über Subgrid liegen diese Zeilen in allen Spalten auf derselben Höhe. */
 .saeulen-raster {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-  align-items: start;
-}
-
-.region-folge {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.85rem;
-}
-
-.region-folge-label,
-.region-naechste { color: var(--tinte-3); }
-.region-folge-label { margin-right: 2px; }
-.region-naechste { margin-left: 4px; }
-
-.region-chip {
-  padding: 2px 10px;
-  color: var(--tinte-2);
-  border: 1px solid var(--linie-stark);
-  border-radius: 999px;
-}
-
-.region-chip.aktiv {
-  font-weight: 600;
-  color: #fff;
-  background: var(--tinte);
-  border-color: var(--tinte);
+  grid-auto-rows: auto;
+  column-gap: 16px;
+  row-gap: 0;
+  align-items: stretch;
+  padding-bottom: 14px;
 }
 
 .gruppe-notiz {
@@ -1063,20 +1023,18 @@ button {
   border-left: 3px solid var(--gelb);
 }
 
+/* Maßnahme als Karte: Kopf zum Aufklappen, darunter Beschreibung und Knopf zum Wählen */
 .massnahme {
   display: flex;
   flex-direction: column;
-  gap: 5px;
   width: 100%;
-  padding: 10px 12px;
-  text-align: left;
   background: var(--flaeche);
   border: 1px solid var(--linie-stark);
   border-radius: 6px;
-  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.massnahme:hover:not(:disabled) { border-color: var(--tinte); }
+.massnahme:hover { border-color: var(--tinte); }
 
 .massnahme.gewaehlt {
   background: #EDF4F8;
@@ -1084,20 +1042,46 @@ button {
   box-shadow: inset 0 0 0 1px var(--tinte);
 }
 
-.massnahme:disabled {
-  cursor: not-allowed;
+.massnahme.offen {
+  border-color: var(--tinte);
+  box-shadow: 0 6px 18px rgba(18, 48, 74, 0.16);
+}
+
+.massnahme.gewaehlt.offen { box-shadow: inset 0 0 0 1px var(--tinte), 0 6px 18px rgba(18, 48, 74, 0.16); }
+
+.massnahme.nicht-waehlbar:not(.offen) {
   background: #F6F8F9;
   border-color: var(--linie);
+}
+
+.massnahme-kopfknopf {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  padding: 8px 10px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.massnahme-kopfknopf:focus-visible {
+  outline: 3px solid var(--orange);
+  outline-offset: 2px;
 }
 
 .massnahme-kopf {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
 }
 
 .massnahme-name {
+  flex: 1;
   font-weight: 600;
   line-height: 1.3;
 }
@@ -1109,8 +1093,25 @@ button {
   white-space: nowrap;
 }
 
-.massnahme:disabled .massnahme-name,
-.massnahme:disabled .massnahme-kosten { color: var(--tinte-3); }
+/* Pfeil: zeigt nach unten, aufgeklappt nach oben */
+.massnahme-pfeil {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-left: 2px;
+  border-right: 2px solid var(--tinte-3);
+  border-bottom: 2px solid var(--tinte-3);
+  transform: translateY(-3px) rotate(45deg);
+  transition: transform 0.15s ease;
+}
+
+.massnahme.offen .massnahme-pfeil {
+  border-color: var(--tinte);
+  transform: translateY(1px) rotate(-135deg);
+}
+
+.massnahme.nicht-waehlbar .massnahme-name,
+.massnahme.nicht-waehlbar .massnahme-kosten { color: var(--tinte-3); }
 
 .massnahme-merkmale {
   display: flex;
@@ -1118,12 +1119,19 @@ button {
   gap: 4px;
 }
 
-.massnahme-merkmale span {
+.massnahme-merkmale .merkmal {
   padding: 1px 7px;
   font-size: 0.78rem;
   color: var(--tinte-2);
   background: var(--wasser);
   border-radius: 3px;
+}
+
+/* Verfügbarkeit („nur diese Runde“, „wieder in Runde 7“): hebt den Zeitdruck hervor */
+.massnahme-merkmale .merkmal-zeit {
+  font-weight: 600;
+  color: var(--orange-dunkel);
+  background: #FDEDE3;
 }
 
 .massnahme-status {
@@ -1135,33 +1143,79 @@ button {
 .status-gesperrt .massnahme-status { color: #9A6A00; }
 .status-budget .massnahme-status { color: var(--rot); }
 
-.auswahl-detail {
-  min-height: 92px;
-  margin-top: 12px;
-  padding: 12px 0 14px;
+.massnahme-gewaehlt {
+  align-self: flex-start;
+  padding: 0 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--gruen);
+  background: #E6F3EB;
+  border-radius: 999px;
+}
+
+/* Aufgeklappter Teil */
+.massnahme-detail {
+  margin: 0 10px;
+  padding: 8px 0 10px;
   border-top: 1px solid var(--linie);
 }
 
-.auswahl-leer {
-  font-size: 0.9rem;
-  color: var(--tinte-3);
-}
+.massnahme-detail[hidden] { display: none; }
 
-.auswahl-titel { font-weight: 600; }
-
-.auswahl-text {
-  margin-top: 2px;
-  font-size: 0.9rem;
+.massnahme-text {
+  font-size: 0.88rem;
+  line-height: 1.45;
   color: var(--tinte-2);
 }
 
-.auswahl-frage {
+.massnahme-frage {
   margin-top: 8px;
   padding-left: 10px;
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   font-style: italic;
+  line-height: 1.45;
   border-left: 3px solid var(--orange);
 }
+
+.merkmal-erklaerung {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--tinte-2);
+}
+
+.massnahme-aktion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 10px;
+}
+
+.knopf-primaer.knopf-klein,
+.knopf-sekundaer.knopf-klein {
+  min-height: 34px;
+  padding: 0 0.85rem;
+  font-size: 0.88rem;
+}
+
+.knopf-primaer:disabled {
+  cursor: not-allowed;
+  background: var(--linie-stark);
+  border-color: var(--linie-stark);
+}
+
+.massnahme-grund {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--rot);
+}
+
+.status-gesperrt .massnahme-grund { color: #9A6A00; }
 
 .runden-abschluss { padding: 14px 18px 16px; }
 
@@ -2358,11 +2412,77 @@ p + .info-tabelle { margin-top: 10px; }
 
 /* ===== Drei Säulen unter der Karte ===== */
 .saeule {
+  display: grid;
+  grid-row: span 3;
+  grid-template-rows: subgrid;
+  row-gap: 8px;
+  min-width: 0;
+  padding: 2px 0 2px 10px;
+  border-left: 3px solid var(--linie-stark);
+}
+
+.saeule-optionen {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 2px 0 6px 10px;
-  border-left: 3px solid var(--linie-stark);
+}
+
+/* „Nichts tun“ steht in allen Spalten unten auf gleicher Höhe */
+.saeule-fuss { align-self: end; }
+
+/* Bereich dieser Runde im Kopf der Ökologie-Spalte */
+.bereich-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 6px 10px;
+  background: var(--bereich-flaeche);
+  border: 1.5px solid var(--bereich);
+  border-radius: 6px;
+}
+
+.bereich-symbol {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  color: #fff;
+  background: var(--bereich);
+  border-radius: 50%;
+}
+
+.bereich-symbol svg {
+  width: 22px;
+  height: 22px;
+}
+
+.bereich-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.bereich-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tinte-2);
+}
+
+.bereich-name {
+  font-family: var(--schrift-schmal);
+  font-size: 1.35rem;
+  color: var(--bereich);
+}
+
+.bereich-quelle {
+  margin-top: 4px;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--tinte-2);
 }
 
 .saeule-oeko { border-left-color: var(--saeule-oeko); }
@@ -2400,13 +2520,17 @@ p + .info-tabelle { margin-top: 10px; }
   background: #E6F3EB;
 }
 
-.saeule .massnahme { padding: 8px 10px; }
-
 /* „Zurückstellen“ ist eine bewusste Entscheidung, aber optisch zurückgenommen */
 .massnahme.zurueck {
-  padding: 6px 10px;
   background: transparent;
   border-style: dashed;
+}
+
+.massnahme.zurueck .massnahme-kopfknopf { padding: 6px 10px; }
+
+.massnahme.zurueck.offen {
+  background: var(--flaeche);
+  border-style: solid;
 }
 
 .massnahme.zurueck .massnahme-name {
@@ -2422,18 +2546,6 @@ p + .info-tabelle { margin-top: 10px; }
 .massnahme.zurueck.gewaehlt .massnahme-name {
   font-weight: 600;
   color: var(--tinte);
-}
-
-.auswahl-saeule {
-  display: inline-block;
-  margin-right: 8px;
-  padding: 0 7px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--tinte-2);
-  background: var(--wasser);
-  border-radius: 3px;
-  vertical-align: 1px;
 }
 
 /* ===== Pop-up: Infopunkt ===== */
@@ -2578,7 +2690,7 @@ p + .info-tabelle { margin-top: 10px; }
 /* Unter 1060 px: Markenname ausblenden, Säulen untereinander */
 @media (max-width: 1060px) {
   .marke-name { display: none; }
-  .saeulen-raster { grid-template-columns: minmax(0, 1fr); }
+  .saeulen-raster { grid-template-columns: minmax(0, 1fr); row-gap: 18px; }
 }
 
 /* ===== Schmale Bildschirme: alles untereinander ===== */
