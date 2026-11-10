@@ -1675,7 +1675,6 @@ button {
   justify-content: space-between;
   gap: 12px;
   padding-bottom: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
 }
 
 .fakten-label {
@@ -1689,6 +1688,26 @@ button {
 .fakt-nummer {
   font-size: 0.8rem;
   color: var(--start-text-3);
+}
+
+/* Faktuhr: dünner Balken unter dem Kopf, läuft in faktDauer (4 s) von voll nach leer.
+   Breite über transform (scaleX) statt width: flüssig, ohne Layout-Neuberechnung. */
+.fakt-uhr {
+  height: 3px;
+  margin-top: -1px;          /* liegt genau auf der Trennlinie des Kopfs */
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+}
+
+.fakt-uhr-fuellung {
+  display: block;
+  height: 100%;
+  background: var(--lade-akzent);
+  border-radius: inherit;
+  transform: scaleX(1);
+  transform-origin: left center;
+  will-change: transform;
 }
 
 .fakt-karte {
@@ -1743,18 +1762,39 @@ button {
   color: var(--start-text-2);
 }
 
+/* Quelle: eigene Zeile unter dem Fakt, durch eine feine Linie abgesetzt.
+   Lange Namen und Adressen brechen um, statt die Karte zu sprengen. */
 .fakt-quelle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  width: 100%;
   margin-top: auto;
-  padding-top: 12px;
-  font-size: 0.8rem;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--start-text-3);
+}
+
+.fakt-quelle-label {
+  flex: none;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   color: var(--start-text-3);
 }
 
 .fakt-quelle a {
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: #BFE3F7;
   text-decoration: underline;
   text-decoration-color: rgba(191, 227, 247, 0.45);
   text-underline-offset: 3px;
+  cursor: pointer;
 }
 
 .fakt-quelle a:hover { text-decoration-color: currentColor; }
