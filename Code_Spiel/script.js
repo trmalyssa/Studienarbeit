@@ -129,7 +129,7 @@ const ANGEBOT_PRO_SAEULE = 3;              // so viele Maßnahmen werden je Säu
 const REGIONEN_FOLGE = ["strand", "meer", "land"];
 
 // Darstellung der Bereiche: eigene Farbe und eigenes Symbol, damit sofort klar ist,
-// für welchen Bereich die Ökologie-Maßnahmen dieser Runde gelten (Spaltenkopf und Karte)
+// für welchen Bereich die Ökologie-Maßnahmen dieser Runde gelten (Leiste über den drei Spalten)
 const BEREICH_STIL = {
   strand: { farbe: "#A86A12", flaeche: "#FBF0DA" },
   meer:   { farbe: "#0F6E8C", flaeche: "#E1F1F6" },
@@ -2735,20 +2735,31 @@ function bereichSymbolSvg(region) {
   return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + inhalt + "</svg>";
 }
 
-// Kopf der Ökologie-Spalte: Bereich dieser Runde, dazu der Anteil seiner Müllquelle am neuen Müll
-function bereichBannerHtml(z, region) {
+// Leiste über den drei Spalten: Bereich dieser Runde, dazu der Anteil seiner Müllquelle am neuen Müll
+function bereichAnzeigen(z, region) {
+  const feld = el("bereichRunde");
+  if (z.beendet) {
+    feld.innerHTML = "";
+    feld.classList.add("versteckt");
+    return;
+  }
   const stil = BEREICH_STIL[region];
   const quelle = QUELLEN.find(function (q) { return q.id === region; });
   const anteil = z.eintrag && z.eintrag.gesamt > 0 ? Math.round(100 * z.eintrag[region] / z.eintrag.gesamt) : null;
-  return '<div class="bereich-banner" style="--bereich:' + stil.farbe + ";--bereich-flaeche:" + stil.flaeche + '">' +
-      '<span class="bereich-symbol">' + bereichSymbolSvg(region) + "</span>" +
-      '<span class="bereich-text">' +
-        '<span class="bereich-label">Bereich dieser Runde</span>' +
-        '<strong class="bereich-name">' + bereichName(region) + "</strong>" +
-      "</span>" +
-    "</div>" +
-    (anteil === null ? "" : '<p class="bereich-quelle">Müllquelle hier: ' + quelle.name + ", " + anteil +
-      " % des neuen Mülls</p>");
+  feld.classList.remove("versteckt");
+  feld.style.setProperty("--bereich", stil.farbe);
+  feld.style.setProperty("--bereich-flaeche", stil.flaeche);
+  feld.innerHTML =
+    '<span class="bereich-symbol">' + bereichSymbolSvg(region) + "</span>" +
+    '<span class="bereich-text">' +
+      '<span class="bereich-label">Bereich dieser Runde</span>' +
+      '<strong class="bereich-name">' + bereichName(region) + "</strong>" +
+    "</span>" +
+    '<span class="bereich-info">Die Ökologie-Maßnahmen dieser Runde betreffen ' +
+      (region === "meer" ? "das Meer" : region === "land" ? "das Land" : "den Strand") + "." +
+      (anteil === null ? "" : "<br>Müllquelle hier: " + quelle.name + ", <strong>" + anteil +
+        " %</strong> des neuen Mülls.") +
+    "</span>";
 }
 
 function massnahmenAnzeigen() {
@@ -2767,6 +2778,8 @@ function massnahmenAnzeigen() {
     hinweis.classList.add("versteckt");
   }
 
+  bereichAnzeigen(z, region);
+
   const liste = el("massnahmenListe");
   liste.innerHTML = "";
 
@@ -2783,11 +2796,7 @@ function massnahmenAnzeigen() {
     titel.appendChild(elementBauen("span", "saeule-status " + (entschieden ? "fertig" : "offen"),
       entschieden ? "entschieden" : "offen"));
     kopf.appendChild(titel);
-    if (s.id === "oeko" && !z.beendet) {
-      kopf.insertAdjacentHTML("beforeend", bereichBannerHtml(z, region));
-    } else {
-      kopf.appendChild(elementBauen("p", "saeule-untertitel", s.untertitel));
-    }
+    kopf.appendChild(elementBauen("p", "saeule-untertitel", s.untertitel));
     gruppe.appendChild(kopf);
 
     const stapel = elementBauen("div", "saeule-optionen");
@@ -3916,35 +3925,8 @@ function seekarteSvg(z) {
     s += muellSymbolSvg(m.form, m.x, m.y, m.winkel, m.groesse);
   });
 
-  // Bereich der Runde: gestrichelte Umrandung in der Farbe des Bereichs (wie im Spaltenkopf der Ökologie)
-  if (!z.beendet) s += bereichUmrandungSvg(regionDerRunde(z.runde));
-
   s += "</svg>";
   return s;
-}
-
-// Umriss von Land, Strand oder Meer, entlang derselben Küstenlinie wie die Karte.
-// Der Umriss liegt eine halbe Linienbreite innerhalb des Kartenrands, damit er überall sichtbar bleibt.
-function bereichUmrandungSvg(region) {
-  const stil = BEREICH_STIL[region];
-  const r = 1.5;
-  const kante = function (versatz) {
-    const p = [];
-    for (let x = 0; x <= KARTE_B; x += 10) {
-      p.push(begrenzen(x, r, KARTE_B - r) + "," + (kuestenlinie(x) + versatz).toFixed(1));
-    }
-    return p;
-  };
-  let punkte;
-  if (region === "land") {
-    punkte = [r + "," + r].concat(kante(-r), [(KARTE_B - r) + "," + r]);
-  } else if (region === "strand") {
-    punkte = kante(r).concat(kante(STRAND_BREITE - r).reverse());
-  } else {
-    punkte = kante(STRAND_BREITE + r).concat([(KARTE_B - r) + "," + (KARTE_H - r), r + "," + (KARTE_H - r)]);
-  }
-  return '<polygon points="' + punkte.join(" ") + '" fill="' + stil.farbe + '" fill-opacity="0.08" stroke="' +
-    stil.farbe + '" stroke-width="2.6" stroke-dasharray="10 6" stroke-linejoin="round" pointer-events="none"/>';
 }
 
 function seekarteAnzeigen() {
@@ -3952,8 +3934,7 @@ function seekarteAnzeigen() {
   el("seekarte").innerHTML = seekarteSvg(z);
   el("kartenStatus").textContent = z.beendet
     ? "Endstand nach " + RUNDEN + " Runden"
-    : "Ökologie-Maßnahmen dieser Runde gelten für den Bereich " + bereichName(regionDerRunde(z.runde)) +
-      " (auf der Karte gestrichelt umrandet). " + aktuellesLevel(z.runde).text;
+    : aktuellesLevel(z.runde).text;
 
   // Legende: nur Symbole, die gerade auf der Karte zu sehen sind
   const w = aktiveWirkung(z, Math.min(z.runde, RUNDEN));
@@ -6042,8 +6023,52 @@ function oberflaecheVerbinden() {
     if (!ereignis.repeat) nameBestaetigen();
   });
 
+  // Escape schließt das oberste offene Pop-up. Es löst denselben Knopf aus wie ein Klick,
+  // damit der Spielablauf (Bericht → Zwischenbilanz → Ereignis …) erhalten bleibt.
+  document.addEventListener("keydown", escapeTaste);
+
   // Ladebildschirm: Die Listener fürs Überspringen meldet ladebildschirmStarten() selbst an
   // und ladeAufraeumen() nach Ablauf der 12 s wieder ab (siehe ladeListenerAnmelden).
+}
+
+// Pop-up → Knopf, den Escape auslöst (oder eigene Aktion). Das Quiz schließt erst nach der Antwort:
+// Sein Knopf ist bis dahin gesperrt, Escape bewirkt dort vorher nichts.
+const ESCAPE_KNOPF = {
+  popupUeber: "ueberSchliessen",
+  popupQuellen: "quellenSchliessen",
+  popupName: "nameAbbrechen",
+  popupEinfuehrung: function () { popupSchliessen("popupEinfuehrung"); },
+  popupBericht: "berichtWeiter",
+  popupEreignis: "ereignisOk",
+  popupAnliegen: "anliegenOk",
+  popupInfo: "infoOk",
+  popupQuiz: "quizWeiter",
+  popupZwischenbilanz: "zbWeiter",
+  popupOtter: "otterOk",
+  popupMuell: "muellSchliessen",
+  popupBudget: "budgetSchliessen",
+  popupBewertung: "bewertungSchliessen",
+  popupBeenden: "beendenAbbrechen",
+  popupAuswertung: "auswertungStart",
+  popupLeaderboard: "leaderboardSchliessen"
+};
+
+function escapeTaste(ereignis) {
+  if (ereignis.key !== "Escape" || ereignis.repeat) return;
+  // oberstes sichtbares Pop-up: „overlay-oben“ (Leaderboard) zuerst, sonst das letzte im Dokument
+  const offen = Array.prototype.slice.call(document.querySelectorAll(".overlay:not(.versteckt)"));
+  if (!offen.length) return;
+  const oben = offen.filter(function (o) { return o.classList.contains("overlay-oben"); });
+  const overlay = (oben.length ? oben : offen)[(oben.length ? oben : offen).length - 1];
+  const aktion = ESCAPE_KNOPF[overlay.id];
+  if (!aktion) return;
+  ereignis.preventDefault();
+  if (typeof aktion === "function") {
+    aktion();
+    return;
+  }
+  const knopf = el(aktion);
+  if (knopf && !knopf.disabled) knopf.click();
 }
 
 // Prüft, ob index.html und style.css zur Version dieses Skripts passen.
@@ -6052,11 +6077,11 @@ const BENOETIGTE_ELEMENTE = ["anzeigeWissen", "auswahlUebersicht", "popupInfo", 
   "quizWeiter", "popupZwischenbilanz", "zbWeiter", "massnahmenListe", "personen", "muellInfoKnopf",
   "popupMuell", "muellInhalt", "muellSchliessen", "entscheidungen", "startSzene", "startBilder", "ladebildschirm",
   "ladeKarte", "ladeFuellung", "ladeBalken", "ladeMarken", "ladeFaktUhr", "ladeWeiter", "startVollbild", "popupQuellen", "popupUeber", "bildNachweis", "ueberBewertung", "startSonne", "startWolken", "startMeer", "startWindsack", "startHalme",
-  "popupOtter", "otterOk", "otterInhalt", "zielZusatz"];
+  "popupOtter", "otterOk", "otterInhalt", "bereichRunde", "zielZusatz"];
 
 function versionPruefen() {
   const fehlend = BENOETIGTE_ELEMENTE.filter(function (id) { return !document.getElementById(id); });
-  const cssNeu = getComputedStyle(document.documentElement).getPropertyValue("--layout-version").trim() === "11";
+  const cssNeu = getComputedStyle(document.documentElement).getPropertyValue("--layout-version").trim() === "12";
   if (!fehlend.length && cssNeu) return true;
   const hinweis = document.createElement("div");
   hinweis.setAttribute("role", "alert");

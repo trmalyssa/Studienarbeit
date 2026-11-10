@@ -4,7 +4,7 @@
 
 /* ===== Grundwerte (zentral änderbar) ===== */
 :root {
-  --layout-version: 11;       /* script.js prüft diesen Wert, damit HTML, CSS und JS zusammenpassen */
+  --layout-version: 12;       /* script.js prüft diesen Wert, damit HTML, CSS und JS zusammenpassen */
   --tinte: #12304A;          /* Linien und Text wie auf einer Seekarte */
   --tinte-2: #3E5A70;        /* zweitrangiger Text */
   --tinte-3: #687F91;        /* Hinweise */
@@ -2430,17 +2430,20 @@ p + .info-tabelle { margin-top: 10px; }
 /* „Nichts tun“ steht in allen Spalten unten auf gleicher Höhe */
 .saeule-fuss { align-self: end; }
 
-/* Bereich dieser Runde im Kopf der Ökologie-Spalte */
-.bereich-banner {
+/* Bereich dieser Runde: Leiste über allen drei Spalten */
+.bereich-runde {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-  margin-top: 6px;
-  padding: 6px 10px;
+  gap: 8px 14px;
+  margin-bottom: 14px;
+  padding: 8px 14px;
   background: var(--bereich-flaeche);
   border: 1.5px solid var(--bereich);
   border-radius: 6px;
 }
+
+.bereich-runde.versteckt { display: none; }
 
 .bereich-symbol {
   flex: none;
@@ -2478,11 +2481,16 @@ p + .info-tabelle { margin-top: 10px; }
   color: var(--bereich);
 }
 
-.bereich-quelle {
-  margin-top: 4px;
-  font-size: 0.78rem;
-  line-height: 1.35;
+.bereich-info {
+  flex: 1 1 260px;
+  font-size: 0.85rem;
+  line-height: 1.45;
   color: var(--tinte-2);
+  text-align: right;
+}
+
+@media (max-width: 860px) {
+  .bereich-info { text-align: left; }
 }
 
 .saeule-oeko { border-left-color: var(--saeule-oeko); }
