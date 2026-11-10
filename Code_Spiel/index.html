@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="style.css?v=10">
+  <link rel="stylesheet" href="style.css?v=11">
 </head>
 <body>
 
@@ -85,11 +85,10 @@
       <section id="entscheidungen" class="tafel entscheidungs-tafel" aria-labelledby="massnahmenTitel">
         <div class="tafel-kopf">
           <h2 id="massnahmenTitel">Entscheidungen der Runde</h2>
-          <div id="regionFolge" class="region-folge"></div>
+          <p class="tafel-zusatz">Klicke auf eine Maßnahme, um sie aufzuklappen.</p>
         </div>
         <p id="foerderHinweis" class="foerder-hinweis versteckt"></p>
         <div id="massnahmenListe" class="saeulen-raster"></div>
-        <div id="auswahlDetail" class="auswahl-detail" aria-live="polite"></div>
       </section>
 
       <section class="tafel ziel-tafel" aria-labelledby="zielTitel">
@@ -115,15 +114,6 @@
         </div>
         <div id="kennzahlenListe" class="kennzahlen-liste"></div>
         <p class="kennzahl-legende"><span class="ziel-strich" aria-hidden="true"></span>Mindestwert für den guten Umweltzustand</p>
-        <p class="kennzahl-legende"><span class="kurs-strich" aria-hidden="true"></span>Sollkurs dieser Runde</p>
-      </section>
-
-      <section id="saeulenTafel" class="tafel" aria-labelledby="saeulenTitel">
-        <div class="tafel-kopf">
-          <h2 id="saeulenTitel">Die drei Säulen</h2>
-        </div>
-        <div id="saeulenListe" class="saeulen-liste"></div>
-        <p id="saeulenHinweis" class="saeulen-hinweis" aria-live="polite"></p>
       </section>
 
       <section class="tafel runden-abschluss" aria-label="Runde abschließen">
@@ -397,6 +387,23 @@
       <div class="popup-inhalt" id="zbInhalt"></div>
       <div class="popup-fuss">
         <button id="zbWeiter" class="knopf-primaer" type="button" data-fokus>Weiter</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Pop-up: Otter mit dem Zwischenstand (Runde 3, 6 und 9, freiwillig) ===== -->
+  <div class="overlay versteckt" id="popupOtter" role="dialog" aria-modal="true" aria-labelledby="otterTitel">
+    <div class="popup popup-anliegen">
+      <div class="popup-kopf anliegen-kopf">
+        <span id="otterFigur" class="anliegen-figur" aria-hidden="true"></span>
+        <div>
+          <h2 id="otterTitel"></h2>
+          <p id="otterUntertitel" class="tafel-zusatz"></p>
+        </div>
+      </div>
+      <div class="popup-inhalt" id="otterInhalt"></div>
+      <div class="popup-fuss">
+        <button id="otterOk" class="knopf-primaer" type="button" data-fokus>Danke, Otter</button>
       </div>
     </div>
   </div>

@@ -125,8 +125,21 @@ const SAEULEN = [
 const ZURUECKSTELLEN = "zurueckstellen";   // Entscheidung: in dieser Säule nichts umsetzen
 const ANGEBOT_PRO_SAEULE = 3;              // so viele Maßnahmen werden je Säule angeboten
 
-// Reihenfolge der Regionen; jede Runde steht eine Region im Fokus der Ökologie
+// Reihenfolge der Regionen; jede Runde gelten die Ökologie-Maßnahmen für einen dieser Bereiche
 const REGIONEN_FOLGE = ["strand", "meer", "land"];
+
+// Darstellung der Bereiche: eigene Farbe und eigenes Symbol, damit sofort klar ist,
+// für welchen Bereich die Ökologie-Maßnahmen dieser Runde gelten (Spaltenkopf und Karte)
+const BEREICH_STIL = {
+  strand: { farbe: "#A86A12", flaeche: "#FBF0DA" },
+  meer:   { farbe: "#0F6E8C", flaeche: "#E1F1F6" },
+  land:   { farbe: "#4E7A2A", flaeche: "#E8F1DF" }
+};
+
+// Otter: taucht in diesen Runden unten links im Meer auf und meldet kurz den Zwischenstand.
+// Freiwillig, ohne Strafe. Ersetzt die frühere Sollkurs-Anzeige in der Seitenleiste.
+const OTTER_RUNDEN = [3, 6, 9];
+const OTTER_ORT = { x: 6.5, y: 94 };   // Fußpunkt der Figur in Prozent der Kartenbreite/-höhe
 
 // Zwischenbilanz nach diesen Runden (3, 6, 9)
 const ZWISCHENBILANZ_ALLE = 3;
@@ -1630,13 +1643,14 @@ function neuerZustand(zufall) {
     ereignis: null,            // Ereignis der aktuellen Runde
     foerderaufruf: null,       // offener EU-Förderaufruf
     auswahl: leereAuswahl(),   // je Säule: null = offen, ZURUECKSTELLEN oder id der Maßnahme
-    zuletzt: null,             // zuletzt angeklickte Auswahl (für die Detailanzeige)
+    zuletzt: null,             // aufgeklappte Karte im Entscheidungsfenster (id der Maßnahme oder "zurueckstellen:<säule>")
     trend: {},                 // Änderung jeder Kennzahl in der letzten Runde
     verlauf: [],               // Momentaufnahmen: Index 0 = Start, dann je Runde
     anliegen: [],              // Anliegen der aktuellen Runde (Sprechblasen)
     anhoerung: { gesamt: 0, zuSchnell: 0 },   // Zähler für die Auswertung (Zuhören)
     gesagt: [],                // bereits geäußerte Aussagen, z. B. "meer:netze"
     infopunkteGelesen: [],     // ids der geöffneten Infopunkte
+    otterGelesen: [],          // Runden, in denen der Otter angeklickt wurde
     muellBilanz: null,         // Müllbilanz der letzten Runde (für das Strandmüll-Pop-up)
     quiz: { richtig: 0, gestellt: 0, ergebnisse: [] },
     beendet: false
@@ -2091,13 +2105,21 @@ function angebot(z, saeule, runde) {
   return ausschnitt(offen, runde - 1);
 }
 
-// Voraussichtliches Angebot der nächsten Runde (unter der Annahme, dass die jetzt gewählte
-// Maßnahme der Säule umgesetzt wird; wiederholbare Maßnahmen bleiben im Angebot)
-function vorschauAngebot(z, saeuleId) {
+// Ab welcher Runde steht eine Maßnahme nach dieser Runde wieder zur Wahl? Gerechnet wird mit dem
+// heutigen Stand (die aktuelle Auswahl gilt als umgesetzt); spätere Entscheidungen können das noch
+// verschieben. Ökologie: nur in jeder dritten Runde, wenn ihr Bereich wieder an der Reihe ist.
+// Ergebnis: Rundennummer oder null (bis Spielende nicht mehr im Angebot)
+function naechstesAngebot(z, m) {
   const kopie = { umgesetzt: Object.assign({}, z.umgesetzt) };
-  const id = z.auswahl[saeuleId];
-  if (id && id !== ZURUECKSTELLEN) kopie.umgesetzt[id] = (kopie.umgesetzt[id] || []).concat([z.runde]);
-  return angebot(kopie, saeuleId, z.runde + 1);
+  SAEULEN.forEach(function (s) {
+    const id = z.auswahl[s.id];
+    if (id && id !== ZURUECKSTELLEN) kopie.umgesetzt[id] = (kopie.umgesetzt[id] || []).concat([z.runde]);
+  });
+  const schritt = m.saeule === "oeko" ? REGIONEN_FOLGE.length : 1;
+  for (let r = z.runde + schritt; r <= RUNDEN; r += schritt) {
+    if (angebot(kopie, m.saeule, r).indexOf(m) >= 0) return r;
+  }
+  return null;
 }
 
 function istAngeboten(z, m) {
@@ -2532,9 +2554,7 @@ function alleAnzeigen() {
   muellAnzeigen();
   zieleAnzeigen();
   kennzahlenAnzeigen();
-  saeulenAnzeigen();
   massnahmenAnzeigen();
-  auswahlAnzeigen();
   rundenKnopfAnzeigen();
 }
 
@@ -2670,7 +2690,6 @@ function kennzahlenErstellen() {
       '<div class="balken">' +
         '<div class="balken-fuellung" id="balken-' + k.id + '"></div>' +
         '<div class="balken-ziel" style="left:' + k.mindest + '%" title="Mindestwert ' + k.mindest + ' %"></div>' +
-        '<div class="balken-kurs" id="kurs-' + k.id + '"></div>' +
       "</div>";
     liste.appendChild(zeile);
   });
@@ -2684,79 +2703,58 @@ function kennzahlenAnzeigen() {
     balken.style.width = wert + "%";
     balken.style.backgroundColor = ampelFarbe(wert, k.mindest);
     el("wert-" + k.id).innerHTML = trendHtml(z.trend[k.id], true) + "<strong>" + wert + " %</strong>";
-    // Sollwert, den die Kennzahl am Ende der laufenden Runde erreicht haben sollte
-    const soll = Math.round(kursSoll(k.id, Math.min(z.runde, RUNDEN)));
-    const marke = el("kurs-" + k.id);
-    marke.style.left = begrenzen(soll, 0, 100) + "%";
-    marke.title = "Sollwert am Ende dieser Runde: " + soll + " %";
   });
 }
 
-// Die drei Säulen: Index 0 bis 100 nach der letzten gespielten Runde (Abstand zum Sollkurs)
-function saeulenFarbe(wert) {
-  if (wert >= 90) return AMPEL.gruen;
-  return wert >= 70 ? AMPEL.gelb : AMPEL.rot;
-}
+// ---------- Entscheidungsfenster ----------
+// Drei gleich hohe Spalten (Ökologie, Ökonomie, Soziales). Jede Maßnahme ist eine Karte:
+// Ein Klick klappt sie auf und zeigt Beschreibung, Leitfrage und die Bedeutung der Etiketten;
+// gewählt wird erst mit dem Knopf in der aufgeklappten Karte. Es ist immer höchstens eine Karte offen.
 
-function saeulenErstellen() {
-  const liste = el("saeulenListe");
-  liste.innerHTML = "";
-  SAEULEN.forEach(function (sa) {
-    const zeile = document.createElement("div");
-    zeile.className = "sz-zeile";
-    zeile.id = "sz-" + sa.id;
-    zeile.style.setProperty("--sz-farbe", "var(--saeule-" + sa.id + ")");
-    zeile.innerHTML =
-      '<div class="sz-kopf"><span class="sz-name">' + sa.name + '</span><strong id="sz-wert-' + sa.id + '"></strong></div>' +
-      '<div class="sz-balken" role="img" id="sz-bild-' + sa.id + '"><div class="sz-fuellung" id="sz-balken-' + sa.id + '"></div></div>';
-    liste.appendChild(zeile);
-  });
-}
-
-function saeulenAnzeigen() {
-  const z = zustand;
-  if (!el("sz-oeko")) saeulenErstellen();
-  const s = z.verlauf[z.verlauf.length - 1];
-  const schwach = schwaechsteSaeule(s);
-  SAEULEN.forEach(function (sa) {
-    const wert = Math.round(s.saeulen[sa.id]);
-    el("sz-wert-" + sa.id).textContent = wert + " von 100";
-    const balken = el("sz-balken-" + sa.id);
-    balken.style.width = wert + "%";
-    balken.style.backgroundColor = saeulenFarbe(wert);
-    el("sz-bild-" + sa.id).setAttribute("aria-label", sa.name + ": " + wert + " von 100");
-    el("sz-" + sa.id).classList.toggle("schwaechste", s.saeulen[sa.id] < 90 && sa.id === schwach.id);
-  });
-
-  let text;
-  if (s.runde === 0) {
-    text = "Jede Säule zeigt, wie nah du dem Sollkurs bist. Fällt eine Säule zurück, zieht sie den Rundenscore zu " +
-      Math.round(SAEULEN_SCHWAECHSTE * 100) + " % mit nach unten.";
-  } else if (s.saeulen[schwach.id] >= 99.5) {
-    text = "Alle drei Säulen liegen auf Kurs.";
+// Symbol eines Bereichs (gleiche Linienführung wie die Seekarte, Farbe über currentColor)
+function bereichSymbolSvg(region) {
+  const linie = 'fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
+  let inhalt;
+  if (region === "strand") {
+    // Sonnenschirm im Sand
+    inhalt = '<path d="M4.5 11.5 A7.5 7.5 0 0 1 19.5 11.5 Z" fill="currentColor"/>' +
+      '<path d="M12 11.5 V19" ' + linie + "/>" +
+      '<path d="M2.5 20 Q12 16.5 21.5 20" ' + linie + "/>";
+  } else if (region === "meer") {
+    // drei Wellen
+    inhalt = [7, 12, 17].map(function (y) {
+      return '<path d="M2.5 ' + y + " q2.4 -2.6 4.8 0 t4.8 0 t4.8 0 t4.8 0" + '" ' + linie + "/>";
+    }).join("");
   } else {
-    const rueck = rueckstaende(s, schwach.id).map(function (r) {
-      return r.name + " " + zahl(r.wert) + r.einheit + " (Soll " + (r.hoeher ? "" : "höchstens ") + zahl(r.soll) + r.einheit + ")";
-    });
-    text = "Schwächste Säule: <strong>" + schwach.name + "</strong>. Hinter dem Kurs: " + rueck.join(", ") + ".";
+    // Baum und Haus auf festem Boden
+    inhalt = '<circle cx="7.5" cy="9" r="4.2" fill="currentColor"/>' +
+      '<path d="M7.5 12.5 V19.5" ' + linie + "/>" +
+      '<path d="M13.5 19.5 V12.5 L17.5 9 L21.5 12.5 V19.5 Z" ' + linie + "/>" +
+      '<path d="M2 19.5 H22" ' + linie + "/>";
   }
-  el("saeulenHinweis").innerHTML = text;
+  return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + inhalt + "</svg>";
+}
+
+// Kopf der Ökologie-Spalte: Bereich dieser Runde, dazu der Anteil seiner Müllquelle am neuen Müll
+function bereichBannerHtml(z, region) {
+  const stil = BEREICH_STIL[region];
+  const quelle = QUELLEN.find(function (q) { return q.id === region; });
+  const anteil = z.eintrag && z.eintrag.gesamt > 0 ? Math.round(100 * z.eintrag[region] / z.eintrag.gesamt) : null;
+  return '<div class="bereich-banner" style="--bereich:' + stil.farbe + ";--bereich-flaeche:" + stil.flaeche + '">' +
+      '<span class="bereich-symbol">' + bereichSymbolSvg(region) + "</span>" +
+      '<span class="bereich-text">' +
+        '<span class="bereich-label">Bereich dieser Runde</span>' +
+        '<strong class="bereich-name">' + bereichName(region) + "</strong>" +
+      "</span>" +
+    "</div>" +
+    (anteil === null ? "" : '<p class="bereich-quelle">Müllquelle hier: ' + quelle.name + ", " + anteil +
+      " % des neuen Mülls</p>");
 }
 
 function massnahmenAnzeigen() {
   const z = zustand;
   const runde = Math.min(z.runde, RUNDEN);
   const region = regionDerRunde(runde);
-
-  // Reihenfolge der Regionen mit aktueller Region (bestimmt das Angebot der Ökologie)
-  el("regionFolge").innerHTML =
-    '<span class="region-folge-label">Ökologie im Fokus</span>' +
-    REGIONEN_FOLGE.map(function (id) {
-      return '<span class="region-chip' + (id === region ? " aktiv" : "") + '">' + bereichName(id) + "</span>";
-    }).join("") +
-    (runde < RUNDEN && !z.beendet
-      ? '<span class="region-naechste">danach ' + bereichName(regionDerRunde(runde + 1)) + "</span>"
-      : "");
 
   // Hinweis auf offenen Förderaufruf (nur mit Sonderereignissen)
   const hinweis = el("foerderHinweis");
@@ -2773,104 +2771,210 @@ function massnahmenAnzeigen() {
   liste.innerHTML = "";
 
   SAEULEN.forEach(function (s) {
+    // Drei Zeilen je Spalte (Kopf, Maßnahmen, „Nichts tun“). Über CSS-Subgrid liegen sie in allen
+    // Spalten auf gleicher Höhe, und alle Spalten sind gleich hoch.
     const gruppe = elementBauen("section", "saeule saeule-" + s.id);
+    gruppe.setAttribute("aria-label", s.name);
     const entschieden = Boolean(z.auswahl[s.id]);
+
     const kopf = elementBauen("div", "saeule-kopf");
     const titel = elementBauen("div", "saeule-titelzeile");
     titel.appendChild(elementBauen("h3", "saeule-titel", s.name));
     titel.appendChild(elementBauen("span", "saeule-status " + (entschieden ? "fertig" : "offen"),
       entschieden ? "entschieden" : "offen"));
     kopf.appendChild(titel);
-    kopf.appendChild(elementBauen("p", "saeule-untertitel",
-      s.id === "oeko" ? s.untertitel + ", Region " + bereichName(region) : s.untertitel));
+    if (s.id === "oeko" && !z.beendet) {
+      kopf.insertAdjacentHTML("beforeend", bereichBannerHtml(z, region));
+    } else {
+      kopf.appendChild(elementBauen("p", "saeule-untertitel", s.untertitel));
+    }
     gruppe.appendChild(kopf);
 
+    const stapel = elementBauen("div", "saeule-optionen");
     const optionen = angebot(z, s.id, runde);
-    optionen.forEach(function (m) { gruppe.appendChild(massnahmeKnopf(m)); });
+    optionen.forEach(function (m) { stapel.appendChild(massnahmeKarte(m)); });
     if (s.id === "oeko") {
       const erledigt = MASSNAHMEN.filter(function (m) {
         return m.saeule === "oeko" && m.bereich === region && !m.wiederholbar && istUmgesetzt(z, m.id);
       });
       if (erledigt.length) {
-        gruppe.appendChild(elementBauen("p", "gruppe-notiz", "Bereits umgesetzt: " +
+        stapel.appendChild(elementBauen("p", "gruppe-notiz", "Bereits umgesetzt: " +
           erledigt.map(function (m) { return m.name; }).join(", ") + "."));
       }
     }
     if (!optionen.length) {
-      gruppe.appendChild(elementBauen("p", "gruppe-notiz", "In diesem Bereich sind alle Maßnahmen umgesetzt."));
+      stapel.appendChild(elementBauen("p", "gruppe-notiz", "In diesem Bereich sind alle Maßnahmen umgesetzt."));
     }
-    gruppe.appendChild(zurueckKnopf(s));
-    // Vorschau: Das Angebot wechselt reihum. So lässt sich eine Maßnahme für später aufheben.
-    if (runde < RUNDEN && !z.beendet) {
-      const vor = vorschauAngebot(z, s.id);
-      if (vor.length) {
-        const hinweisZeile = elementBauen("p", "vorschau-naechste");
-        const kopfText = elementBauen("strong", "", "Nächste Runde" +
-          (s.id === "oeko" ? " (" + bereichName(regionDerRunde(runde + 1)) + ")" : "") + " voraussichtlich: ");
-        hinweisZeile.appendChild(kopfText);
-        hinweisZeile.appendChild(document.createTextNode(vor.map(function (m) { return m.name; }).join(" · ")));
-        gruppe.appendChild(hinweisZeile);
-      }
-    }
+    gruppe.appendChild(stapel);
+
+    const fuss = elementBauen("div", "saeule-fuss");
+    fuss.appendChild(zurueckKarte(s));
+    gruppe.appendChild(fuss);
+
     liste.appendChild(gruppe);
   });
 
   uebersichtAnzeigen();
 }
 
-function massnahmeKnopf(m) {
+// Etikett zur Verfügbarkeit: Muss ich mich jetzt entscheiden, oder kommt die Maßnahme wieder?
+function zeitMerkmal(z, m, status, gewaehlt) {
+  if (z.beendet || z.runde >= RUNDEN || gewaehlt || status.art === "fertig" || status.art === "nicht-angeboten") {
+    return null;
+  }
+  const wieder = naechstesAngebot(z, m);
+  if (wieder === null) {
+    return { text: "letzte Gelegenheit", art: "zeit",
+      erklaerung: "Letzte Gelegenheit: Nach dieser Runde steht die Maßnahme voraussichtlich nicht mehr zur Wahl." };
+  }
+  if (m.saeule === "oeko") {
+    return { text: "wieder in Runde " + wieder, art: "zeit",
+      erklaerung: "Wieder in Runde " + wieder + ": Maßnahmen für den Bereich " + bereichName(m.bereich) +
+        " stehen nur in jeder dritten Runde zur Wahl." };
+  }
+  if (wieder > z.runde + 1) {
+    return { text: "nur diese Runde", art: "zeit",
+      erklaerung: "Nur diese Runde: Das Angebot wechselt. Voraussichtlich steht die Maßnahme erst in Runde " +
+        wieder + " wieder zur Wahl." };
+  }
+  return null;
+}
+
+// Gemeinsamer Aufbau jeder Karte: Kopf (Knopf zum Aufklappen) und aufklappbarer Inhalt
+function karteBauen(k) {
+  const z = zustand;
+  const offen = z.zuletzt === k.schluessel;
+  const karte = elementBauen("div", "massnahme" + (k.klasse ? " " + k.klasse : ""));
+  if (k.gewaehlt) karte.classList.add("gewaehlt");
+  if (offen) karte.classList.add("offen");
+  const detailId = "karte-" + k.schluessel.replace(/[^a-z0-9]/gi, "-");
+
+  const kopf = document.createElement("button");
+  kopf.type = "button";
+  kopf.className = "massnahme-kopfknopf";
+  kopf.setAttribute("aria-expanded", offen ? "true" : "false");
+  kopf.setAttribute("aria-controls", detailId);
+  kopf.dataset.karte = k.schluessel;
+  kopf.innerHTML =
+    '<span class="massnahme-kopf">' +
+      '<span class="massnahme-name">' + k.name + "</span>" +
+      '<span class="massnahme-kosten">' + k.kosten + "</span>" +
+      '<span class="massnahme-pfeil" aria-hidden="true"></span>' +
+    "</span>" +
+    (k.merkmale.length ? '<span class="massnahme-merkmale">' + k.merkmale.map(function (t) {
+      return '<span class="merkmal' + (t.art ? " merkmal-" + t.art : "") + '">' + t.text + "</span>";
+    }).join("") + "</span>" : "") +
+    (k.gewaehlt ? '<span class="massnahme-gewaehlt">Ausgewählt</span>'
+      : k.grund ? '<span class="massnahme-status">' + k.grund + "</span>" : "");
+  kopf.addEventListener("click", function () { karteUmschalten(k.schluessel); });
+  karte.appendChild(kopf);
+
+  const detail = elementBauen("div", "massnahme-detail");
+  detail.id = detailId;
+  detail.hidden = !offen;
+  if (offen) {
+    const erklaerungen = k.merkmale.filter(function (t) { return t.erklaerung; });
+    detail.innerHTML =
+      '<p class="massnahme-text">' + k.text + "</p>" +
+      (k.frage ? '<p class="massnahme-frage">' + k.frage + "</p>" : "") +
+      (erklaerungen.length ? '<ul class="merkmal-erklaerung">' + erklaerungen.map(function (t) {
+        return "<li>" + t.erklaerung + "</li>";
+      }).join("") + "</ul>" : "");
+    const aktion = elementBauen("div", "massnahme-aktion");
+    const waehlen = document.createElement("button");
+    waehlen.type = "button";
+    waehlen.className = (k.gewaehlt ? "knopf-sekundaer" : "knopf-primaer") + " knopf-klein";
+    waehlen.textContent = k.gewaehlt ? "Auswahl aufheben" : k.waehlenText;
+    waehlen.disabled = z.beendet || (!k.gewaehlt && !k.moeglich);
+    waehlen.dataset.waehlen = k.schluessel;
+    waehlen.addEventListener("click", k.aktion);
+    aktion.appendChild(waehlen);
+    if (!k.gewaehlt && !k.moeglich && k.grund) {
+      aktion.appendChild(elementBauen("span", "massnahme-grund", k.grund));
+    }
+    detail.appendChild(aktion);
+  }
+  karte.appendChild(detail);
+  return karte;
+}
+
+function massnahmeKarte(m) {
   const z = zustand;
   const status = massnahmeStatus(z, m);
   const gewaehlt = z.auswahl[m.saeule] === m.id;
-  const knopf = document.createElement("button");
-  knopf.type = "button";
-  knopf.className = "massnahme";
-  if (gewaehlt) knopf.classList.add("gewaehlt");
-  if (status.art) knopf.classList.add("status-" + status.art);
-  knopf.disabled = (!status.moeglich && !gewaehlt) || z.beendet;
-  knopf.setAttribute("aria-pressed", gewaehlt ? "true" : "false");
 
   const merkmale = [];
-  if (m.laufendeKosten) merkmale.push("+" + euro(m.laufendeKosten) + " pro Runde");
-  if (m.wiederholbar) merkmale.push("wiederholbar");
-  if (m.einschraenkend) merkmale.push("einschränkend");
-  if (z.foerderaufruf && z.foerderaufruf.massnahme === m.id) merkmale.push("gefördert");
-  if (m.wiederholbar && istUmgesetzt(z, m.id)) merkmale.push(z.umgesetzt[m.id].length + "× umgesetzt");
+  if (m.laufendeKosten) {
+    merkmale.push({ text: "+" + euro(m.laufendeKosten) + " pro Runde",
+      erklaerung: "Folgekosten: Nach der Umsetzung kostet die Maßnahme jede Runde " + euro(m.laufendeKosten) + "." });
+  }
+  if (m.wiederholbar) {
+    merkmale.push({ text: "wiederholbar",
+      erklaerung: "Wiederholbar: Du kannst die Maßnahme mehrmals umsetzen." +
+        (m.kostenAnstieg ? " Jede weitere Umsetzung kostet " + euro(m.kostenAnstieg) + " mehr (vor Rabatten)." : "") });
+  }
+  if (m.einschraenkend) {
+    merkmale.push({ text: "einschränkend",
+      erklaerung: "Einschränkend: Die Maßnahme setzt Regeln durch und kostet Zustimmung. Sie ist nur ab " +
+        AKZEPTANZ_SPERRE + " % Akzeptanz möglich." });
+  }
+  if (z.foerderaufruf && z.foerderaufruf.massnahme === m.id) {
+    merkmale.push({ text: "gefördert",
+      erklaerung: "Gefördert: Setzt du die Maßnahme bis Ende von Runde " + z.foerderaufruf.bisRunde +
+        " um, erhältst du " + euro(z.foerderaufruf.betrag) + " aus dem EU-Förderaufruf." });
+  }
+  if (m.wiederholbar && istUmgesetzt(z, m.id)) merkmale.push({ text: z.umgesetzt[m.id].length + "× umgesetzt" });
+  const zeit = zeitMerkmal(z, m, status, gewaehlt);
+  if (zeit) merkmale.push(zeit);
 
-  knopf.innerHTML =
-    '<span class="massnahme-kopf">' +
-      '<span class="massnahme-name">' + m.name + "</span>" +
-      '<span class="massnahme-kosten">' + euro(kostenBerechnen(z, m)) + "</span>" +
-    "</span>" +
-    (merkmale.length ? '<span class="massnahme-merkmale">' + merkmale.map(function (t) {
-      return "<span>" + t + "</span>";
-    }).join("") + "</span>" : "") +
-    (status.grund && !gewaehlt ? '<span class="massnahme-status">' + status.grund + "</span>" : "");
-
-  knopf.addEventListener("click", function () {
-    massnahmeWaehlen(m.id);
+  return karteBauen({
+    schluessel: m.id,
+    klasse: (status.art ? "status-" + status.art : "") + (!status.moeglich && !gewaehlt ? " nicht-waehlbar" : ""),
+    name: m.name,
+    kosten: euro(kostenBerechnen(z, m)),
+    merkmale: merkmale,
+    gewaehlt: gewaehlt,
+    moeglich: status.moeglich,
+    grund: status.grund,
+    text: m.beschreibung,
+    frage: m.teaser,
+    waehlenText: "Maßnahme wählen",
+    aktion: function () { massnahmeWaehlen(m.id); }
   });
-  return knopf;
 }
 
-// Knopf „Zurückstellen“: in dieser Säule bewusst nichts umsetzen
-function zurueckKnopf(s) {
+// Karte „Nichts tun“: in dieser Säule bewusst nichts umsetzen
+function zurueckKarte(s) {
   const z = zustand;
-  const gewaehlt = z.auswahl[s.id] === ZURUECKSTELLEN;
-  const knopf = document.createElement("button");
-  knopf.type = "button";
-  knopf.className = "massnahme zurueck" + (gewaehlt ? " gewaehlt" : "");
-  knopf.disabled = z.beendet;
-  knopf.setAttribute("aria-pressed", gewaehlt ? "true" : "false");
-  knopf.innerHTML =
-    '<span class="massnahme-kopf">' +
-      '<span class="massnahme-name">Nichts tun</span>' +
-      '<span class="massnahme-kosten">0 €</span>' +
-    "</span>";
-  knopf.addEventListener("click", function () {
-    zurueckstellen(s.id);
+  return karteBauen({
+    schluessel: ZURUECKSTELLEN + ":" + s.id,
+    klasse: "zurueck",
+    name: "Nichts tun",
+    kosten: euro(0),
+    merkmale: [],
+    gewaehlt: z.auswahl[s.id] === ZURUECKSTELLEN,
+    moeglich: true,
+    grund: "",
+    text: "Du setzt in diesem Bereich in dieser Runde nichts um und sparst das Budget. " +
+      "Laufende Wirkungen und Folgekosten gelten weiter.",
+    frage: "",
+    waehlenText: "Nichts tun wählen",
+    aktion: function () { zurueckstellen(s.id); }
   });
-  return knopf;
+}
+
+// Aufklappen und Zuklappen: Ein Klick auf eine andere Karte schließt die offene
+function karteUmschalten(schluessel) {
+  const z = zustand;
+  z.zuletzt = z.zuletzt === schluessel ? null : schluessel;
+  massnahmenAnzeigen();
+  fokusAuf('[data-karte="' + schluessel + '"]');
+}
+
+// Nach dem Neuzeichnen den Tastaturfokus wieder auf denselben Knopf setzen
+function fokusAuf(selektor) {
+  const ziel = el("massnahmenListe").querySelector(selektor);
+  if (ziel) ziel.focus({ preventScroll: true });
 }
 
 function uebersichtAnzeigen() {
@@ -2887,31 +2991,6 @@ function uebersichtAnzeigen() {
       entschieden + " von " + SAEULEN.length + " entschieden</span>" +
     '<span class="uebersicht-kosten">Kosten <strong>' + euro(kosten) + "</strong> · danach <strong" +
       (z.budget - kosten < 0 ? ' class="im-minus"' : "") + ">" + euro(z.budget - kosten) + "</strong></span>";
-}
-
-// Detail der zuletzt angeklickten Auswahl: nur anteasern, keine Zahlen zu den Wirkungen
-function auswahlAnzeigen() {
-  const z = zustand;
-  const feld = el("auswahlDetail");
-  if (z.zuletzt && z.zuletzt.indexOf(ZURUECKSTELLEN + ":") === 0) {
-    const s = saeuleFinden(z.zuletzt.split(":")[1]);
-    feld.innerHTML =
-      '<p class="auswahl-titel">' + s.name + ": zurückgestellt</p>" +
-      '<p class="auswahl-text">Du setzt in diesem Bereich in dieser Runde nichts um und sparst das Budget. ' +
-      "Laufende Wirkungen gelten weiter.</p>";
-    return;
-  }
-  const m = z.zuletzt ? massnahmeFinden(z.zuletzt) : null;
-  if (!m) {
-    feld.innerHTML =
-      '<p class="auswahl-leer">Triff in jedem Bereich eine Entscheidung: eine Maßnahme oder ' +
-      "„Nichts tun“. Erst dann kannst du die Runde beenden.</p>";
-    return;
-  }
-  feld.innerHTML =
-    '<p class="auswahl-titel"><span class="auswahl-saeule">' + saeuleFinden(m.saeule).name + "</span>" + m.name + "</p>" +
-    '<p class="auswahl-text">' + m.beschreibung + "</p>" +
-    '<p class="auswahl-frage">' + m.teaser + "</p>";
 }
 
 function rundenKnopfAnzeigen() {
@@ -2993,6 +3072,16 @@ function markerAnzeigen() {
       '<span class="marker-name" aria-hidden="true">' + gebiet + "</span>",
       function () { infopunktOeffnen(p.id); }));
   });
+
+  // Otter mit dem Zwischenstand (freiwillig, auch vor den Infopunkten anklickbar)
+  if (otterDa(z)) {
+    const gelesen = z.otterGelesen.indexOf(z.runde) >= 0;
+    ebene.appendChild(kartenKnopf("person otter " + (gelesen ? "gelesen" : "ungelesen"), OTTER_ORT,
+      gelesen ? "Otter: Zwischenstand noch einmal ansehen" : "Otter: Zwischenstand ansehen",
+      '<span class="person-blase" aria-hidden="true">' + (gelesen ? "✓" : "!") + "</span>" + otterSvg() +
+      '<span class="person-name" aria-hidden="true">Otter</span>',
+      otterOeffnen));
+  }
 
   // Personen erst, wenn die Pflicht-Infopunkte gelesen sind
   if (pflichtInfosOffen(z).length) return;
@@ -3827,8 +3916,35 @@ function seekarteSvg(z) {
     s += muellSymbolSvg(m.form, m.x, m.y, m.winkel, m.groesse);
   });
 
+  // Bereich der Runde: gestrichelte Umrandung in der Farbe des Bereichs (wie im Spaltenkopf der Ökologie)
+  if (!z.beendet) s += bereichUmrandungSvg(regionDerRunde(z.runde));
+
   s += "</svg>";
   return s;
+}
+
+// Umriss von Land, Strand oder Meer, entlang derselben Küstenlinie wie die Karte.
+// Der Umriss liegt eine halbe Linienbreite innerhalb des Kartenrands, damit er überall sichtbar bleibt.
+function bereichUmrandungSvg(region) {
+  const stil = BEREICH_STIL[region];
+  const r = 1.5;
+  const kante = function (versatz) {
+    const p = [];
+    for (let x = 0; x <= KARTE_B; x += 10) {
+      p.push(begrenzen(x, r, KARTE_B - r) + "," + (kuestenlinie(x) + versatz).toFixed(1));
+    }
+    return p;
+  };
+  let punkte;
+  if (region === "land") {
+    punkte = [r + "," + r].concat(kante(-r), [(KARTE_B - r) + "," + r]);
+  } else if (region === "strand") {
+    punkte = kante(r).concat(kante(STRAND_BREITE - r).reverse());
+  } else {
+    punkte = kante(STRAND_BREITE + r).concat([(KARTE_B - r) + "," + (KARTE_H - r), r + "," + (KARTE_H - r)]);
+  }
+  return '<polygon points="' + punkte.join(" ") + '" fill="' + stil.farbe + '" fill-opacity="0.08" stroke="' +
+    stil.farbe + '" stroke-width="2.6" stroke-dasharray="10 6" stroke-linejoin="round" pointer-events="none"/>';
 }
 
 function seekarteAnzeigen() {
@@ -3836,7 +3952,8 @@ function seekarteAnzeigen() {
   el("seekarte").innerHTML = seekarteSvg(z);
   el("kartenStatus").textContent = z.beendet
     ? "Endstand nach " + RUNDEN + " Runden"
-    : "Ökologie im Fokus: " + bereichName(regionDerRunde(z.runde)) + ". " + aktuellesLevel(z.runde).text;
+    : "Ökologie-Maßnahmen dieser Runde gelten für den Bereich " + bereichName(regionDerRunde(z.runde)) +
+      " (auf der Karte gestrichelt umrandet). " + aktuellesLevel(z.runde).text;
 
   // Legende: nur Symbole, die gerade auf der Karte zu sehen sind
   const w = aktiveWirkung(z, Math.min(z.runde, RUNDEN));
@@ -3915,7 +4032,7 @@ function einfuehrungSeiten() {
       html:
         "<p>Nachhaltigkeit ruht auf drei Säulen. Pro Runde entscheidest du in jeder Säule einmal:</p>" +
         "<ul>" +
-        "<li><strong>Ökologie:</strong> Schutz für Meer und Artenvielfalt (Fokus wechselt zwischen Strand, Meer und Land).</li>" +
+        "<li><strong>Ökologie:</strong> Schutz für Meer und Artenvielfalt. Der Bereich wechselt jede Runde: Strand, Meer, Land.</li>" +
         "<li><strong>Ökonomie:</strong> Tourismus und Wirtschaft füllen dein Budget, belasten aber oft das Meer.</li>" +
         "<li><strong>Soziales:</strong> Die Akzeptanz und Zufriedenheit der Bevölkerung.</li>" +
         "</ul>" +
@@ -3926,6 +4043,7 @@ function einfuehrungSeiten() {
         "<li>Viele Maßnahmen wirken verzögert und auf mehrere Säulen zugleich.</li>" +
         "<li>Einschränkende Maßnahmen brauchen mindestens " + AKZEPTANZ_SPERRE + " % Akzeptanz, und sie kosten Zustimmung, die nicht von selbst zurückkommt.</li>" +
         "<li>Die schwächste Säule zählt doppelt: Wer eine Säule vernachlässigt, verliert Punkte, auch wenn die anderen glänzen.</li>" +
+        "<li>In den Runden " + namenListe(OTTER_RUNDEN.map(String)) + " taucht unten links im Meer ein Otter auf. Klicke ihn an, wenn du wissen willst, wie du gerade stehst.</li>" +
         "</ul>"
     }
   ];
@@ -4062,10 +4180,7 @@ let aktuellerBericht = null;
 
 function berichtZeigen(bericht) {
   aktuellerBericht = bericht;
-  const v = bericht.vorher;
-  const n = bericht.nachher;
   const rw = bericht.richtwerte;
-  const mb = bericht.muell;
   let html = "";
 
   // Entscheidungen der drei Säulen
@@ -4082,35 +4197,13 @@ function berichtZeigen(bericht) {
   });
   html += "</section>";
 
-  // Veränderungen mit Richtwerten
-  const zeilen = KENNZAHLEN.concat([{ id: "akzeptanz", name: "Akzeptanz" }]).map(function (k) {
-    return { name: k.name, a: v[k.id], b: n[k.id], rw: rw[k.id] + " %", einheit: " %", besser: true };
-  }).concat([
-    { name: "Strandmüll", a: v.strandmuell, b: n.strandmuell, rw: "unter " + MUELL_SCHWELLE, einheit: "", besser: false },
-    { name: "Budget", a: v.budget, b: n.budget, rw: "", einheit: "€", besser: true }
-  ]);
-  html += '<section class="bericht-block"><h3>Was sich verändert hat</h3>' +
-    '<table class="bericht-tabelle"><thead><tr><th>Kennzahl</th><th>vorher</th><th>jetzt</th>' +
-    '<th>Änderung</th><th>strebt zu</th></tr></thead><tbody>';
-  zeilen.forEach(function (z) {
-    const diff = z.b - z.a;
-    const fmt = function (x) { return z.einheit === "€" ? euro(x) : zahl(x) + z.einheit; };
-    const diffText = z.einheit === "€" ? (diff >= 0 ? "+" : "−") + euro(Math.abs(diff)) : vorzeichen(diff);
-    const klasse = diff === 0 ? "" : ((diff > 0) === z.besser ? "trend-gut" : "trend-schlecht");
-    html += "<tr><th scope=\"row\">" + z.name + "</th><td>" + fmt(z.a) + "</td><td><strong>" + fmt(z.b) +
-      "</strong></td><td class=\"" + klasse + "\">" + diffText + "</td><td>" + z.rw + "</td></tr>";
-  });
-  html += "</tbody></table>" +
+  // Veränderungen: Balken wie im Spiel, die von „vorher“ nach „jetzt“ wandern
+  html += '<section class="bericht-block"><h3>Was sich verändert hat</h3>' + veraenderungHtml(bericht) +
+    '<p class="vb-legende"><span><span class="ziel-strich" aria-hidden="true"></span>Mindestwert</span>' +
+    '<span><span class="vb-richtwert-zeichen" aria-hidden="true"></span>Richtwert, auf den die Kennzahl zustrebt</span>' +
+    '<span><span class="vb-vorher-zeichen" aria-hidden="true"></span>Stand vorher</span></p>' +
     '<p class="klein">Jede Kennzahl bewegt sich pro Runde höchstens ' + MAX_AENDERUNG +
     " Punkte auf ihren Richtwert zu. Der Richtwert ergibt sich aus dem Zustand der Region.</p></section>";
-
-  // Die drei Säulen: Abstand zum Sollkurs und Konflikte dieser Runde
-  html += '<section class="bericht-block"><h3>Die drei Säulen</h3>' + saeulenBerichtHtml(bericht) + "</section>";
-
-  // Müllbilanz
-  html += '<section class="bericht-block"><h3>Müllbilanz am Strand</h3>' + bilanzHtml(mb) +
-    '<p class="klein">Eintrag: Strandbesucher ' + zahl(mb.eintrag.strand, 1) + ", Fischerei und Schifffahrt " +
-    zahl(mb.eintrag.meer, 1) + ", Flüsse und Hinterland " + zahl(mb.eintrag.land, 1) + " Teile pro 100 m.</p></section>";
 
   // Belastungen der Meeresgesundheit
   const b = rw.belastungen;
@@ -4157,14 +4250,6 @@ function berichtZeigen(bericht) {
     html += "</ul></section>";
   }
 
-  // Einnahmen
-  const ein = bericht.einnahmen;
-  html += '<section class="bericht-block"><h3>Einnahmen dieser Runde: ' + euro(ein.summe) + "</h3>" +
-    '<p class="klein">Grundeinkommen ' + euro(ein.grund) + ", Tourismus × Wirtschaft " + euro(ein.anteil) +
-    (ein.zusatz ? ", Abgaben (Kurtaxe) " + euro(ein.zusatz) : "") +
-    (ein.foerderung ? ", Förderprogramme " + euro(ein.foerderung) : "") +
-    (ein.laufend.summe ? ", laufende Kosten −" + euro(ein.laufend.summe) : "") + ".</p></section>";
-
   el("berichtTitel").textContent = "Bericht zu Runde " + bericht.runde;
   el("berichtInhalt").innerHTML = html;
   el("berichtInhalt").scrollTop = 0;
@@ -4172,40 +4257,165 @@ function berichtZeigen(bericht) {
     ? "Zum Abschlussquiz"
     : bericht.zwischenbilanz ? "Zur Zwischenbilanz" : "Weiter zu Runde " + zustand.runde;
   popupOeffnen("popupBericht");
+  berichtAnimieren(el("berichtInhalt"));
 }
 
-// Säulen vor und nach der Runde, mit Konflikthinweis, wenn eine Säule deutlich nachgegeben hat
-function saeulenBerichtHtml(bericht) {
-  const verlauf = zustand.verlauf;
-  const jetzt = verlauf[verlauf.length - 1];
-  const davor = verlauf[verlauf.length - 2];
-  let html = '<table class="bericht-tabelle"><thead><tr><th>Säule</th><th>Runde ' + davor.runde + "</th><th>Runde " +
-    jetzt.runde + '</th><th>Änderung</th><th>Hinter dem Kurs</th></tr></thead><tbody>';
-  SAEULEN.forEach(function (sa) {
-    const diff = jetzt.saeulen[sa.id] - davor.saeulen[sa.id];
-    const rueck = rueckstaende(jetzt, sa.id).map(function (r) { return r.name; }).join(", ");
-    html += '<tr><th scope="row">' + sa.name + "</th><td>" + zahl(davor.saeulen[sa.id]) + "</td><td><strong>" +
-      zahl(jetzt.saeulen[sa.id]) + '</strong></td><td class="' + (diff === 0 ? "" : diff > 0 ? "trend-gut" : "trend-schlecht") +
-      '">' + vorzeichen(Math.round(diff * 10) / 10) + "</td><td>" + (rueck || "–") + "</td></tr>";
-  });
-  html += "</tbody></table>" +
-    '<p class="klein">Rundenscore ' + zahl(jetzt.score, 1) + " (Runde " + davor.runde + ": " + zahl(davor.score, 1) +
-    "). Er besteht zu " + Math.round((1 - SAEULEN_SCHWAECHSTE) * 100) + " % aus dem Mittelwert der drei Säulen und zu " +
-    Math.round(SAEULEN_SCHWAECHSTE * 100) + " % aus der schwächsten.</p>";
+// ---------- Rundenbericht: animierte Balken ----------
+// Jede Zeile beschreibt ihre Animation als Folge von Schritten { v: Wert, w: Breite in %, f: Farbe }.
+// Kennzahlen haben zwei Schritte (vorher → jetzt), der Strandmüll einen Schritt je Posten der Müllbilanz.
 
-  const gefallen = SAEULEN.filter(function (sa) { return davor.saeulen[sa.id] - jetzt.saeulen[sa.id] >= 8; });
-  if (gefallen.length) {
-    const sa = gefallen[0];
-    const gewaehlt = bericht.entscheidungen.filter(function (e) { return e.massnahme; }).map(function (e) {
-      return e.massnahme.name;
+function vbZeileHtml(o) {
+  const erster = o.schritte[0];
+  const letzter = o.schritte[o.schritte.length - 1];
+  const diff = letzter.v - erster.v;
+  const klasse = diff === 0 ? "" : ((diff > 0) === o.besser ? "trend-gut" : "trend-schlecht");
+  return '<div class="vb-zeile' + (o.zusatzKlasse ? " " + o.zusatzKlasse : "") + '" data-schritte=\'' +
+      JSON.stringify(o.schritte) + "' data-einheit=\"" + o.einheit + '">' +
+    '<div class="vb-kopf">' +
+      '<span class="vb-name">' + o.name + "</span>" +
+      '<span class="vb-werte">' +
+        '<span class="vb-alt">' + zahl(erster.v) + o.einheit + "</span>" +
+        '<span class="vb-pfeil" aria-hidden="true">→</span>' +
+        '<strong class="vb-zahl" aria-hidden="true">' + zahl(erster.v) + o.einheit + "</strong>" +
+        '<span class="sr-only">jetzt ' + zahl(letzter.v) + o.einheit + "</span>" +
+        '<span class="vb-diff ' + klasse + '">' + vorzeichen(diff) + "</span>" +
+      "</span>" +
+    "</div>" +
+    '<div class="balken vb-balken">' +
+      '<div class="vb-vorher" style="width:' + erster.w + '%"></div>' +
+      '<div class="balken-fuellung vb-fuellung" style="width:' + erster.w + "%;background-color:" + erster.f + '"></div>' +
+      '<div class="vb-vorher-strich" style="left:' + erster.w + '%"></div>' +
+      o.marken +
+    "</div>" +
+    (o.fuss ? '<p class="vb-fuss">' + o.fuss + "</p>" : "") +
+    "</div>";
+}
+
+function veraenderungHtml(bericht) {
+  const v = bericht.vorher;
+  const n = bericht.nachher;
+  const rw = bericht.richtwerte;
+  const mb = bericht.muell;
+  let html = '<div class="vb-liste">';
+
+  // Kennzahlen und Akzeptanz: Ampelfarbe wie in der Seitenleiste und der Kopfleiste
+  const reihen = KENNZAHLEN.map(function (k) {
+    return { id: k.id, name: k.name, marke: k.mindest, markeTitel: "Mindestwert " + k.mindest + " %",
+      farbe: function (x) { return ampelFarbe(x, k.mindest); } };
+  }).concat([{ id: "akzeptanz", name: "Akzeptanz", marke: AKZEPTANZ_SPERRE,
+    markeTitel: "Unter " + AKZEPTANZ_SPERRE + " % sind einschränkende Maßnahmen gesperrt", farbe: akzeptanzFarbe }]);
+  reihen.forEach(function (k) {
+    const richtwert = begrenzen(rw[k.id], 0, 100);
+    html += vbZeileHtml({
+      name: k.name, einheit: " %", besser: true,
+      schritte: [v[k.id], n[k.id]].map(function (x) { return { v: x, w: begrenzen(x, 0, 100), f: k.farbe(x) }; }),
+      marken: '<div class="balken-ziel" style="left:' + k.marke + '%" title="' + k.markeTitel + '"></div>' +
+        '<div class="vb-richtwert" style="left:' + richtwert + '%" title="Richtwert ' + rw[k.id] + ' %"></div>',
+      fuss: "strebt zu " + rw[k.id] + " %"
     });
-    html += '<p class="vergleich-kasten"><strong>Zielkonflikt:</strong> ' + sa.name + " ist in dieser Runde um " +
-      zahl(Math.round(davor.saeulen[sa.id] - jetzt.saeulen[sa.id])) + " Punkte gesunken" +
-      (gewaehlt.length ? ". Gewählt hast du: " + gewaehlt.join(", ") + ". " : ". ") +
-      "Maßnahmen, die eine Säule voranbringen, belasten oft eine andere. Prüfe, ob du den Rückstand mit einer " +
-      "Maßnahme der betroffenen Säule ausgleichen kannst.</p>";
-  }
-  return html;
+  });
+
+  // Strandmüll: Der Balken läuft die Müllbilanz Posten für Posten ab
+  const muellSchritt = function (x) {
+    return { v: x, w: muellProzent(x), f: x < MUELL_SCHWELLE ? AMPEL.gruen : AMPEL.rot };
+  };
+  const posten = [
+    { titel: "Reinigung", wert: -mb.entfernt, art: "gut" },
+    { titel: "natürlicher Abtrag", wert: -mb.abtrag, art: "gut" },
+    { titel: "neuer Eintrag", wert: mb.neu - (mb.bestand - mb.entfernt - mb.abtrag), art: "schlecht" }
+  ];
+  const schritte = [muellSchritt(mb.bestand)];
+  let stand = mb.bestand;
+  posten.forEach(function (p, i) {
+    stand += p.wert;
+    if (p.wert) {
+      p.schritt = schritte.length;
+      schritte.push(Object.assign(muellSchritt(stand), { posten: i }));
+    }
+  });
+  html += vbZeileHtml({
+    name: "Strandmüll", einheit: "", besser: false, zusatzKlasse: "vb-muell",
+    schritte: schritte,
+    marken: '<div class="vb-schwelle" style="left:' + muellProzent(MUELL_SCHWELLE) +
+      '%" title="EU-Schwellenwert: unter ' + MUELL_SCHWELLE + ' Teile"></div>',
+    fuss: "Teile pro 100 m Strand, Ziel unter " + MUELL_SCHWELLE
+  });
+  // Müllbilanz: einmal, direkt am Strandmüll-Balken; der aktive Posten leuchtet während der Animation auf
+  html += '<div class="vb-muellbilanz">' + posten.map(function (p, i) {
+    const text = p.wert > 0 ? "+" + zahl(p.wert) : p.wert < 0 ? "−" + zahl(-p.wert) : "0";
+    return '<span class="vb-posten ' + p.art + '" data-posten="' + i + '"><strong>' + text + "</strong>" +
+      p.titel + "</span>";
+  }).join("") + "</div>" +
+    '<p class="klein vb-eintrag">Eintrag: Strandbesucher ' + zahl(mb.eintrag.strand, 1) + ", Fischerei und Schifffahrt " +
+    zahl(mb.eintrag.meer, 1) + ", Flüsse und Hinterland " + zahl(mb.eintrag.land, 1) + " Teile pro 100 m.</p>";
+
+  // Budget: ohne Balken
+  const bDiff = n.budget - v.budget;
+  html += '<div class="vb-zeile vb-budget"><div class="vb-kopf">' +
+    '<span class="vb-name">Budget</span>' +
+    '<span class="vb-werte"><span class="vb-alt">' + euro(v.budget) + "</span>" +
+    '<span class="vb-pfeil" aria-hidden="true">→</span><strong>' + euro(n.budget) + "</strong>" +
+    '<span class="vb-diff ' + (bDiff === 0 ? "" : bDiff > 0 ? "trend-gut" : "trend-schlecht") + '">' +
+    (bDiff >= 0 ? "+" : "−") + euro(Math.abs(bDiff)) + "</span></span></div></div>";
+
+  return html + "</div>";
+}
+
+// Startet die Balkenanimation im Rundenbericht. Ein neuer Aufruf bricht eine laufende Animation ab.
+const VB_DAUER = 900;      // ms pro Schritt
+const VB_VERSATZ = 160;    // ms Versatz zwischen den Zeilen
+let vbLauf = 0;
+
+function berichtAnimieren(container) {
+  const lauf = ++vbLauf;
+  const ruhig = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const zeilen = Array.prototype.slice.call(container.querySelectorAll(".vb-zeile[data-schritte]"));
+  zeilen.forEach(function (zeile, i) {
+    const schritte = JSON.parse(zeile.getAttribute("data-schritte"));
+    const einheit = zeile.getAttribute("data-einheit");
+    const fuellung = zeile.querySelector(".vb-fuellung");
+    const zahlFeld = zeile.querySelector(".vb-zahl");
+    const zeigen = function (wert) { zahlFeld.textContent = zahl(wert) + einheit; };
+    const posten = function (s) {
+      container.querySelectorAll(".vb-posten").forEach(function (p) {
+        p.classList.toggle("aktiv", s.posten !== undefined && +p.getAttribute("data-posten") === s.posten);
+      });
+    };
+    const ende = function () {
+      const s = schritte[schritte.length - 1];
+      fuellung.style.width = s.w + "%";
+      fuellung.style.backgroundColor = s.f;
+      zeigen(s.v);
+      zeile.classList.add("fertig");
+      if (zeile.classList.contains("vb-muell")) posten({});
+    };
+    if (ruhig || schritte.length < 2) { ende(); return; }
+
+    const schritt = function (k) {
+      if (lauf !== vbLauf) return;
+      if (k >= schritte.length) { ende(); return; }
+      const von = schritte[k - 1].v;
+      const s = schritte[k];
+      fuellung.style.transitionDuration = VB_DAUER + "ms";
+      fuellung.style.width = s.w + "%";
+      fuellung.style.backgroundColor = s.f;
+      if (zeile.classList.contains("vb-muell")) posten(s);
+      const t0 = performance.now();
+      const zaehlen = function (t) {
+        if (lauf !== vbLauf) return;
+        const x = Math.min(1, (t - t0) / VB_DAUER);
+        const weich = 1 - Math.pow(1 - x, 3);
+        zeigen(Math.round(von + (s.v - von) * weich));
+        if (x < 1) {
+          requestAnimationFrame(zaehlen);
+        } else {
+          setTimeout(function () { schritt(k + 1); }, 150);
+        }
+      };
+      requestAnimationFrame(zaehlen);
+    };
+    setTimeout(function () { schritt(1); }, 350 + i * VB_VERSATZ);
+  });
 }
 
 function bilanzFeld(titel, wert, art) {
@@ -4319,6 +4529,97 @@ function anliegenSchliessen() {
   rundenKnopfAnzeigen();
 }
 
+// ---------- Otter: kurzer Zwischenstand in Runde 3, 6 und 9 ----------
+function otterDa(z) {
+  return !z.beendet && OTTER_RUNDEN.indexOf(z.runde) >= 0;
+}
+
+// Seeotter im Stil der Karte: flache Farben, dunkle Kontur, schaut aus dem Wasser
+function otterSvg() {
+  const tinte = "#12304A";
+  const fell = "#8A5A3B";
+  const hell = "#D9B48C";
+  return '<svg class="otter-figur" viewBox="0 0 34 28" aria-hidden="true" focusable="false">' +
+    // Ohren
+    '<circle cx="11.2" cy="5" r="1.7" fill="' + fell + '" stroke="' + tinte + '" stroke-width="1.2"/>' +
+    '<circle cx="22.8" cy="5" r="1.7" fill="' + fell + '" stroke="' + tinte + '" stroke-width="1.2"/>' +
+    // Körper
+    '<path d="M9 26 C8 17 10.5 11.5 17 11.5 C23.5 11.5 26 17 25 26" fill="' + fell + '" stroke="' + tinte + '" stroke-width="1.4"/>' +
+    '<path d="M12.6 26 C12.6 19.5 14.2 16.6 17 16.6 C19.8 16.6 21.4 19.5 21.4 26 Z" fill="' + hell + '"/>' +
+    // Kopf
+    '<ellipse cx="17" cy="9" rx="6.8" ry="5.9" fill="' + fell + '" stroke="' + tinte + '" stroke-width="1.4"/>' +
+    '<ellipse cx="17" cy="11" rx="3.6" ry="2.5" fill="' + hell + '"/>' +
+    '<ellipse cx="17" cy="9.9" rx="1.25" ry="0.85" fill="' + tinte + '"/>' +
+    '<circle cx="14.2" cy="7.6" r="0.95" fill="' + tinte + '"/>' +
+    '<circle cx="19.8" cy="7.6" r="0.95" fill="' + tinte + '"/>' +
+    '<path d="M13.2 11 H9.6 M13.2 12 L9.9 13 M20.8 11 H24.4 M20.8 12 L24.1 13" stroke="' + tinte + '" stroke-width="0.6" stroke-linecap="round"/>' +
+    // Pfoten
+    '<ellipse cx="14.3" cy="18.2" rx="1.7" ry="1.25" fill="#6E4329" stroke="' + tinte + '" stroke-width="0.9"/>' +
+    '<ellipse cx="19.7" cy="18.2" rx="1.7" ry="1.25" fill="#6E4329" stroke="' + tinte + '" stroke-width="0.9"/>' +
+    // Wasserlinie
+    '<path d="M1 24.5 Q5 22.5 9 24.5 T17 24.5 T25 24.5 T33 24.5 V28 H1 Z" fill="#FFFFFF" fill-opacity="0.35"/>' +
+    '<path d="M1 24.5 Q5 22.5 9 24.5 T17 24.5 T25 24.5 T33 24.5" fill="none" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round"/>' +
+    "</svg>";
+}
+
+// Zwischenstand aus der letzten Momentaufnahme: Welche Kennzahlen liegen hinter dem Kurs?
+// Gleicher Maßstab wie die Wertung (kursGrad), aber nur in Worten und ohne Fachbegriffe.
+function otterStand(s) {
+  const kennzahlen = Object.keys(KENNZAHL_NAMEN).map(function (id) {
+    const soll = kursSoll(id, s.runde);
+    const muell = id === "strandmuell";
+    return { name: KENNZAHL_NAMEN[id], muell: muell,
+      wert: muell ? zahl(Math.round(s[id])) + " Teile" : s[id] + " %",
+      soll: muell ? "höchstens " + zahl(Math.round(soll)) + " Teile" : Math.round(soll) + " %",
+      hinten: kursGrad(id, s[id], s.runde) < 1,
+      luecke: kennzahlPunkte(id, soll) - kennzahlPunkte(id, s[id]) };
+  });
+  const hinten = kennzahlen.filter(function (k) { return k.hinten; })
+    .sort(function (a, b) { return b.luecke - a.luecke; });
+  const imPlan = kennzahlen.filter(function (k) { return !k.hinten; });
+
+  let titel;
+  let satz;
+  if (!hinten.length) {
+    titel = "Alles auf Kurs";
+    satz = "Alle sechs Kennzahlen liegen da, wo sie jetzt sein sollten. Halte die Richtung.";
+  } else if (hinten.length <= 2) {
+    titel = "Fast auf Kurs";
+    satz = "Das meiste läuft nach Plan. Hier hängst du hinterher:";
+  } else {
+    titel = "Kurskorrektur nötig";
+    satz = "Mehrere Kennzahlen hängen hinterher. In diesem Tempo wird es knapp:";
+  }
+  let html = '<p class="otter-satz">' + satz + "</p>";
+  if (hinten.length) {
+    html += '<ul class="otter-liste">' + hinten.slice(0, 3).map(function (k) {
+      return "<li><strong>" + k.name + "</strong> " + k.wert + '<span class="otter-soll">jetzt nötig: ' + k.soll + "</span></li>";
+    }).join("") + "</ul>";
+    if (imPlan.length) {
+      html += '<p class="klein">Im Plan: ' + namenListe(imPlan.map(function (k) { return k.name; })) + ".</p>";
+    }
+  }
+  return { titel: titel, html: html };
+}
+
+function otterOeffnen() {
+  const z = zustand;
+  if (!otterDa(z)) return;
+  const s = z.verlauf[z.verlauf.length - 1];
+  const stand = otterStand(s);
+  el("otterFigur").innerHTML = otterSvg();
+  el("otterTitel").textContent = stand.titel;
+  el("otterUntertitel").textContent = "Der Otter meldet deinen Stand nach Runde " + s.runde + ".";
+  el("otterInhalt").innerHTML = stand.html;
+  if (z.otterGelesen.indexOf(z.runde) < 0) z.otterGelesen.push(z.runde);
+  popupOeffnen("popupOtter");
+}
+
+function otterSchliessen() {
+  popupSchliessen("popupOtter");
+  markerAnzeigen();
+}
+
 // ---------- Budget: wie es sich zusammensetzt ----------
 function budgetZeigen() {
   const z = zustand;
@@ -4377,7 +4678,8 @@ function bewertungHtml() {
     "</tbody></table>";
 
   html += "<h3>Nachhaltigkeitsscore: den Kurs halten</h3>" +
-    "<p>Jede Kennzahl hat in jeder Runde einen <strong>Sollwert</strong> (orangefarbenes Dreieck auf dem Balken). " +
+    "<p>Jede Kennzahl hat in jeder Runde einen <strong>Sollwert</strong>. Wie weit du davon entfernt bist, zeigen " +
+    "der Rundenbericht, die Zwischenbilanz und der Otter in den Runden " + namenListe(OTTER_RUNDEN.map(String)) + ". " +
     "Der Sollkurs steigt anfangs flach, weil Maßnahmen verzögert wirken, und endet bei den Mindestwerten des guten " +
     "Umweltzustands. Wer auf oder über dem Sollwert liegt, bekommt die volle Punktzahl. Liegt eine Kennzahl darunter, " +
     "sinkt ihre Punktzahl bis auf null, sobald sie " + KURS_TOLERANZ + " Punkte (beim Strandmüll: Müllpunkte) hinter dem " +
@@ -4616,8 +4918,12 @@ function massnahmeWaehlen(id) {
 
 function auswahlAktualisieren() {
   massnahmenAnzeigen();
-  auswahlAnzeigen();
   rundenKnopfAnzeigen();
+  // Fokus bleibt auf dem Knopf in der offenen Karte (oder auf ihrem Kopf, falls er gesperrt ist)
+  if (zustand.zuletzt) {
+    fokusAuf('[data-waehlen="' + zustand.zuletzt + '"]:not(:disabled)');
+    if (!el("massnahmenListe").contains(document.activeElement)) fokusAuf('[data-karte="' + zustand.zuletzt + '"]');
+  }
 }
 
 function zurueckstellen(saeule) {
@@ -5798,6 +6104,7 @@ function oberflaecheVerbinden() {
     muellInfoKnopf: muellPopupZeigen,
     bewertungKnopf: bewertungZeigen,
     anliegenOk: anliegenSchliessen,
+    otterOk: otterSchliessen,
     beendenKnopf: function () { popupOeffnen("popupBeenden"); },   // unvollständige Spiele kommen nicht ins Leaderboard
     beendenOk: zumStartbildschirm,
     auswertungLeaderboard: leaderboardOeffnen,
@@ -5837,11 +6144,11 @@ const BENOETIGTE_ELEMENTE = ["anzeigeWissen", "auswahlUebersicht", "popupInfo", 
   "quizWeiter", "popupZwischenbilanz", "zbWeiter", "massnahmenListe", "personen", "muellInfoKnopf",
   "popupMuell", "muellInhalt", "muellSchliessen", "entscheidungen", "startSzene", "startBilder", "ladebildschirm",
   "ladeKarte", "ladeFuellung", "ladeBalken", "ladeMarken", "ladeFaktUhr", "ladeWeiter", "startVollbild", "popupQuellen", "popupUeber", "bildNachweis", "ueberBewertung", "startSonne", "startWolken", "startMeer", "startWindsack", "startHalme",
-  "saeulenListe", "saeulenHinweis", "zielZusatz"];
+  "popupOtter", "otterOk", "otterInhalt", "zielZusatz"];
 
 function versionPruefen() {
   const fehlend = BENOETIGTE_ELEMENTE.filter(function (id) { return !document.getElementById(id); });
-  const cssNeu = getComputedStyle(document.documentElement).getPropertyValue("--layout-version").trim() === "10";
+  const cssNeu = getComputedStyle(document.documentElement).getPropertyValue("--layout-version").trim() === "11";
   if (!fehlend.length && cssNeu) return true;
   const hinweis = document.createElement("div");
   hinweis.setAttribute("role", "alert");
