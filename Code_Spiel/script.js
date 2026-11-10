@@ -3267,6 +3267,76 @@ function meerGlitzerSvg() {
   return '<path d="' + d + '" stroke="#FFFFFF" stroke-opacity="0.22" stroke-width="1.2" stroke-linecap="round"/>';
 }
 
+// Wiese: weiche, etwas dunklere Grasflecken und kleine grüne Grasbüschel im Binnenland
+// (hinter der Dünenkante). Hotels, Fabrik und Fluss bleiben frei.
+function wiesenSvg() {
+  const r = zufallsfolge(83);
+  let s = '<g filter="url(#kaWeich)" fill="#A9BC7C">';
+  [[60, 40, 38, 14], [300, 30, 46, 12], [250, 76, 40, 10], [380, 60, 30, 10], [600, 18, 34, 9], [770, 60, 26, 12]].forEach(function (f) {
+    s += '<ellipse cx="' + f[0] + '" cy="' + f[1] + '" rx="' + f[2] + '" ry="' + f[3] + '" opacity="0.45"/>';
+  });
+  s += "</g>";
+  const farben = ["#7E9A4E", "#91AB5B", "#6B8743", "#A3B868"];
+  s += '<g fill="none" stroke-linecap="round" stroke-width="0.8" opacity="0.8">';
+  for (let i = 0; i < 90; i++) {
+    const x = 6 + r() * (KARTE_B - 12);
+    const y = 6 + r() * (kuestenlinie(x) - 26);
+    if (x > 118 && x < 218) continue;                              // Fluss
+    if (x > 420 && x < 760 && y > 14) continue;                    // Ort und Fabrik
+    let d = "";
+    for (let j = 0; j < 3; j++) {
+      const neigung = (j - 1) * 1.6 + (r() - 0.5);
+      const hoehe = 3 + r() * 2.5;
+      d += "M" + (x + j * 0.8).toFixed(1) + "," + y.toFixed(1) + " l" + neigung.toFixed(1) + "," + (-hoehe).toFixed(1) + " ";
+    }
+    s += '<path d="' + d + '" stroke="' + farben[Math.floor(r() * farben.length)] + '"/>';
+  }
+  return s + "</g>";
+}
+
+// Bäume auf den freien Landflächen: runde Laubbäume und schlanke Kiefern, flach gezeichnet
+// mit Licht von oben links (wie die Sonne im Titelbild) und weichem Schatten nach rechts unten.
+// Die Plätze halten Abstand zu Infopunkten, Personen, Gebäuden, Fluss und den Müll-Schwerpunkten.
+const BAEUME = [
+  // x, y (Fuß), Größe, Art
+  [22, 44, 1.25, "laub"], [52, 27, 1.05, "kiefer"], [80, 66, 1.35, "laub"], [104, 36, 1, "laub"], [38, 88, 0.95, "kiefer"],
+  [224, 26, 1.05, "kiefer"], [294, 78, 1.25, "laub"], [396, 72, 1, "kiefer"],
+  [400, 28, 1, "laub"], [568, 24, 0.85, "laub"], [786, 28, 1.1, "kiefer"], [772, 56, 0.95, "laub"]
+];
+
+function baumSvg(x, y, g, art) {
+  const t = function (wert) { return wert.toFixed(1); };
+  let s = '<ellipse cx="' + t(x + 4 * g) + '" cy="' + t(y) + '" rx="' + t(8 * g) + '" ry="' + t(2.6 * g) + '" fill="#0B2238" opacity="0.16"/>';
+  if (art === "kiefer") {
+    s += '<rect x="' + t(x - 0.9 * g) + '" y="' + t(y - 5 * g) + '" width="' + t(1.8 * g) + '" height="' + t(5 * g) + '" fill="#6E5236"/>';
+    [[0, 9, 6.5], [-5.5, 8, 5.2], [-10.5, 6.5, 4]].forEach(function (ebene, i) {
+      const unten = y - 4 * g + ebene[0] * g;
+      const oben = unten - ebene[1] * g;
+      const b = ebene[2] * g;
+      s += '<path d="M' + t(x - b) + "," + t(unten) + " L" + t(x) + "," + t(oben) + " L" + t(x + b) + "," + t(unten) + ' Z" fill="' +
+        (i === 2 ? "#4F7444" : "#456A3C") + '"/>' +
+        '<path d="M' + t(x - b) + "," + t(unten) + " L" + t(x) + "," + t(oben) + " L" + t(x - b * 0.15) + "," + t(unten) + ' Z" fill="#6C9157"/>';
+    });
+    return s;
+  }
+  s += '<rect x="' + t(x - 1 * g) + '" y="' + t(y - 7 * g) + '" width="' + t(2 * g) + '" height="' + t(7 * g) + '" rx="' + t(0.6 * g) + '" fill="#7A5A3A"/>';
+  s += '<g fill="#5F8243">' +
+    '<circle cx="' + t(x - 4 * g) + '" cy="' + t(y - 10 * g) + '" r="' + t(5 * g) + '"/>' +
+    '<circle cx="' + t(x + 4.2 * g) + '" cy="' + t(y - 10.5 * g) + '" r="' + t(5 * g) + '"/>' +
+    '<circle cx="' + t(x) + '" cy="' + t(y - 15 * g) + '" r="' + t(6 * g) + '"/></g>';
+  s += '<g fill="#7FA157">' +
+    '<circle cx="' + t(x - 5 * g) + '" cy="' + t(y - 11.5 * g) + '" r="' + t(3.2 * g) + '"/>' +
+    '<circle cx="' + t(x - 1.6 * g) + '" cy="' + t(y - 16.8 * g) + '" r="' + t(3.8 * g) + '"/></g>';
+  s += '<circle cx="' + t(x - 2.8 * g) + '" cy="' + t(y - 18 * g) + '" r="' + t(1.6 * g) + '" fill="#A3BE73"/>';
+  return s;
+}
+
+function baeumeSvg() {
+  return BAEUME.slice().sort(function (a, b) { return a[1] - b[1]; }).map(function (b) {
+    return baumSvg(b[0], b[1], b[2], b[3]);
+  }).join("");
+}
+
 // Strandhafer auf der Dünenkante: kleine Büschel aus drei bis fünf Halmen (Farben wie im Titelbild).
 // Hotels, Fabrik und Fluss bleiben frei.
 function strandhaferSvg() {
@@ -3925,7 +3995,9 @@ function seekarteSvg(z) {
   s += '<polygon points="0,0 ' + linienPunkte(0) + ' 800,0" fill="url(#kaLand)"/>';
   s += '<polygon points="0,' + (kuestenlinie(0) - 16).toFixed(1) + " " + linienPunkte(-16) + " " +
     linienPunkte(0).split(" ").reverse().join(" ") + '" fill="url(#kaDuene)"/>';
+  s += wiesenSvg();
   s += strandhaferSvg();
+  s += baeumeSvg();
 
   // Brutzone am Strand: rot gestrichelter Bereich links der Flussmündung, mit Schild.
   // Das Schild steht links, damit Müllfänger und Infopunkte am Strand frei bleiben.
