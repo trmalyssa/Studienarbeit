@@ -2177,6 +2177,175 @@ p + .info-tabelle { margin-top: 10px; }
   border: 1.5px solid var(--tinte);
 }
 
+/* Rundenbericht: Balken wandern animiert vom alten zum neuen Stand */
+.vb-liste {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.vb-kopf {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 9px;
+  font-size: 0.95rem;
+}
+
+.vb-werte {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vb-alt { color: var(--tinte-3); }
+.vb-pfeil { color: var(--tinte-3); }
+
+.vb-zahl {
+  min-width: 3.4em;
+  text-align: right;
+}
+
+.vb-diff {
+  min-width: 3.2em;
+  text-align: right;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.vb-zeile.fertig .vb-diff,
+.vb-budget .vb-diff { opacity: 1; }
+
+.vb-balken { margin-bottom: 10px; }
+
+/* Stand vor der Runde: schraffiert, bleibt bei einem Rückgang als Verlust sichtbar */
+.vb-vorher {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 2px;
+  background: repeating-linear-gradient(-45deg, #C9D6DE 0 3px, transparent 3px 6px);
+}
+
+.vb-fuellung {
+  position: relative;
+  transition-property: width, background-color;
+  transition-timing-function: cubic-bezier(0.33, 1, 0.68, 1);
+  transition-duration: 0s;
+}
+
+.vb-vorher-strich {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  margin-left: -1px;
+  border-left: 2px dotted var(--tinte-2);
+}
+
+/* Richtwert: kleines Dreieck unter dem Balken */
+.vb-richtwert {
+  position: absolute;
+  bottom: -9px;
+  width: 0;
+  height: 0;
+  margin-left: -5px;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 7px solid var(--tinte-2);
+}
+
+.vb-schwelle {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 3px;
+  margin-left: -1px;
+  background: var(--gruen);
+}
+
+.vb-fuss {
+  margin-top: -2px;
+  font-size: 0.8rem;
+  color: var(--tinte-3);
+}
+
+.vb-muellbilanz {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: -6px;
+}
+
+.vb-posten {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  font-size: 0.8rem;
+  color: var(--tinte-3);
+  background: var(--papier);
+  border: 1.5px solid transparent;
+  border-radius: 4px;
+  transition: border-color 0.3s ease, background-color 0.3s ease;
+}
+
+.vb-posten strong {
+  font-family: var(--schrift-schmal);
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.vb-posten.gut strong { color: var(--gruen); }
+.vb-posten.schlecht strong { color: var(--rot); }
+.vb-posten.aktiv { border-color: var(--tinte); background: var(--flaeche); }
+
+.vb-eintrag { margin-top: -8px; }
+
+.vb-budget {
+  padding-top: 12px;
+  border-top: 1px solid var(--linie);
+}
+
+.vb-budget .vb-kopf { margin-bottom: 0; }
+
+.vb-legende {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 14px;
+  font-size: 0.8rem;
+  color: var(--tinte-3);
+}
+
+.vb-legende > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 12px;
+}
+
+.vb-richtwert-zeichen,
+.vb-vorher-zeichen { display: inline-block; }
+
+.vb-richtwert-zeichen {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 7px solid var(--tinte-2);
+}
+
+.vb-vorher-zeichen {
+  width: 14px;
+  height: 10px;
+  border-radius: 2px;
+  background: repeating-linear-gradient(-45deg, #C9D6DE 0 3px, transparent 3px 6px);
+  border-left: 2px dotted var(--tinte-2);
+}
+
 .belastung-balken {
   display: flex;
   height: 14px;
@@ -2735,6 +2904,8 @@ p + .info-tabelle { margin-top: 10px; }
   .ziel-liste,
   .entscheidungen { grid-template-columns: minmax(0, 1fr); }
   .bilanz { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .vb-kopf { flex-wrap: wrap; }
+  .vb-posten { padding: 6px 8px; }
   .ergebnis {
     grid-template-columns: minmax(0, 1fr);
     gap: 10px;
