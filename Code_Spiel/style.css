@@ -996,7 +996,15 @@ button {
 
 /* ===== Entscheidungen der Runde (unter der Karte) ===== */
 .entscheidungs-tafel { padding: 16px 18px 4px; }
-.entscheidungs-tafel .tafel-kopf { align-items: center; }
+/* Kopf: Titel links, Bereich dieser Runde mittig über allen drei Spalten, Hinweis rechts */
+.entscheidungs-tafel .tafel-kopf {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.entscheidungs-tafel .tafel-kopf .tafel-zusatz { text-align: right; }
+.bereich-anzeige:empty { display: none; }
 
 /* drei Säulen nebeneinander, alle gleich hoch. Jede Säule belegt drei Zeilen (Kopf, Maßnahmen,
    „Nichts tun“); über Subgrid liegen diese Zeilen in allen Spalten auf derselben Höhe. */
@@ -2599,12 +2607,11 @@ p + .info-tabelle { margin-top: 10px; }
 /* „Nichts tun“ steht in allen Spalten unten auf gleicher Höhe */
 .saeule-fuss { align-self: end; }
 
-/* Bereich dieser Runde im Kopf der Ökologie-Spalte */
+/* Bereich dieser Runde im Kopf des Entscheidungsfensters */
 .bereich-banner {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 6px;
   padding: 6px 10px;
   background: var(--bereich-flaeche);
   border: 1.5px solid var(--bereich);
@@ -2648,7 +2655,9 @@ p + .info-tabelle { margin-top: 10px; }
 }
 
 .bereich-quelle {
-  margin-top: 4px;
+  margin-left: 6px;
+  padding-left: 12px;
+  border-left: 1px solid var(--bereich);
   font-size: 0.78rem;
   line-height: 1.35;
   color: var(--tinte-2);
@@ -2860,6 +2869,8 @@ p + .info-tabelle { margin-top: 10px; }
 @media (max-width: 1060px) {
   .marke-name { display: none; }
   .saeulen-raster { grid-template-columns: minmax(0, 1fr); row-gap: 18px; }
+  .entscheidungs-tafel .tafel-kopf { grid-template-columns: minmax(0, 1fr); justify-items: start; }
+  .entscheidungs-tafel .tafel-kopf .tafel-zusatz { text-align: left; }
 }
 
 /* ===== Schmale Bildschirme: alles untereinander ===== */
