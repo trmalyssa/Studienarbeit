@@ -896,9 +896,9 @@ const FOERDERPROGRAMME = [
 // deren Bedingung zutrifft und die noch nicht gesagt wurde.
 // wenn(z, w): z = Spielzustand, w = aktive Wirkungen der Runde
 const PERSONEN = {
-  strand: { name: "Merle", rolle: "betreibt den Strandkiosk", x: 41.3, y: 36.5, farbe: "#E2A92B" },
-  meer:   { name: "Jannik", rolle: "Kutterfischer im Hafen", x: 92.6, y: 56.5, farbe: "#1D4F8C" },
-  land:   { name: "Ole", rolle: "Schichtleiter im Gewerbegebiet", x: 74.5, y: 28.5, farbe: "#5E7D4E" }
+  strand: { name: "Merle", rolle: "betreibt den Strandkiosk", x: 41.3, y: 36.5, farbe: "#E2A92B", kleidung: "kiosk" },
+  meer:   { name: "Jannik", rolle: "Kutterfischer im Hafen", x: 92.6, y: 56.5, farbe: "#1D4F8C", kleidung: "fischer" },
+  land:   { name: "Ole", rolle: "Schichtleiter im Gewerbegebiet", x: 74.5, y: 28.5, farbe: "#5E7D4E", kleidung: "arbeiter" }
 };
 
 // true, wenn die Maßnahme in den letzten n Runden umgesetzt wurde
@@ -3018,11 +3018,73 @@ function namenListe(namen) {
 }
 
 // ---------- Marker auf der Seekarte: Infopunkte und Personen ----------
-function figurSvg(farbe) {
-  return '<svg class="person-figur" viewBox="0 0 20 30" aria-hidden="true" focusable="false">' +
-    '<circle cx="10" cy="6" r="5" fill="#F2D2B6" stroke="#12304A" stroke-width="1.4"/>' +
-    '<path d="M3 29 L3 18 Q3 12 10 12 Q17 12 17 18 L17 29 Z" fill="' + farbe + '" stroke="#12304A" stroke-width="1.4"/>' +
-    "</svg>";
+// Einfache Figur mit Kopf, Haaren, Armen und Beinen. Ein Erkennungsmerkmal pro Person:
+// Merle (Kiosk) trägt eine Schürze, Jannik (Kutter) Südwester und Ölzeug, Ole (Gewerbegebiet)
+// Schutzhelm und Warnstreifen. Licht von links oben wie im Titelbild: rechte Körperhälfte etwas dunkler.
+const FIGUR_STIL = {
+  kiosk:    { haut: "#F2D2B6", haare: "#8A4B2A", hose: "#3C5A78" },
+  fischer:  { haut: "#EBC6A4", haare: "#6B4A2E", hose: "#E2A92B" },
+  arbeiter: { haut: "#F0CDAE", haare: "#4A3524", hose: "#4A4F57" }
+};
+
+function figurSvg(person) {
+  const stil = FIGUR_STIL[person.kleidung] || FIGUR_STIL.kiosk;
+  const farbe = person.farbe;
+  const tinte = "#12304A";
+  const linie = ' stroke="' + tinte + '" stroke-width="0.9" stroke-linejoin="round"';
+  const arm = function (d) {
+    return '<path d="' + d + '" fill="none" stroke="' + tinte + '" stroke-width="3.1" stroke-linecap="round"/>' +
+      '<path d="' + d + '" fill="none" stroke="' + farbe + '" stroke-width="1.6" stroke-linecap="round"/>';
+  };
+  let s = '<svg class="person-figur" viewBox="0 0 20 30" aria-hidden="true" focusable="false">';
+  // Schatten am Boden (Licht von links oben)
+  s += '<ellipse cx="11" cy="29" rx="6.2" ry="1.1" fill="#0B2238" opacity="0.22"/>';
+  // Beine und Schuhe
+  s += '<path d="M6.8,20.5 L7,28.2 L9.6,28.2 L9.7,22.4 L10.3,22.4 L10.4,28.2 L13,28.2 L13.2,20.5 Z" fill="' + stil.hose + '"' + linie + "/>";
+  s += '<path d="M6.6,28.6 H9.8 M10.2,28.6 H13.4" stroke="' + tinte + '" stroke-width="1.4" stroke-linecap="round"/>';
+  // Arme hinter dem Körper, Hände
+  s += arm("M5.6,13.6 Q3.9,17 4.5,20.6") + arm("M14.4,13.6 Q16.1,17 15.5,20.6");
+  s += '<circle cx="4.5" cy="21.2" r="1.15" fill="' + stil.haut + '"' + linie.replace("0.9", "0.7") + "/>" +
+    '<circle cx="15.5" cy="21.2" r="1.15" fill="' + stil.haut + '"' + linie.replace("0.9", "0.7") + "/>";
+  // Oberkörper mit Schattenseite rechts
+  s += '<path d="M5.2,21.6 L5.3,15 Q5.5,11.7 10,11.5 Q14.5,11.7 14.7,15 L14.8,21.6 Z" fill="' + farbe + '"' + linie + "/>";
+  s += '<path d="M10.6,11.6 Q14.4,11.9 14.6,15 L14.7,21.2 L11.4,21.2 Q12.4,16 10.6,11.6 Z" fill="#0B2238" opacity="0.14"/>';
+  if (person.kleidung === "kiosk") {
+    // Schürze mit Träger und Tasche
+    s += '<path d="M7.2,15.2 H12.8 L13.2,21.8 H6.8 Z" fill="#FBF8F1"' + linie.replace("0.9", "0.6") + "/>" +
+      '<path d="M7.6,15.2 L8.6,12 M12.4,15.2 L11.4,12" stroke="#FBF8F1" stroke-width="0.8"/>' +
+      '<path d="M8.6,18.4 H11.4 V20 H8.6 Z" fill="none" stroke="' + farbe + '" stroke-width="0.5"/>';
+  } else if (person.kleidung === "fischer") {
+    // Latzhose aus gelbem Ölzeug über dem blauen Pullover
+    s += '<path d="M7,16 H13 L13.2,21.8 H6.8 Z" fill="' + stil.hose + '"' + linie.replace("0.9", "0.6") + "/>" +
+      '<path d="M7.6,16 L7.4,12.4 M12.4,16 L12.6,12.4" stroke="' + stil.hose + '" stroke-width="0.9"/>';
+  } else {
+    // Warnstreifen auf der Arbeitsjacke
+    s += '<path d="M5.4,17.2 H14.6 M5.4,19.4 H14.6" stroke="#F1E9A8" stroke-width="0.9"/>';
+  }
+  // Hals und Kopf
+  s += '<rect x="9" y="9.6" width="2" height="2.4" fill="' + stil.haut + '"/>';
+  s += '<circle cx="10" cy="6.6" r="4.2" fill="' + stil.haut + '"' + linie + "/>";
+  s += '<circle cx="8.5" cy="6.9" r="0.45" fill="' + tinte + '"/><circle cx="11.5" cy="6.9" r="0.45" fill="' + tinte + '"/>' +
+    '<path d="M8.9,8.6 Q10,9.3 11.1,8.6" fill="none" stroke="' + tinte + '" stroke-width="0.5" stroke-linecap="round"/>';
+  if (person.kleidung === "kiosk") {
+    // Haare mit Zopf
+    s += '<path d="M14,4.6 Q16.8,6.2 15.6,10.2" fill="none" stroke="' + stil.haare + '" stroke-width="1.8" stroke-linecap="round"/>' +
+      '<path d="M5.8,6.4 Q5.8,2 10,2.2 Q14.2,2 14.2,6.4 Q12.8,4 10,4.2 Q7.2,4 5.8,6.4 Z" fill="' + stil.haare + '"' + linie.replace("0.9", "0.6") + "/>";
+  } else if (person.kleidung === "fischer") {
+    // Bart und Südwester
+    s += '<path d="M6.3,7.8 Q10,12.4 13.7,7.8 Q12.8,9.9 10,10 Q7.2,9.9 6.3,7.8 Z" fill="' + stil.haare + '"/>' +
+      '<path d="M8.9,8.7 Q10,9.2 11.1,8.7" fill="none" stroke="' + stil.haut + '" stroke-width="0.6" stroke-linecap="round"/>';
+    s += '<path d="M5.2,5.4 Q5.4,1 10,1.1 Q14.6,1 14.8,5.4 Q17.4,5.9 17.2,6.8 Q10,5.6 2.8,6.8 Q2.6,5.9 5.2,5.4 Z" fill="#E2A92B"' +
+      linie.replace("0.9", "0.7") + "/>";
+  } else {
+    // Schutzhelm
+    s += '<path d="M5.5,5.4 Q5.5,1 10,1 Q14.5,1 14.5,5.4 Z" fill="#E8662A"' + linie.replace("0.9", "0.7") + "/>" +
+      '<path d="M4.2,5.6 H15.8" stroke="' + tinte + '" stroke-width="1.4" stroke-linecap="round"/>' +
+      '<path d="M4.4,5.5 H15.6" stroke="#E8662A" stroke-width="0.6" stroke-linecap="round"/>' +
+      '<path d="M8,2.6 Q9,1.8 10.4,1.8" fill="none" stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="0.6" stroke-linecap="round"/>';
+  }
+  return s + "</svg>";
 }
 
 // Knopf über der Karte; ort.x/ort.y in Prozent der Kartenbreite/-höhe
@@ -3070,7 +3132,7 @@ function markerAnzeigen() {
     const wer = p.name + " (" + bereichName(a.region) + ")";
     const knopf = kartenKnopf("person " + (a.gelesen ? "gelesen" : "ungelesen"), p,
       a.gelesen ? wer + ": Anliegen gehört" : "Anliegen von " + wer + " anhören",
-      '<span class="person-blase" aria-hidden="true">' + (a.gelesen ? "✓" : "…") + "</span>" + figurSvg(p.farbe) +
+      '<span class="person-blase" aria-hidden="true">' + (a.gelesen ? "✓" : "…") + "</span>" + figurSvg(p) +
       '<span class="person-name" aria-hidden="true">' + p.name + "</span>",
       function () { anliegenOeffnen(index); });
     knopf.disabled = a.gelesen;
@@ -3135,6 +3197,47 @@ function flussAbschnitte() {
     [[146, -4], [118, 26], [206, 44], [176, 70]],
     [[176, 70], [146, 96], [196, yMuendung - 18], [196, yMuendung + 4]]
   ];
+}
+
+// Breite des Flusses an der Stelle s (0 = Quelle oben, 2 = Mündung): zum Meer hin breiter,
+// an der Mündung öffnet er sich trichterförmig
+function flussBreite(s) {
+  return 9 + 2.6 * s + 11 * Math.pow(Math.max(0, (s - 1.55) / 0.45), 2);
+}
+
+// Punkte entlang der Flussmitte mit Lage s, fein genug für weiche Ufer
+function flussMitte(schritte) {
+  const punkte = [];
+  flussAbschnitte().forEach(function (abschnitt, i) {
+    for (let k = i === 0 ? 0 : 1; k <= schritte; k++) {
+      const p = bezierPunkt(abschnitt, k / schritte);
+      p.s = i + k / schritte;
+      punkte.push(p);
+    }
+  });
+  return punkte;
+}
+
+// Umriss des Flusses als geschlossene Punktliste: halbe Breite × faktor + zusatz zu beiden Seiten.
+// Das Ufer schwingt leicht, damit es natürlich wirkt.
+function flussUmriss(faktor, zusatz) {
+  const links = [];
+  const rechts = [];
+  flussMitte(14).forEach(function (p) {
+    const halb = flussBreite(p.s) / 2 * faktor + zusatz;
+    const welle = 0.5 * Math.sin(p.s * 23) * faktor;
+    links.push([p.x - p.ry * (halb + welle), p.y + p.rx * (halb + welle)]);
+    rechts.push([p.x + p.ry * (halb - welle), p.y - p.rx * (halb - welle)]);
+  });
+  return links.concat(rechts.reverse());
+}
+
+// Offene Linie parallel zu einem Ufer (seite 1 = links, -1 = rechts), abstand vom Ufer nach außen (+) oder innen (-)
+function flussUferLinie(seite, abstand) {
+  return "M" + flussMitte(14).map(function (p) {
+    const halb = (flussBreite(p.s) / 2 + abstand) * seite;
+    return (p.x - p.ry * halb).toFixed(1) + "," + (p.y + p.rx * halb).toFixed(1);
+  }).join(" L");
 }
 
 // Punkt und Flussrichtung (normiert) auf einem Bézier-Abschnitt, t von 0 bis 1
@@ -3348,32 +3451,258 @@ function strandhaferSvg() {
   return s + "</g>";
 }
 
-// Fisch als helle Silhouette (Kopf links bei richtung = 1). Er schwimmt ein Stück geradeaus,
-// wendet und schwimmt zurück; die Schwanzflosse schlägt dabei leicht.
-const FISCH_KOERPER = "M-8,0 C-6,-3.4 1,-4.2 6.5,-1.2 L6.5,1.2 C1,4.2 -6,3.4 -8,0 Z";
-const FISCH_SCHWANZ = "M6,0 L11.5,-4 Q10.2,0 11.5,4 Z";
+// ---------- Fische ----------
+// Arten und Merkmale nach der Fischseite der Schutzstation Wattenmeer
+// (schutzstation-wattenmeer.de/wissen/tiere/fische). Zu Beginn (Artenvielfalt um 50) schwimmen nur
+// die zwei häufigsten Arten: Hering (in Schwärmen) und Sandgrundel („auffallend häufig“). Erholt sich
+// die Artenvielfalt, kommen mehr Tiere und weitere Arten dazu: die Jungfische der „Kinderstube“
+// (Scholle, Wittling, Hornhecht), dann Standfische (Seeskorpion, Steinpicker) und zuletzt Katzenhai und
+// Nagelrochen, die an der Wattenmeerküste heute selten bzw. ausgerottet sind.
+// ab = nötige Artenvielfalt; anzahl = Stufen [ab Artenvielfalt, Tiere]; schwarm = Fische pro Tier;
+// boden = lebt am Grund (schwimmt weiter unten und ruhiger)
+const FISCH_ARTEN = [
+  { id: "hering",      name: "Hering",      ab: 0,  anzahl: [[0, 1], [40, 2], [62, 3], [80, 4]], schwarm: 3 },
+  { id: "grundel",     name: "Sandgrundel", ab: 0,  anzahl: [[0, 1], [45, 2], [66, 3], [85, 4]], boden: true },
+  { id: "scholle",     name: "Scholle",     ab: 57, anzahl: [[57, 1], [72, 2]], boden: true },
+  { id: "wittling",    name: "Wittling",    ab: 62, anzahl: [[62, 1], [78, 2]] },
+  { id: "hornhecht",   name: "Hornhecht",   ab: 67, anzahl: [[67, 1]], schwarm: 2 },
+  { id: "seeskorpion", name: "Seeskorpion", ab: 72, anzahl: [[72, 1]], boden: true },
+  { id: "steinpicker", name: "Steinpicker", ab: 77, anzahl: [[77, 1]], boden: true },
+  { id: "katzenhai",   name: "Katzenhai",   ab: 84, anzahl: [[84, 1]], groesse: 1.1 },
+  { id: "rochen",      name: "Nagelrochen", ab: 91, anzahl: [[91, 1]], boden: true, groesse: 1.15 }
+];
 
-function fischZeichen(farbe) {
-  return '<path d="' + FISCH_KOERPER + '" fill="' + farbe + '"/>' +
-    '<path class="ka-fisch-schwanz" d="' + FISCH_SCHWANZ + '" fill="' + farbe + '"/>' +
-    '<circle cx="-5" cy="-0.8" r="0.7" fill="#24506F" opacity="0.7"/>';
+function sichtbareFischArten(artenvielfalt) {
+  return FISCH_ARTEN.filter(function (a) { return artenvielfalt >= a.ab; });
 }
 
-function fischSvg(x, y, richtung, nummer) {
+// Fische in Seitenansicht (Rochen und Scholle von oben), Kopf links, um (0,0), etwa 16 Einheiten lang.
+// Ohne Umrisslinie wie im Titelbild: dunklerer Rücken, hellerer Bauch, kleines Auge mit Lichtpunkt.
+// Die Schwanzflosse steht in einer eigenen Gruppe, damit sie schlagen kann.
+function fischAuge(x, y, r) {
+  return '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="#1E3445"/>' +
+    '<circle cx="' + (x - r * 0.35).toFixed(2) + '" cy="' + (y - r * 0.35).toFixed(2) + '" r="' + (r * 0.35).toFixed(2) + '" fill="#FFFFFF" opacity="0.8"/>';
+}
+
+function fischSchwanz(inhalt) {
+  return '<g class="ka-fisch-schwanz">' + inhalt + "</g>";
+}
+
+const FISCH_FORMEN = {
+  // Hering: schlank, silbern, blaugrüner Rücken, gegabelte Schwanzflosse
+  hering: function () {
+    return fischSchwanz('<path d="M6,0 L11,-3.6 L9.3,0 L11,3.6 Z" fill="#7FA2B8"/>') +
+      '<path d="M-0.6,-2.9 L1.4,-4.4 L2.6,-2.6 Z" fill="#4E7E9C"/>' +
+      '<path d="M-8,0 C-6.4,-2.7 0.5,-3.3 6.4,-1 L6.4,1 C0.5,3.1 -6.4,2.7 -8,0 Z" fill="#DCE7EC"/>' +
+      '<path d="M-8,0 C-6.4,-2.7 0.5,-3.3 6.4,-1 L6.4,-0.2 C1,-1.3 -4.5,-1.1 -8,0 Z" fill="#4E7E9C"/>' +
+      '<path d="M-6,0.9 C-2,1.9 2,1.7 5.5,0.7" fill="none" stroke="#FFFFFF" stroke-opacity="0.6" stroke-width="0.5"/>' +
+      fischAuge(-5.6, -0.5, 0.75);
+  },
+  // Sandgrundel: klein, keulenförmig, sandfarben mit dunklen Tupfen, zwei Rückenflossen, Augen oben
+  grundel: function () {
+    return fischSchwanz('<path d="M5.8,0.15 L9.2,-2.1 Q10.2,0.15 9.2,2.4 Z" fill="#B9A27A"/>') +
+      '<path d="M-2.6,-2.6 L-1.4,-4 L0,-2.3 Z M1.2,-1.8 L2.2,-3.2 L4,-1.2 Z" fill="#B9A27A"/>' +
+      '<path d="M-6.5,0.3 C-6.5,-2.6 -2.5,-3 0.5,-1.9 C3,-1 5,-0.7 6.2,-0.5 L6.2,0.8 C4.5,1.1 2,1.9 -1,2.3 C-4.5,2.6 -6.5,2.1 -6.5,0.3 Z" fill="#D4C098"/>' +
+      '<path d="M-6.5,0.3 C-6.5,-2.6 -2.5,-3 0.5,-1.9 C3,-1 5,-0.7 6.2,-0.5 L6.2,0 C3,-0.2 -1,-0.6 -6.5,0.3 Z" fill="#A68D63"/>' +
+      '<g fill="#7F6A48" opacity="0.7"><circle cx="-2" cy="-0.6" r="0.5"/><circle cx="1" cy="-0.4" r="0.45"/><circle cx="3.6" cy="-0.2" r="0.4"/></g>' +
+      fischAuge(-4.6, -1.9, 0.75);
+  },
+  // Scholle: Plattfisch von oben, rundlich mit Flossensaum, bräunlich mit orangen Flecken, Augen auf einer Seite
+  scholle: function () {
+    return fischSchwanz('<path d="M7.6,0 L11.2,-2.6 Q12,0 11.2,2.6 Z" fill="#B9A47E"/>') +
+      '<ellipse cx="0" cy="0" rx="8.6" ry="5.6" fill="#B9A47E" opacity="0.85"/>' +
+      '<ellipse cx="0" cy="0" rx="7" ry="4.4" fill="#9A8463"/>' +
+      '<ellipse cx="-1" cy="-1" rx="4.5" ry="2.2" fill="#B49E78" opacity="0.6"/>' +
+      '<path d="M-5,0.3 Q0,-0.6 7,0" fill="none" stroke="#7E6A4C" stroke-opacity="0.5" stroke-width="0.35"/>' +
+      '<g fill="#E07B39"><circle cx="-2" cy="-1.8" r="0.75"/><circle cx="1.8" cy="1.4" r="0.75"/><circle cx="3.8" cy="-1.5" r="0.7"/>' +
+      '<circle cx="-0.6" cy="2.2" r="0.7"/><circle cx="-4" cy="1.3" r="0.6"/></g>' +
+      fischAuge(-5.4, -1.2, 0.6) + fischAuge(-4.4, -2.5, 0.6);
+  },
+  // Wittling: „kleiner Bruder des Kabeljaus“, drei Rücken- und zwei Afterflossen, ohne Kinnfaden
+  wittling: function () {
+    return fischSchwanz('<path d="M6.6,0 L10.8,-3.2 L10.4,0 L10.8,3.2 Z" fill="#B7AA8A"/>') +
+      '<path d="M-3.5,-2.8 L-2.6,-4.6 L-1,-3 Z M-0.4,-3 L0.8,-4.4 L2.6,-2.4 Z M3.2,-2.2 L4.3,-3.4 L5.8,-1.6 Z" fill="#A69777"/>' +
+      '<path d="M-0.5,2.8 L0.8,4 L2.4,2.5 Z M3,2.2 L4.2,3.3 L5.8,1.7 Z" fill="#C9C0A6"/>' +
+      '<path d="M-9,0 C-7,-2.9 0,-3.4 7,-1.1 L7,1.1 C0,3.4 -7,3 -9,0 Z" fill="#E3E1D6"/>' +
+      '<path d="M-9,0 C-7,-2.9 0,-3.4 7,-1.1 L7,-0.2 C1,-1.2 -5,-1 -9,0 Z" fill="#A69777"/>' +
+      '<path d="M-6.5,-0.6 Q0,-1.4 6.5,-0.4" fill="none" stroke="#8C7F62" stroke-width="0.35"/>' +
+      '<circle cx="-4.6" cy="0.5" r="0.55" fill="#4A4232" opacity="0.7"/>' +
+      fischAuge(-6.6, -0.6, 0.75);
+  },
+  // Hornhecht: sehr schlank mit gezähntem „Schnabel“, blaugrüner Rücken
+  hornhecht: function () {
+    return fischSchwanz('<path d="M10.6,0 L14.4,-2.4 L13,0 L14.4,2.4 Z" fill="#4F8A90"/>') +
+      '<path d="M6.5,-1.2 L8.5,-2.3 L9.6,-0.9 Z M6.5,1.2 L8.5,2.3 L9.6,0.9 Z" fill="#2F6F78"/>' +
+      '<path d="M-5.6,-0.35 L-13.5,0 L-5.6,0.5 Z" fill="#2F6F78"/>' +
+      '<path d="M-6,0 C-2,-1.5 6,-1.6 11,-0.6 L11,0.6 C6,1.6 -2,1.4 -6,0 Z" fill="#DCE6E3"/>' +
+      '<path d="M-6,0 C-2,-1.5 6,-1.6 11,-0.6 L11,-0.05 C6,-0.5 -1,-0.5 -6,0 Z" fill="#2F6F78"/>' +
+      fischAuge(-4.4, -0.3, 0.6);
+  },
+  // Seeskorpion: großer Kopf mit weitem Maul, marmoriert, Flossen braun-weiß quergestreift
+  seeskorpion: function () {
+    return fischSchwanz('<path d="M6.2,0.1 L10.2,-2.8 Q11,0.1 10.2,3 Z" fill="#D9CBAE"/>' +
+      '<path d="M8.2,-1.6 V1.8" stroke="#7A6143" stroke-width="0.5"/>') +
+      '<path d="M-4.5,-3.5 L-3.6,-5.6 L-2.6,-3.6 L-1.6,-5.2 L-0.4,-3.1 L0.8,-4.4 L2,-2.6 Z" fill="#9A8160"/>' +
+      '<path d="M-8.5,0.6 C-9,-3.2 -4.5,-4.4 -1,-3.4 C2,-2.5 5,-1.2 6.6,-0.6 L6.6,0.8 C4.5,1.5 1,3 -3.5,3.4 C-7,3.6 -8.4,2.4 -8.5,0.6 Z" fill="#7C6549"/>' +
+      '<g fill="#C9B48C" opacity="0.8"><ellipse cx="-4" cy="-1.2" rx="1.4" ry="0.9"/><ellipse cx="0" cy="-0.6" rx="1.1" ry="1.4"/>' +
+      '<ellipse cx="3.4" cy="-0.1" rx="0.9" ry="1.1"/></g>' +
+      '<path d="M-3.2,0.4 C-0.5,0.6 1.6,2.8 1.4,5 C-0.8,4.4 -2.8,2.8 -3.2,0.4 Z" fill="#E9DFC9"/>' +
+      '<path d="M-2.4,1.6 L0.6,2.8 M-2,3 L0.6,4.3" stroke="#7A6143" stroke-width="0.5"/>' +
+      '<path d="M-8.6,0.4 Q-7,1.2 -5.6,0.5" fill="none" stroke="#3F3020" stroke-width="0.45"/>' +
+      fischAuge(-6, -1.6, 0.8);
+  },
+  // Steinpicker: eckige Knochenplatten, langer Schwanzstiel, graubraun gebändert, Kinnfäden
+  steinpicker: function () {
+    return fischSchwanz('<path d="M9.2,0 L12,-1.8 L12,1.8 Z" fill="#7C7568"/>') +
+      '<path d="M-7.5,0.5 L-6,-2.1 L-2,-2.7 L3,-1.3 L9.5,-0.5 L9.5,0.6 L3,1.3 L-2,2.4 L-6,2.4 Z" fill="#9C9587"/>' +
+      '<path d="M-7.5,0.5 L-6,-2.1 L-2,-2.7 L3,-1.3 L9.5,-0.5 L9.5,0 L3,-0.4 L-2,-0.8 Z" fill="#6E675B"/>' +
+      '<path d="M-3.8,-2.4 L-4,2.3 M-0.4,-2.2 L-0.6,2 M2.8,-1.3 V1.3 M6,-0.9 V0.9" stroke="#565046" stroke-width="0.9" stroke-opacity="0.6"/>' +
+      '<path d="M-6,0.6 L9,0.1" stroke="#C9C2B3" stroke-width="0.35"/>' +
+      '<path d="M-4.5,0.6 C-3,0.2 -1,1.4 -1.6,3.8 C-3.4,3.8 -4.8,2.4 -4.5,0.6 Z" fill="#B5AD9C" opacity="0.9"/>' +
+      '<path d="M-7.2,1.3 l-0.8,1.5 M-6.6,1.6 l-0.2,1.7 M-6,1.8 l0.3,1.5" stroke="#5E574C" stroke-width="0.35" stroke-linecap="round"/>' +
+      '<path d="M-5.6,-2.1 L-5.2,-3.2 L-4.6,-2.3" fill="none" stroke="#6E675B" stroke-width="0.5"/>' +
+      fischAuge(-5.6, -1, 0.7);
+  },
+  // Kleingefleckter Katzenhai: langgestreckt, sandfarben mit dunklen Punkten, breite Brustflossen
+  katzenhai: function () {
+    let flecken = "";
+    [[-8, -0.6], [-5.4, 0.8], [-3.6, -1.2], [-1, 0.4], [1.4, -1.3], [3.6, 0.6], [5.8, -0.7], [8, 0.2], [-6.6, -1.6], [0.6, 1.5]].forEach(function (f, i) {
+      flecken += '<circle cx="' + f[0] + '" cy="' + f[1] + '" r="' + (0.35 + (i % 3) * 0.1).toFixed(2) + '"/>';
+    });
+    return fischSchwanz('<path d="M11.6,0 L17.6,-2.6 L16.4,-0.4 L14.6,1.2 Z" fill="#B59C70"/>') +
+      '<path d="M-4,1.6 L-1,5 L0.2,1.8 Z M5,1.8 L6.6,3.2 L7.6,1.5 Z" fill="#B89E73"/>' +
+      '<path d="M2,-2 L4,-4.2 L5.4,-1.8 Z M7.4,-1.2 L8.8,-2.8 L9.8,-1 Z" fill="#B59C70"/>' +
+      '<path d="M-12,0.6 C-12,-1.8 -6,-2.6 0,-2.2 C6,-1.8 10,-1 12,-0.4 L12,0.8 C8,1.4 2,2.4 -4,2.6 C-9,2.7 -12,2.1 -12,0.6 Z" fill="#D7C29B"/>' +
+      '<path d="M-12,0.6 C-12,-1.8 -6,-2.6 0,-2.2 C6,-1.8 10,-1 12,-0.4 L12,0.1 C6,-0.6 -4,-0.8 -12,0.6 Z" fill="#B59C70"/>' +
+      '<g fill="#5F4E36" opacity="0.75">' + flecken + "</g>" +
+      '<path d="M-7,-0.4 v1.5 M-6.2,-0.4 v1.5" stroke="#9C8460" stroke-width="0.3"/>' +
+      fischAuge(-9.2, -0.4, 0.6);
+  },
+  // Nagelrochen von oben: rautenförmig wie ein Kinderdrachen mit langem Schwanz, dunkelgrau mit
+  // hellen, dunkel umrandeten Flecken und einer Dornenreihe bis zur Schwanzspitze
+  rochen: function () {
+    let dornen = "";
+    for (let x = -3; x <= 14; x += 1.7) dornen += '<circle cx="' + x.toFixed(1) + '" cy="0" r="0.28"/>';
+    return '<path d="M3.5,-0.5 L16,-0.3 L16,0.3 L3.5,0.5 Z" fill="#5E6468"/>' +
+      '<g class="ka-rochen-fluegel">' +
+      '<path d="M-9.5,0 Q-6,-2 -1,-8.6 Q3,-3 5,0 Q3,3 -1,8.6 Q-6,2 -9.5,0 Z" fill="#6E7478"/>' +
+      '<path d="M-8,0 Q-4,-1.4 0,-3 Q3,-1 3.6,0 Q3,1 0,3 Q-4,1.4 -8,0 Z" fill="#868C8F" opacity="0.7"/>' +
+      '<g fill="#D8D2C2" stroke="#2A2E31" stroke-width="0.3"><circle cx="-2" cy="-4.4" r="0.7"/><circle cx="-2" cy="4.4" r="0.7"/>' +
+      '<circle cx="1" cy="-2.2" r="0.6"/><circle cx="1" cy="2.2" r="0.6"/></g></g>' +
+      '<g fill="#C9C1AE">' + dornen + "</g>" +
+      fischAuge(-5.5, -0.9, 0.45) + fischAuge(-5.5, 0.9, 0.45);
+  }
+};
+
+// Ein Tier (oder ein kleiner Schwarm) auf der Karte. Es schwimmt ein Stück geradeaus, wendet und
+// schwimmt zurück; die Schwanzflosse schlägt dabei leicht. Bodenfische bewegen sich kürzer und langsamer.
+function fischSvg(art, x, y, richtung, nummer) {
   const r = zufallsfolge(200 + nummer * 13);
-  const weg = 26 + r() * 30;
+  const weg = art.boden ? 10 + r() * 14 : 26 + r() * 30;
   // nicht über den Kartenrand hinausschwimmen
-  const sx = richtung === 1 ? Math.max(x, 14 + weg) : Math.min(x, KARTE_B - 14 - weg);
-  const dauer = 14 + r() * 10;
-  return '<g transform="translate(' + sx.toFixed(1) + "," + y.toFixed(1) + ") scale(" + richtung + ',1)">' +
-    '<g class="ka-fisch" style="--weg:-' + weg.toFixed(1) + "px;" + animStil(dauer, r() * dauer) + '" opacity="0.88">' +
-    fischZeichen("#EAF4F8") + "</g></g>";
+  const sx = richtung === 1 ? Math.max(x, 18 + weg) : Math.min(x, KARTE_B - 18 - weg);
+  const dauer = art.boden ? 22 + r() * 12 : 14 + r() * 10;
+  const g = (art.groesse || 1) * 1.15;
+  let inhalt = "";
+  if (art.schwarm) {
+    [[0, 0], [8, -5], [10, 4.5]].slice(0, art.schwarm).forEach(function (v) {
+      inhalt += '<g transform="translate(' + v[0] + "," + v[1] + ') scale(0.8)">' + FISCH_FORMEN[art.id]() + "</g>";
+    });
+  } else {
+    inhalt = FISCH_FORMEN[art.id]();
+  }
+  return '<g transform="translate(' + sx.toFixed(1) + "," + y.toFixed(1) + ") scale(" + (richtung * g).toFixed(2) + "," + g + ')">' +
+    '<g class="ka-fisch" style="--weg:-' + weg.toFixed(1) + "px;" + animStil(dauer, r() * dauer) + '" opacity="0.92">' +
+    inhalt + "</g></g>";
 }
 
-// Oberkante des Schornsteins einer Fabrik (gleiche Maße wie in fabrikSvg)
+// Alle Fische zur aktuellen Artenvielfalt. Jedes Tier hat einen festen Platz (gleiche Zufallsfolge),
+// damit nichts springt, wenn die Karte neu gezeichnet wird. Bodenfische schwimmen weiter unten.
+function fischeSvg(artenvielfalt) {
+  const tiere = [];
+  FISCH_ARTEN.forEach(function (art, artNummer) {
+    if (artenvielfalt < art.ab) return;
+    let anzahl = 0;
+    art.anzahl.forEach(function (stufe) { if (artenvielfalt >= stufe[0]) anzahl = stufe[1]; });
+    for (let n = 0; n < anzahl; n++) {
+      const r = zufallsfolge(300 + artNummer * 37 + n * 11);
+      let x = 0;
+      let y = 0;
+      for (let versuch = 0; versuch < 25; versuch++) {
+        x = 50 + r() * 690;
+        y = art.boden ? 252 + r() * 50 : 208 + r() * 78;
+        const frei = !(x < 100 && y > 262) &&                                   // Otter unten links
+          !tiere.some(function (t) { return Math.abs(t.x - x) < 34 && Math.abs(t.y - y) < 14; });
+        if (frei) break;
+      }
+      tiere.push({ art: art, x: x, y: y, richtung: r() > 0.5 ? 1 : -1, nummer: artNummer * 10 + n });
+    }
+  });
+  return tiere.sort(function (a, b) { return a.y - b.y; }).map(function (t) {
+    return fischSvg(t.art, t.x, t.y, t.richtung, t.nummer);
+  }).join("");
+}
+
+// ---------- Gebäude in Schrägansicht ----------
+// Die Karte wird von Süden (vom Meer aus) schräg von oben betrachtet. Deshalb sieht man bei jedem
+// Gebäude die Vorderseite, das Dach von oben und die rechte Seitenwand; die Tiefe läuft nach oben
+// und etwas nach rechts. Die Sonne steht links oben wie im Titelbild: Dachflächen hell,
+// Vorderseite mittel, rechte Seite im Schatten. Statt schwarzer Umrisse nur weiche, dunklere Kanten.
+const SCHRAEG = { x: 0.3, y: -0.52 };
+const BAU_KANTE = ' stroke="#4E4538" stroke-opacity="0.4" stroke-width="0.6" stroke-linejoin="round"';
+
+function schraeg(t) {
+  return { x: t * SCHRAEG.x, y: t * SCHRAEG.y };
+}
+
+function vieleck(punkte) {
+  return "M" + punkte.map(function (p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" L") + " Z";
+}
+
+// Quader: Vorderseite von x bis x + b und von oben bis oben + h, Tiefe t
+function quaderSvg(x, oben, b, h, t, farben) {
+  const d = schraeg(t);
+  const unten = oben + h;
+  return '<path d="' + vieleck([[x + b, oben], [x + b + d.x, oben + d.y], [x + b + d.x, unten + d.y], [x + b, unten]]) +
+    '" fill="' + farben.seite + '"' + BAU_KANTE + "/>" +
+    '<path d="' + vieleck([[x, oben], [x + d.x, oben + d.y], [x + b + d.x, oben + d.y], [x + b, oben]]) +
+    '" fill="' + farben.dach + '"' + BAU_KANTE + "/>" +
+    '<rect x="' + x.toFixed(1) + '" y="' + oben.toFixed(1) + '" width="' + b + '" height="' + h + '" fill="' + farben.front + '"' + BAU_KANTE + "/>";
+}
+
+// Fenster auf der Vorderseite: Glas mit Lichtkante oben links und Sims
+function fensterSvg(x, y, b, h) {
+  return '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + b + '" height="' + h + '" fill="url(#kaGlas)" stroke="#6F8796" stroke-opacity="0.6" stroke-width="0.4"/>' +
+    '<path d="M' + (x + 0.6).toFixed(1) + "," + (y + h - 0.7).toFixed(1) + " V" + (y + 0.6).toFixed(1) + " H" + (x + b * 0.55).toFixed(1) +
+    '" fill="none" stroke="#FFFFFF" stroke-opacity="0.7" stroke-width="0.5"/>' +
+    '<path d="M' + (x - 0.4).toFixed(1) + "," + (y + h + 0.3).toFixed(1) + " H" + (x + b + 0.4).toFixed(1) + '" stroke="#B9AB8F" stroke-width="0.6"/>';
+}
+
+// Fenster auf der rechten Seitenwand (Parallelogramm in Tiefenrichtung)
+function seitenFensterSvg(xWand, y, t0, t1, h) {
+  const a = schraeg(t0);
+  const e = schraeg(t1);
+  return '<path d="' + vieleck([[xWand + a.x, y + a.y], [xWand + e.x, y + e.y], [xWand + e.x, y + e.y + h], [xWand + a.x, y + a.y + h]]) +
+    '" fill="#8FAFC2" opacity="0.85"/>';
+}
+
+// Maße einer Fabrik. x, y, b, h beschreiben die Grundfläche wie früher (Unterkante y + h bleibt),
+// damit Müll, Personen und Mülleimer weiter frei stehen.
+function fabrikMasse(x, y, b, h) {
+  const hv = Math.round(h * 0.72);                 // sichtbare Höhe der Vorderseite
+  const oben = y + h - hv;
+  const t = Math.round(h * 0.75);
+  const d = schraeg(t);
+  const kr = Math.max(2.6, b * 0.055);             // Radius des Schornsteins
+  const kx = x + b * 0.8 + d.x * 0.55;             // steht hinten rechts auf dem Dach
+  const kFuss = oben + d.y * 0.55 - 3;
+  return { hv: hv, oben: oben, t: t, d: d, kr: kr, kx: kx, kFuss: kFuss, kSpitze: kFuss - (h + 2) };
+}
+
+// Oberkante des Schornsteins einer Fabrik (für den Rauch)
 function schornsteinSpitze(x, y, b, h) {
-  const kb = Math.max(6, b * 0.145);
-  return { x: x + b * 0.76 + kb / 2, y: y - (h + 2) };
+  const m = fabrikMasse(x, y, b, h);
+  return { x: m.kx, y: m.kSpitze };
 }
 
 // Rauchwolken: steigen aus dem Schornstein, treiben mit dem Wind nach rechts, wachsen und verblassen
@@ -3391,41 +3720,86 @@ function rauchSvg(spitze, groesse, versatz) {
   return s + "</g>";
 }
 
-// Großes Hotel: Fenster in Reihen, Schild „Hotel“, Eingang mit Vordach, Fahne
-function hotelGrossSvg(x, y, tinte) {
+// Großes Hotel: Flachdach mit Dachaufbau und Fahne, Schild „Hotel“, Fensterreihen mit Balkonen,
+// Eingang mit Vordach. x, y = linke obere Ecke der früheren Vorderansicht (34 × 30), Unterkante bleibt.
+function hotelGrossSvg(x, y) {
   const b = 34;
-  const h = 30;
-  let s = '<rect x="' + x + '" y="' + y + '" width="' + b + '" height="' + h + '" fill="#FBF8F1" stroke="' + tinte + '" stroke-width="1.2"/>';
-  s += '<rect x="' + (x - 1.5) + '" y="' + (y - 3) + '" width="' + (b + 3) + '" height="3.5" fill="' + tinte + '"/>';
-  // Fahne auf dem Dach
-  s += '<line x1="' + (x + b - 5) + '" y1="' + (y - 3) + '" x2="' + (x + b - 5) + '" y2="' + (y - 11) + '" stroke="' + tinte + '" stroke-width="0.9"/>' +
-    '<path d="M' + (x + b - 5) + "," + (y - 11) + " l6,1.6 l-6,1.6 Z\" fill=\"#E2A92B\"/>";
+  const h = 25;
+  const t = 14;
+  const oben = y + 30 - h;
+  const unten = oben + h;
+  const d = schraeg(t);
+  let s = quaderSvg(x, oben, b, h, t, { front: "url(#kaWandHell)", seite: "#D8CCB3", dach: "#EEE9DE" });
+  // Dachfläche mit Attika (heller Rand) und Dachaufbau
+  const innen = function (k, rand) {
+    const p = schraeg(t * k);
+    return [x + rand + p.x, oben + p.y];
+  };
+  s += '<path d="' + vieleck([innen(0.12, 1.4), innen(0.88, 1.4), [innen(0.88, 1.4)[0] + b - 2.8, innen(0.88, 1.4)[1]],
+    [innen(0.12, 1.4)[0] + b - 2.8, innen(0.12, 1.4)[1]]]) + '" fill="#DAD3C4"/>';
+  const aufbau = schraeg(t * 0.3);
+  s += quaderSvg(x + 5 + aufbau.x, oben + aufbau.y - 3, 8, 3, t * 0.4, { front: "#E6DDCB", seite: "#C9BC9F", dach: "#F4F0E7" });
+  // Fahne hinten rechts auf dem Dach
+  const f = schraeg(t * 0.7);
+  const fx = x + b - 4 + f.x;
+  const fy = oben + f.y;
+  s += '<line x1="' + fx.toFixed(1) + '" y1="' + fy.toFixed(1) + '" x2="' + fx.toFixed(1) + '" y2="' + (fy - 10).toFixed(1) +
+    '" stroke="#5E5A52" stroke-width="0.8"/>' +
+    '<path d="M' + fx.toFixed(1) + "," + (fy - 10).toFixed(1) + " q3,-0.6 6,1.4 q-3,0.8 -6,1.8 Z\" fill=\"#E2A92B\"/>";
   // Schild
-  s += '<rect x="' + (x + 4) + '" y="' + (y + 2.5) + '" width="' + (b - 8) + '" height="7.5" rx="1" fill="#1D4F8C"/>' +
-    '<text x="' + (x + b / 2) + '" y="' + (y + 8.6) + '" text-anchor="middle" font-size="6.4" font-weight="700" ' +
+  s += '<rect x="' + (x + 4) + '" y="' + (oben + 2) + '" width="' + (b - 8) + '" height="6.6" rx="1" fill="#1D4F8C"/>' +
+    '<text x="' + (x + b / 2) + '" y="' + (oben + 7.1) + '" text-anchor="middle" font-size="5.8" font-weight="700" ' +
     'letter-spacing="0.4" fill="#ffffff">Hotel</text>';
-  // Fenster: 2 Reihen à 4, mit Balkonlinie
+  // Fenster: zwei Reihen à vier mit Balkonbrüstung, dazu Fenster auf der Seitenwand
   for (let reihe = 0; reihe < 2; reihe++) {
-    const fy = y + 12.5 + reihe * 6.5;
-    for (let spalte = 0; spalte < 4; spalte++) {
-      s += '<rect x="' + (x + 3.5 + spalte * 7.4) + '" y="' + fy + '" width="4.2" height="4" fill="#9CC7E0" stroke="' + tinte + '" stroke-width="0.5"/>';
-    }
-    s += '<line x1="' + (x + 2.5) + '" y1="' + (fy + 4.6) + '" x2="' + (x + b - 2.5) + '" y2="' + (fy + 4.6) + '" stroke="' + tinte + '" stroke-width="0.5" opacity="0.6"/>';
+    const fy2 = oben + 10.5 + reihe * 5.6;
+    for (let spalte = 0; spalte < 4; spalte++) s += fensterSvg(x + 3.5 + spalte * 7.4, fy2, 4.2, 3.4);
+    s += '<rect x="' + (x + 2.4) + '" y="' + (fy2 + 3.2).toFixed(1) + '" width="' + (b - 4.8) + '" height="1" fill="#FFFFFF" opacity="0.75"/>';
+    s += seitenFensterSvg(x + b, fy2, t * 0.18, t * 0.42, 3.2) + seitenFensterSvg(x + b, fy2, t * 0.58, t * 0.82, 3.2);
   }
   // Eingang mit Vordach
-  s += '<rect x="' + (x + b / 2 - 3) + '" y="' + (y + h - 5.5) + '" width="6" height="5.5" fill="' + tinte + '"/>' +
-    '<rect x="' + (x + b / 2 - 5) + '" y="' + (y + h - 7) + '" width="10" height="1.6" fill="#1D4F8C"/>';
+  s += '<rect x="' + (x + b / 2 - 2.8) + '" y="' + (unten - 4.6) + '" width="5.6" height="4.6" fill="#3D4F5E"/>' +
+    '<path d="' + vieleck([[x + b / 2 - 5, unten - 5.4], [x + b / 2 + 5, unten - 5.4], [x + b / 2 + 5.8, unten - 6.8], [x + b / 2 - 4.2, unten - 6.8]]) +
+    '" fill="#2F64A0"/>' +
+    '<rect x="' + (x + b / 2 - 5) + '" y="' + (unten - 5.4) + '" width="10" height="0.9" fill="#1D4F8C"/>';
   return s;
 }
 
-// Kleines Gästehaus: Satteldach, zwei Fenster, ohne Schrift
-function hotelKleinSvg(x, y, tinte) {
-  let s = '<path d="M' + (x - 1.5) + "," + y + " L" + (x + 9) + "," + (y - 7) + " L" + (x + 19.5) + "," + y + ' Z" ' +
-    'fill="#B8694A" stroke="' + tinte + '" stroke-width="1"/>';
-  s += '<rect x="' + x + '" y="' + y + '" width="18" height="13" fill="#FBF8F1" stroke="' + tinte + '" stroke-width="1.2"/>';
-  s += '<rect x="' + (x + 2.5) + '" y="' + (y + 3) + '" width="4" height="4" fill="#9CC7E0" stroke="' + tinte + '" stroke-width="0.5"/>' +
-    '<rect x="' + (x + 11.5) + '" y="' + (y + 3) + '" width="4" height="4" fill="#9CC7E0" stroke="' + tinte + '" stroke-width="0.5"/>' +
-    '<rect x="' + (x + 7.5) + '" y="' + (y + 8) + '" width="3" height="5" fill="' + tinte + '"/>';
+// Kleines Gästehaus: Satteldach (First parallel zur Vorderseite), Giebel an der rechten Seite,
+// zwei Fenster und Tür. x, y = linke obere Ecke der früheren Vorderansicht (18 × 13), Unterkante bleibt.
+function hotelKleinSvg(x, y) {
+  const b = 18;
+  const h = 10;
+  const t = 12;
+  const giebel = 6.5;
+  const oben = y + 13 - h;
+  const unten = oben + h;
+  const d = schraeg(t);
+  const m = schraeg(t / 2);
+  // rechte Seitenwand mit Giebeldreieck
+  let s = '<path d="' + vieleck([[x + b, unten], [x + b, oben], [x + b + m.x, oben + m.y - giebel], [x + b + d.x, oben + d.y],
+    [x + b + d.x, unten + d.y]]) + '" fill="#D8CCB3"' + BAU_KANTE + "/>";
+  s += seitenFensterSvg(x + b, oben + 2.2, t * 0.32, t * 0.62, 3);
+  // Vorderseite
+  s += '<rect x="' + x + '" y="' + oben + '" width="' + b + '" height="' + h + '" fill="url(#kaWandHell)"' + BAU_KANTE + "/>";
+  s += fensterSvg(x + 2.4, oben + 2.2, 3.8, 3.4) + fensterSvg(x + 11.8, oben + 2.2, 3.8, 3.4);
+  s += '<rect x="' + (x + 7.4) + '" y="' + (unten - 5.2) + '" width="3.2" height="5.2" fill="#7A5A3A"/>';
+  // Dachfläche zum Betrachter, steht an den Seiten etwas über; Ziegelreihen und heller First
+  const traufe = [[x - 1.4, oben + 0.6], [x + b + 1.4, oben + 0.6]];
+  const first = [[x - 1.4 + m.x, oben + m.y - giebel], [x + b + 1.4 + m.x, oben + m.y - giebel]];
+  s += '<path d="' + vieleck([traufe[0], first[0], first[1], traufe[1]]) + '" fill="url(#kaZiegel)"' + BAU_KANTE + "/>";
+  let reihen = "";
+  for (let k = 1; k < 4; k++) {
+    const a = k / 4;
+    const ya = traufe[0][1] + (first[0][1] - traufe[0][1]) * a;
+    const xa = traufe[0][0] + (first[0][0] - traufe[0][0]) * a;
+    reihen += "M" + xa.toFixed(1) + "," + ya.toFixed(1) + " h" + (b + 2.8) + " ";
+  }
+  s += '<path d="' + reihen + '" stroke="#7E3F27" stroke-opacity="0.28" stroke-width="0.5"/>';
+  s += '<path d="M' + first[0][0].toFixed(1) + "," + first[0][1].toFixed(1) + " H" + first[1][0].toFixed(1) +
+    '" stroke="#E6A386" stroke-width="0.8" stroke-linecap="round"/>';
+  // kleiner Schornstein auf dem Dach
+  s += quaderSvg(x + 12.5 + m.x * 0.6, oben + m.y * 0.6 - giebel * 0.75 - 2, 2.2, 3, 2, { front: "#B0634A", seite: "#8F4A35", dach: "#C77A60" });
   return s;
 }
 
@@ -3446,53 +3820,69 @@ function brutSchildSvg(x, boden, tinte) {
   return s;
 }
 
-// Fabrik: graue Halle mit Sheddach, Schornstein, Fensterband, Rolltor und Schild.
-// x, y = linke obere Ecke der Halle, b/h = Breite/Höhe, zacken = Zahl der Dachzacken
-function fabrikSvg(x, y, b, h, zacken, schrift, tinte) {
+// Fabrik: Halle mit Sheddach (Zacken laufen von vorne nach hinten), Oberlichter, Schornstein hinten
+// rechts auf dem Dach, Fensterband, Rolltor und Schild. x, y, b, h = Grundfläche wie früher,
+// zacken = Zahl der Dachzacken, schrift = Schriftgröße des Schilds
+function fabrikSvg(x, y, b, h, zacken, schrift) {
+  const m = fabrikMasse(x, y, b, h);
+  const d = m.d;
+  const oben = m.oben;
+  const unten = y + h;
+  // rechte Seitenwand
+  let s = '<path d="' + vieleck([[x + b, oben], [x + b + d.x, oben + d.y], [x + b + d.x, unten + d.y], [x + b, unten]]) +
+    '" fill="#8F999F"' + BAU_KANTE + "/>";
+  // Sheddach: schräge Dachflächen, am First ein Streifen Oberlicht
   const zahn = b / zacken;
-  const kx = x + b * 0.76;                 // Schornstein hinter dem Dach
-  const kb = Math.max(6, b * 0.145);
-  const kh = h + 2;
-  let s = '<rect x="' + kx.toFixed(1) + '" y="' + (y - kh) + '" width="' + kb.toFixed(1) + '" height="' + (kh + 2) + '" fill="#9AA4AC" stroke="' + tinte + '" stroke-width="1.2"/>' +
-    '<rect x="' + kx.toFixed(1) + '" y="' + (y - kh + 6) + '" width="' + kb.toFixed(1) + '" height="2.6" fill="#5F6B75"/>' +
-    '<rect x="' + kx.toFixed(1) + '" y="' + (y - kh + 12) + '" width="' + kb.toFixed(1) + '" height="2.6" fill="#5F6B75"/>';
-  let dach = "M" + x + "," + y;
+  const zh = 6;
   for (let i = 0; i < zacken; i++) {
-    dach += " L" + (x + i * zahn).toFixed(1) + "," + (y - 8) + " L" + (x + (i + 1) * zahn).toFixed(1) + "," + y;
+    const x0 = x + i * zahn;
+    const x1 = x0 + zahn;
+    s += '<path d="' + vieleck([[x0, oben - zh], [x1, oben], [x1 + d.x, oben + d.y], [x0 + d.x, oben - zh + d.y]]) +
+      '" fill="url(#kaShed)"' + BAU_KANTE + "/>";
+    s += '<path d="M' + (x0 + 0.8).toFixed(1) + "," + (oben - zh + 0.9).toFixed(1) + " l" + d.x.toFixed(1) + "," + d.y.toFixed(1) +
+      '" stroke="#D6E8F2" stroke-width="1.3" stroke-linecap="round"/>';
+    s += '<path d="' + vieleck([[x0, oben], [x0, oben - zh], [x1, oben]]) + '" fill="#B9C1C6"' + BAU_KANTE + "/>";
   }
-  s += '<path d="' + dach + ' Z" fill="#7F8B94" stroke="' + tinte + '" stroke-width="1.1" stroke-linejoin="round"/>';
-  for (let i = 0; i < zacken; i++) {
-    s += '<line x1="' + (x + i * zahn + 1.2).toFixed(1) + '" y1="' + (y - 6.5) + '" x2="' + (x + i * zahn + 1.2).toFixed(1) + '" y2="' + (y - 1) +
-      '" stroke="#C9D6DE" stroke-width="1.4"/>';
-  }
-  s += '<rect x="' + x + '" y="' + y + '" width="' + b + '" height="' + h + '" fill="#B4BCC2" stroke="' + tinte + '" stroke-width="1.2"/>';
-  // Schild
+  // Vorderseite
+  s += '<rect x="' + x + '" y="' + oben + '" width="' + b + '" height="' + m.hv + '" fill="url(#kaWandGrau)"' + BAU_KANTE + "/>";
+  // Rolltor rechts, Schild und Fensterband links davon
+  const tor = Math.round(m.hv * 0.45);
+  const torX = x + b - tor - 4;
   const sh = schrift + 1.6;
-  s += '<rect x="' + (x + 6) + '" y="' + (y + 3) + '" width="' + (b - 12) + '" height="' + sh.toFixed(1) + '" rx="1" fill="#ffffff" stroke="' + tinte + '" stroke-width="0.8"/>' +
-    '<text x="' + (x + b / 2) + '" y="' + (y + 3 + sh * 0.78).toFixed(1) + '" text-anchor="middle" font-size="' + schrift + '" font-weight="700" ' +
-    'letter-spacing="0.5" fill="' + tinte + '">FABRIK</text>';
-  // Fensterband links, Rolltor rechts
-  const tor = Math.round(h * 0.45);
-  const fenster = Math.floor((b - tor - 10) / 7);
-  for (let i = 0; i < fenster; i++) {
-    s += '<rect x="' + (x + 4 + i * 7) + '" y="' + (y + h - 9) + '" width="5" height="5" fill="#DCE3E8" stroke="' + tinte + '" stroke-width="0.5"/>';
-  }
-  s += '<rect x="' + (x + b - tor - 4) + '" y="' + (y + h - tor) + '" width="' + tor + '" height="' + tor + '" fill="#8C969E" stroke="' + tinte + '" stroke-width="0.8"/>';
-  for (let i = 1; i < 4; i++) {
-    const ly = y + h - tor + i * tor / 4;
-    s += '<line x1="' + (x + b - tor - 4) + '" y1="' + ly.toFixed(1) + '" x2="' + (x + b - 4) + '" y2="' + ly.toFixed(1) + '" stroke="' + tinte + '" stroke-width="0.4"/>';
-  }
+  s += '<rect x="' + (x + 5) + '" y="' + (oben + 2.4) + '" width="' + (torX - x - 8) + '" height="' + sh.toFixed(1) + '" rx="1" fill="#FBFAF6" stroke="#6C7880" stroke-width="0.5"/>' +
+    '<text x="' + (x + 5 + (torX - x - 8) / 2).toFixed(1) + '" y="' + (oben + 2.4 + sh * 0.78).toFixed(1) + '" text-anchor="middle" font-size="' + schrift +
+    '" font-weight="700" letter-spacing="0.5" fill="#2E4352">FABRIK</text>';
+  const fy = Math.max(oben + 2.4 + sh + 1.4, unten - 8.5);
+  const fh = Math.min(4.6, unten - fy - 2);
+  for (let fx = x + 4; fx + 5 <= torX - 2; fx += 7) s += fensterSvg(fx, fy, 5, fh);
+  s += '<rect x="' + torX + '" y="' + (unten - tor) + '" width="' + tor + '" height="' + tor + '" fill="#7C878F"' + BAU_KANTE + "/>";
+  let lamellen = "";
+  for (let i = 1; i < 5; i++) lamellen += "M" + torX + "," + (unten - tor + i * tor / 5).toFixed(1) + " h" + tor + " ";
+  s += '<path d="' + lamellen + '" stroke="#5F6A72" stroke-width="0.4"/>';
+  // Schornstein: Zylinder mit Licht von links, zwei dunkle Ringe, Öffnung oben
+  const kl = m.kx - m.kr;
+  s += '<rect x="' + kl.toFixed(1) + '" y="' + m.kSpitze.toFixed(1) + '" width="' + (2 * m.kr).toFixed(1) + '" height="' + (m.kFuss - m.kSpitze).toFixed(1) +
+    '" fill="url(#kaZylinder)"/>';
+  [0.18, 0.34].forEach(function (a) {
+    const ry = m.kSpitze + (m.kFuss - m.kSpitze) * a;
+    s += '<rect x="' + kl.toFixed(1) + '" y="' + ry.toFixed(1) + '" width="' + (2 * m.kr).toFixed(1) + '" height="2.2" fill="#5C666E" opacity="0.8"/>';
+  });
+  s += '<ellipse cx="' + m.kx.toFixed(1) + '" cy="' + m.kFuss.toFixed(1) + '" rx="' + m.kr.toFixed(1) + '" ry="' + (m.kr * 0.45).toFixed(1) + '" fill="#8C979E"/>' +
+    '<ellipse cx="' + m.kx.toFixed(1) + '" cy="' + m.kSpitze.toFixed(1) + '" rx="' + m.kr.toFixed(1) + '" ry="' + (m.kr * 0.45).toFixed(1) +
+    '" fill="#3E474E" stroke="#9AA4AC" stroke-width="0.6"/>';
   return s;
 }
 
 // ---------- Müll als kleine Symbole ----------
-// Drei flache Farbfamilien: Plastik (weiß/hellblau), Glas (grün), Essensreste (gelb/orange).
-// Jede Form hat eine Füllfarbe und einen dünnen Rand, keine Glanzlichter oder Etiketten.
+// Drei Farbfamilien: Plastik (weiß/hellblau), Glas (grün), Essensreste (gelb/orange).
+// Im Stil des Titelbilds: weiche, farbige Kanten statt Tinte, Licht von links oben (helle Glanzkante),
+// Etikett oder Muster für Wiedererkennbarkeit. Am Boden liegender Müll wirft einen kleinen Schatten
+// (siehe muellSymbolSvg), schwimmender nicht.
 // Alle Formen sind um (0,0) gezeichnet, etwa 12 Einheiten lang (Strand ist 22 breit).
 const MUELL_FARBEN = {
-  plastik: { flaeche: "#EEF5F8", flaeche2: "#CFE2EC", rand: "#4F6B80" },
-  glas:    { flaeche: "#6E9E4A", flaeche2: "#A5CB82", rand: "#3F6328" },
-  essen:   { flaeche: "#EDB53C", flaeche2: "#E07B39", kern: "#F6E6BE", rand: "#94660F" }
+  plastik: { flaeche: "#EEF5F8", flaeche2: "#CFE2EC", etikett: "#6FA8CB", rand: "#6F8A9C" },
+  glas:    { flaeche: "#6E9E4A", flaeche2: "#A5CB82", etikett: "#EFE6CC", rand: "#4C7334" },
+  essen:   { flaeche: "#EDB53C", flaeche2: "#E07B39", kern: "#F6E6BE", rand: "#A9761A" }
 };
 
 function muellFormen() {
@@ -3500,30 +3890,46 @@ function muellFormen() {
   const g = MUELL_FARBEN.glas;
   const e = MUELL_FARBEN.essen;
   const linie = function (farbe) {
-    return ' stroke="' + farbe + '" stroke-width="0.55" stroke-linejoin="round"';
+    return ' stroke="' + farbe + '" stroke-opacity="0.8" stroke-width="0.45" stroke-linejoin="round"';
+  };
+  const glanz = function (d, deckkraft) {
+    return '<path d="' + d + '" fill="none" stroke="#FFFFFF" stroke-opacity="' + (deckkraft || 0.75) + '" stroke-width="0.6" stroke-linecap="round"/>';
   };
   return {
-    // Plastik: liegende Flasche (Boden links, Verschluss rechts), Tüte, Verpackung
+    // Plastik: liegende Flasche mit Etikett (Boden links, Verschluss rechts), Tüte mit Falten, bunte Verpackung
     flasche: '<path d="M-6,-2.2 H1.6 Q3,-2.2 3.8,-1 H5 V1 H3.8 Q3,2.2 1.6,2.2 H-6 Q-6.8,2.2 -6.8,1.4 V-1.4 Q-6.8,-2.2 -6,-2.2 Z" ' +
-      'fill="' + p.flaeche + '"' + linie(p.rand) + "/>" +
-      '<rect x="5" y="-1.35" width="1.6" height="2.7" rx="0.3" fill="' + p.flaeche2 + '"' + linie(p.rand) + "/>",
-    tuete: '<path d="M-4,-4.6 H-2 V-2.4 Q0,-1 2,-2.4 V-4.6 H4 L4.7,4 Q0,5.3 -4.7,4 Z" fill="' + p.flaeche + '"' + linie(p.rand) + "/>",
+      'fill="' + p.flaeche + '" fill-opacity="0.95"' + linie(p.rand) + "/>" +
+      '<rect x="-4" y="-2.2" width="3.8" height="4.4" fill="' + p.etikett + '" opacity="0.85"/>' +
+      '<rect x="5" y="-1.35" width="1.6" height="2.7" rx="0.3" fill="' + p.etikett + '"' + linie(p.rand) + "/>" +
+      glanz("M-5.6,-1.3 H-4.4 M0.4,-1.3 H2.2"),
+    tuete: '<path d="M-4,-4.6 H-2 V-2.4 Q0,-1 2,-2.4 V-4.6 H4 L4.7,4 Q0,5.3 -4.7,4 Z" fill="' + p.flaeche + '" fill-opacity="0.92"' + linie(p.rand) + "/>" +
+      '<path d="M-1.6,-0.4 Q-0.6,1.8 -1.8,3.8 M1.8,0 Q1,2 2.2,4" fill="none" stroke="' + p.rand + '" stroke-opacity="0.35" stroke-width="0.4"/>' +
+      '<path d="M-2.6,1.4 H2.6" stroke="' + p.etikett + '" stroke-opacity="0.7" stroke-width="0.9"/>' +
+      glanz("M-3.2,-0.8 L-3.6,2.6", 0.6),
     verpackung: '<path d="M-2.7,-3.6 L-2,-3.1 L-1.35,-3.6 L-0.7,-3.1 L0,-3.6 L0.7,-3.1 L1.35,-3.6 L2,-3.1 L2.7,-3.6 V3.6 ' +
-      'L2,3.1 L1.35,3.6 L0.7,3.1 L0,3.6 L-0.7,3.1 L-1.35,3.6 L-2,3.1 L-2.7,3.6 Z" fill="' + p.flaeche2 + '"' + linie(p.rand) + "/>",
-    // Glas: heile Flasche mit langem Hals und zerbrochene Flasche mit Scherben
+      'L2,3.1 L1.35,3.6 L0.7,3.1 L0,3.6 L-0.7,3.1 L-1.35,3.6 L-2,3.1 L-2.7,3.6 Z" fill="' + p.flaeche2 + '"' + linie(p.rand) + "/>" +
+      '<rect x="-2.7" y="-1.2" width="5.4" height="2.4" fill="#E8662A" opacity="0.75"/>' +
+      glanz("M-1.8,-2.4 V-1.6 M-1.8,1.8 V2.4", 0.7),
+    // Glas: heile Flasche mit Etikett und langem Hals, zerbrochene Flasche mit Scherben
     glasflasche: '<path d="M-6,-2.3 H0.6 Q2.4,-2.3 3,-1 H6.4 V1 H3 Q2.4,2.3 0.6,2.3 H-6 Q-6.8,2.3 -6.8,1.5 V-1.5 Q-6.8,-2.3 -6,-2.3 Z" ' +
-      'fill="' + g.flaeche + '"' + linie(g.rand) + "/>",
+      'fill="' + g.flaeche + '" fill-opacity="0.92"' + linie(g.rand) + "/>" +
+      '<rect x="-4.6" y="-2.3" width="3.6" height="4.6" fill="' + g.etikett + '" opacity="0.85"/>' +
+      glanz("M-5.8,-1.3 H-4.9 M-0.6,-1.3 H1 M3.4,-0.4 H5.8", 0.6),
     scherbe: '<path d="M5.6,-1 H3.6 Q2.8,-2.4 1.2,-2.4 H-3 L-4.3,-1.3 L-3.3,-0.5 L-5,0.5 L-3.7,1.3 L-4.6,2.4 H1.2 Q2.8,2.4 3.6,1 H5.6 Z" ' +
-      'fill="' + g.flaeche + '"' + linie(g.rand) + "/>" +
+      'fill="' + g.flaeche + '" fill-opacity="0.92"' + linie(g.rand) + "/>" +
       '<polygon points="-7.4,-1.8 -5.9,0.2 -8,0.6" fill="' + g.flaeche2 + '"' + linie(g.rand) + "/>" +
-      '<polygon points="-7.6,2 -6.2,1.6 -6.8,3.3" fill="' + g.flaeche2 + '"' + linie(g.rand) + "/>",
-    // Essensreste: Apfelbutzen (aufrecht) und Bananenschale
+      '<polygon points="-7.6,2 -6.2,1.6 -6.8,3.3" fill="' + g.flaeche2 + '"' + linie(g.rand) + "/>" +
+      glanz("M-2.6,-1.4 H1.4", 0.6),
+    // Essensreste: Apfelbutzen (aufrecht) und Bananenschale mit braunen Stellen
     apfel: '<path d="M-2.2,-2.3 Q-0.5,0 -2.2,2.3 H2.2 Q0.5,0 2.2,-2.3 Z" fill="' + e.kern + '"' + linie(e.rand) + "/>" +
       '<path d="M-2.6,-2.3 Q0,-4.8 2.6,-2.3 Q0,-1.6 -2.6,-2.3 Z" fill="' + e.flaeche2 + '"' + linie(e.rand) + "/>" +
       '<path d="M-2.6,2.3 Q0,1.6 2.6,2.3 Q0,4.6 -2.6,2.3 Z" fill="' + e.flaeche2 + '"' + linie(e.rand) + "/>" +
-      '<path d="M0,-3.6 Q0.2,-4.6 0.9,-5.1" fill="none" stroke="' + e.rand + '" stroke-width="0.6" stroke-linecap="round"/>',
+      '<path d="M-0.3,-0.8 l0.3,0.6 M0.4,0.4 l-0.2,0.6" stroke="#6B4A2A" stroke-width="0.5" stroke-linecap="round"/>' +
+      '<path d="M0,-3.6 Q0.2,-4.6 0.9,-5.1" fill="none" stroke="#7A5A3A" stroke-width="0.6" stroke-linecap="round"/>' +
+      glanz("M-1.6,-3.1 Q-0.8,-3.7 0,-3.8", 0.7),
     banane: '<path d="M0,-2.8 Q-3.8,-1.8 -4.6,3.2 Q-2.6,2 -0.6,-1.4 Z M0,-2.8 Q3.8,-1.6 4.7,2.6 Q2.6,1.7 0.6,-1.4 Z ' +
       'M-0.6,-2.4 Q-1,1.2 0.2,4.8 Q1.6,1.2 0.6,-2.4 Z" fill="' + e.flaeche + '"' + linie(e.rand) + "/>" +
+      '<g fill="#8A5A1E" opacity="0.6"><circle cx="-3" cy="1.6" r="0.45"/><circle cx="3.2" cy="1.2" r="0.4"/><circle cx="0.3" cy="2.6" r="0.35"/></g>' +
       '<rect x="-0.5" y="-4.6" width="1" height="1.9" rx="0.3" fill="' + e.rand + '"/>'
   };
 }
@@ -3537,8 +3943,15 @@ const MUELL_ARTEN = {
 };
 const MUELL_AUFRECHT = ["apfel", "banane", "tuete", "verpackung"];
 
-function muellSymbolSvg(form, x, y, winkel, groesse) {
-  return '<g transform="translate(' + x.toFixed(1) + "," + y.toFixed(1) + ") rotate(" + Math.round(winkel) + ") scale(" +
+// schwimmt = true: im Wasser, ohne Schatten (Treibgut, Müll im Fluss)
+function muellSymbolSvg(form, x, y, winkel, groesse, schwimmt) {
+  let s = "";
+  if (!schwimmt) {
+    const tief = MUELL_AUFRECHT.indexOf(form) >= 0 ? 4.4 : 2;
+    s += '<ellipse cx="' + (x + 1.4 * groesse).toFixed(1) + '" cy="' + (y + tief * groesse).toFixed(1) + '" rx="' + (5.4 * groesse).toFixed(1) +
+      '" ry="' + (1.5 * groesse).toFixed(1) + '" fill="#3B2F1E" opacity="0.16"/>';
+  }
+  return s + '<g transform="translate(' + x.toFixed(1) + "," + y.toFixed(1) + ") rotate(" + Math.round(winkel) + ") scale(" +
     groesse.toFixed(2) + ')">' + MUELL_FORMEN[form] + "</g>";
 }
 
@@ -3547,11 +3960,11 @@ function muellSymbolSvg(form, x, y, winkel, groesse) {
 // Infopunkte und Personen stehen in Prozent der Karte; hier in Karteneinheiten umgerechnet.
 function muellSperrflaechen(z) {
   const flaechen = [
-    [612, 26, 70, 54], [482, 24, 42, 42], [527, 40, 24, 26],     // Fabrik, Hotel, Gästehaus
+    [612, 26, 74, 54], [482, 22, 44, 44], [527, 38, 26, 28],     // Fabrik, Hotel, Gästehaus
     [730, 90, 22, 80], [647, 76, 10, 34]                           // Hafensteg, Abwasserrohr
   ];
   if (istUmgesetzt(z, "gewerbe")) {
-    flaechen.push([684, 48, 54, 36], [424, 32, 42, 42], [465, 54, 24, 26], [549, 64, 24, 26]);
+    flaechen.push([684, 46, 58, 38], [424, 30, 44, 44], [465, 52, 26, 28], [549, 62, 26, 28]);
   }
   INFOPUNKTE.forEach(function (p) {
     flaechen.push([p.x * 8 - 15, p.y * 3.2 - 14, 30, 38]);       // Knopf und Beschriftung
@@ -3586,8 +3999,9 @@ function flussPunkte() {
   return punkte;
 }
 
+// Abstand zum Ufer (nicht zur Flussmitte), weil der Fluss zur Mündung hin breiter wird
 function abstandZumFluss(x, y, punkte) {
-  return Math.min.apply(null, punkte.map(function (p) { return Math.hypot(p.x - x, p.y - y); }));
+  return Math.min.apply(null, punkte.map(function (p) { return Math.hypot(p.x - x, p.y - y) - flussBreite(p.s) / 2; }));
 }
 
 // Hotspots am Strand: Abschnitt von x bis x + b, Anteile der Müllarten, Anzahl Plätze
@@ -3661,7 +4075,7 @@ function hotspotPlaetze(z, lage) {
       if (x < 8 || x > KARTE_B - 8 || y < 10) continue;
       if (lage === "land" && y > kuestenlinie(x) - 6) continue;            // nicht im Sand
       if (imRechteck(x, y, sperre)) continue;
-      if (abstandZumFluss(x, y, fluss) < 13) continue;                     // nicht im Fluss
+      if (abstandZumFluss(x, y, fluss) < 6) continue;                      // nicht im Fluss und nicht direkt am Ufer
       if (eigene.concat(alle).some(function (m) { return Math.hypot(m.x - x, m.y - y) < MUELL_ABSTAND; })) continue;
       const wahl = formWaehlen(h.arten, r);
       const teil = lage === "strand"
@@ -3709,7 +4123,7 @@ function flussMuellSvg(z, muellfaengerWirkt) {
     const form = MUELL_ARTEN.plastik[Math.floor(r() * MUELL_ARTEN.plastik.length)];
     const winkel = Math.atan2(p.ry, p.rx) * 180 / Math.PI + (r() - 0.5) * 30;
     if (i >= anzahl) continue;
-    s += muellSymbolSvg(form, p.x - p.ry * quer, p.y + p.rx * quer, winkel, 0.8);
+    s += muellSymbolSvg(form, p.x - p.ry * quer, p.y + p.rx * quer, winkel, 0.8, true);
   }
   return s;
 }
@@ -3727,7 +4141,7 @@ function treibgutSvg(anzahl) {
     const form = TREIBGUT_FORMEN[Math.floor(r() * TREIBGUT_FORMEN.length)];
     const winkel = form === "flasche" ? (r() - 0.5) * 30 + (r() < 0.5 ? 180 : 0) : (r() - 0.5) * 50;
     if (i >= anzahl) continue;
-    s += muellSymbolSvg(form, x, y, winkel, 1.2) +
+    s += muellSymbolSvg(form, x, y, winkel, 1.2, true) +
       '<path d="M' + (x - 8).toFixed(1) + "," + (y + 5.6).toFixed(1) + " q4,-1.8 8,0 t8,0\" fill=\"none\" " +
       'stroke="#FFFFFF" stroke-opacity="0.5" stroke-width="0.8" stroke-linecap="round"/>';
   }
@@ -3740,6 +4154,14 @@ function treibgutAnzahl(z) {
 
 // Kleines Symbol für die Legende unter der Karte. Breite und Höhe stehen direkt am SVG,
 // damit die Größe auch ohne passende CSS-Regel stimmt.
+// Legendentext zu den Fischen: welche Arten gerade zu sehen sind
+function fischLegende(artenvielfalt) {
+  const namen = sichtbareFischArten(artenvielfalt).map(function (a) { return a.name; });
+  return "Fische: " + (namen.length <= 3
+    ? namenListe(namen)
+    : namen.slice(0, 2).join(", ") + " und " + (namen.length - 2) + " weitere Arten");
+}
+
 function legendenSvg(inhalt, viewBox) {
   return '<svg class="lg-symbol" width="20" height="15" viewBox="' + viewBox + '" aria-hidden="true" focusable="false">' +
     inhalt + "</svg>";
@@ -3865,16 +4287,59 @@ function stegSvg(yOben, tStueck, tinte) {
   return { svg: s, yEnde: yEnde, tUnten: yEnde + tBreite };
 }
 
-// Mülleimer mit Recycling-Zeichen, (x, y) = Mitte am Boden
+// Mülleimer mit Recycling-Zeichen, (x, y) = Mitte am Boden. Schräg von oben gesehen:
+// leicht konische Tonne mit Licht von links, Deckel als Ellipse, Schatten nach rechts unten.
 function muelleimerSvg(x, y, tinte) {
   const f = HAFEN_FARBEN;
+  const kante = ' stroke="' + tinte + '" stroke-opacity="0.55" stroke-width="0.45" stroke-linejoin="round"';
   return '<g transform="translate(' + x.toFixed(1) + "," + y.toFixed(1) + ') scale(1.2)">' +
-    '<ellipse cx="0" cy="0.3" rx="3.4" ry="0.8" fill="' + tinte + '" opacity="0.18"/>' +
-    '<path d="M-3,-7 H3 L2.4,0 H-2.4 Z" fill="' + f.eimer + '" stroke="' + tinte + '" stroke-width="0.6" stroke-linejoin="round"/>' +
-    '<rect x="-1.1" y="-9.5" width="2.2" height="1.1" rx="0.4" fill="' + f.eimerDeckel + '" stroke="' + tinte + '" stroke-width="0.4"/>' +
-    '<rect x="-3.7" y="-8.6" width="7.4" height="1.7" rx="0.5" fill="' + f.eimerDeckel + '" stroke="' + tinte + '" stroke-width="0.5"/>' +
-    '<circle cx="0" cy="-3.6" r="1.55" fill="none" stroke="#FFFFFF" stroke-width="0.7" stroke-dasharray="2.6 0.65"/>' +
+    '<ellipse cx="1.4" cy="0.1" rx="3.8" ry="1" fill="#0B2238" opacity="0.2"/>' +
+    '<path d="M-3,-6.6 L-2.5,-0.5 Q0,0.5 2.5,-0.5 L3,-6.6 Z" fill="' + f.eimer + '"' + kante + "/>" +
+    '<path d="M0.9,-6.6 L3,-6.6 L2.5,-0.5 Q1.7,-0.1 0.8,0 Z" fill="#000000" opacity="0.18"/>' +
+    '<path d="M-2.2,-5.8 L-1.9,-1.2" stroke="#FFFFFF" stroke-opacity="0.3" stroke-width="0.6" stroke-linecap="round"/>' +
+    '<circle cx="0" cy="-3.6" r="1.45" fill="none" stroke="#FFFFFF" stroke-width="0.65" stroke-dasharray="2.4 0.65"/>' +
+    '<ellipse cx="0" cy="-6.8" rx="3.5" ry="1.25" fill="' + f.eimerDeckel + '"' + kante + "/>" +
+    '<ellipse cx="-0.6" cy="-7" rx="1.9" ry="0.55" fill="#FFFFFF" opacity="0.22"/>' +
+    '<rect x="-1" y="-8.6" width="2" height="1.2" rx="0.4" fill="' + f.eimerDeckel + '"' + kante + "/>" +
     "</g>";
+}
+
+// Windrad auf See: Fundament im Wasser, weißer Turm mit Schattenseite, Gondel, Rotor dreht sich
+// langsam (CSS, Drehpunkt = Nabe). nummer versetzt die Drehung, damit nicht alle gleich stehen.
+function windradSvg(x, y, nummer) {
+  const naben = y - 22.6;
+  let s = '<ellipse cx="' + x + '" cy="' + (y + 0.6) + '" rx="4.6" ry="1.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.45" stroke-width="0.8"/>' +
+    '<ellipse cx="' + (x + 3) + '" cy="' + (y + 0.8) + '" rx="5" ry="1.2" fill="#0B2238" opacity="0.15"/>' +
+    '<rect x="' + (x - 1.7) + '" y="' + (y - 3.2) + '" width="3.4" height="3.6" fill="#E2A92B"/>' +
+    '<rect x="' + (x + 0.2) + '" y="' + (y - 3.2) + '" width="1.5" height="3.6" fill="#B9861D"/>' +
+    '<path d="M' + (x - 1.1) + "," + (y - 3.2) + " L" + (x - 0.6) + "," + (naben + 1) + " L" + (x + 0.6) + "," + (naben + 1) + " L" + (x + 1.1) + "," + (y - 3.2) +
+    ' Z" fill="#F4F6F7"/>' +
+    '<path d="M' + x + "," + (y - 3.2) + " L" + x + "," + (naben + 1) + " L" + (x + 0.6) + "," + (naben + 1) + " L" + (x + 1.1) + "," + (y - 3.2) +
+    ' Z" fill="#C9D2D8"/>' +
+    '<rect x="' + (x - 1.4) + '" y="' + (naben - 1.2) + '" width="4.4" height="2.5" rx="0.9" fill="#E9EDEF" stroke="#8C9AA4" stroke-width="0.35"/>';
+  let fluegel = "";
+  [0, 120, 240].forEach(function (w) {
+    fluegel += '<path transform="rotate(' + w + " " + x + " " + naben + ')" d="M' + x + "," + naben + " l-0.9,-1.2 l0.9,-10 l0.9,1.4 Z\" " +
+      'fill="#FAFBFB" stroke="#9AA7B0" stroke-width="0.3" stroke-linejoin="round"/>';
+  });
+  s += '<g class="ka-rotor" style="transform-origin:' + x + "px " + naben + "px;" + animStil(5 + nummer * 0.4, nummer * 0.7) + '">' + fluegel + "</g>";
+  return s + '<circle cx="' + x + '" cy="' + naben + '" r="1.1" fill="#DDE3E6" stroke="#8C9AA4" stroke-width="0.35"/>';
+}
+
+// Forschungsboje: gelber Schwimmkörper mit rotem Band, kleiner Mast mit Antenne und Licht, Wellenring
+function bojeSvg(x, y) {
+  return '<ellipse cx="' + x + '" cy="' + (y + 4) + '" rx="8" ry="2" fill="none" stroke="#FFFFFF" stroke-opacity="0.5" stroke-width="0.8"/>' +
+    '<ellipse cx="' + (x + 2.5) + '" cy="' + (y + 4.4) + '" rx="6" ry="1.5" fill="#0B2238" opacity="0.18"/>' +
+    '<path d="M' + x + "," + (y - 4) + " V" + (y - 15) + '" stroke="#5E5A52" stroke-width="1"/>' +
+    '<path d="M' + (x - 2.4) + "," + (y - 11) + " H" + (x + 2.4) + '" stroke="#5E5A52" stroke-width="0.7"/>' +
+    '<circle cx="' + x + '" cy="' + (y - 15.6) + '" r="1.2" fill="#E8662A"/>' +
+    '<path d="M' + (x - 5.6) + "," + y + " A5.6,4.6 0 0 1 " + (x + 5.6) + "," + y + " Q" + x + "," + (y + 5) + " " + (x - 5.6) + "," + y + ' Z" fill="#E2A92B"/>' +
+    '<path d="M' + (x - 5.5) + "," + (y + 0.6) + " Q" + x + "," + (y + 5) + " " + (x + 5.5) + "," + (y + 0.6) + " L" + (x + 5) + "," + (y + 2.4) +
+    " Q" + x + "," + (y + 6) + " " + (x - 5) + "," + (y + 2.4) + ' Z" fill="#C8382E"/>' +
+    '<path d="M' + (x + 1) + "," + (y - 4.4) + " A5.6,4.6 0 0 1 " + (x + 5.6) + "," + y + " Q" + (x + 3.5) + "," + (y + 2.6) + " " + (x + 1.2) + "," + (y + 3) +
+    ' Z" fill="#000000" opacity="0.14"/>' +
+    '<path d="M' + (x - 3.4) + "," + (y - 2.4) + " Q" + (x - 2) + "," + (y - 3.8) + " " + x + "," + (y - 4) +
+    '" fill="none" stroke="#FFFFFF" stroke-opacity="0.6" stroke-width="0.8" stroke-linecap="round"/>';
 }
 
 // Mülleimer: verteilt am Strand, einer am Hotel, einer an der Fabrik (y = Boden)
@@ -3895,6 +4360,9 @@ function seekarteSvg(z) {
   let s = "";
 
   const farben = meerFarben(k.meeresgesundheit);
+  // Flusswasser: trüb bei viel Eintrag aus dem Hinterland, klar bei wenig
+  const flussTruebung = begrenzen(z.eintrag.land / EINTRAG_GRUND.land, 0, 1);
+  const flussFarbe = mischfarbe([112, 178, 214], [140, 162, 140], flussTruebung);
   s += '<svg viewBox="0 0 ' + KARTE_B + " " + KARTE_H + '" xmlns="http://www.w3.org/2000/svg" ' +
     'preserveAspectRatio="xMidYMid slice" focusable="false">';
   s += "<defs>" +
@@ -3909,8 +4377,22 @@ function seekarteSvg(z) {
     '<stop offset="0" stop-color="#EDE0BF"/><stop offset="1" stop-color="#DCC89C"/></linearGradient>' +
     '<linearGradient id="kaDuene" x1="0" y1="80" x2="0" y2="118" gradientUnits="userSpaceOnUse">' +
     '<stop offset="0" stop-color="#C7C08F" stop-opacity="0"/><stop offset="1" stop-color="#B8A477" stop-opacity="0.75"/></linearGradient>' +
+    // Fluss: oben je nach Eintrag aus dem Hinterland klar bis trüb, zur Mündung in die Meeresfarbe übergehend
     '<linearGradient id="kaFluss" x1="0" y1="0" x2="0" y2="1">' +
-    '<stop offset="0" stop-color="#8FC3DE"/><stop offset="1" stop-color="' + farben.flach + '"/></linearGradient>' +
+    '<stop offset="0" stop-color="' + flussFarbe + '"/><stop offset="1" stop-color="' + farben.flach + '"/></linearGradient>' +
+    // Gebäude: Wände mit Licht von oben, Dachziegel, Sheddach, Schornstein mit Licht von links, Glas
+    '<linearGradient id="kaWandHell" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFBF2"/>' +
+    '<stop offset="1" stop-color="#EADFC8"/></linearGradient>' +
+    '<linearGradient id="kaWandGrau" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C8CED2"/>' +
+    '<stop offset="1" stop-color="#A9B1B6"/></linearGradient>' +
+    '<linearGradient id="kaZiegel" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#A85A3C"/>' +
+    '<stop offset="1" stop-color="#CF8463"/></linearGradient>' +
+    '<linearGradient id="kaShed" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#B3BCC2"/>' +
+    '<stop offset="1" stop-color="#8E989F"/></linearGradient>' +
+    '<linearGradient id="kaZylinder" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#C9D0D5"/>' +
+    '<stop offset="0.45" stop-color="#AEB7BD"/><stop offset="1" stop-color="#7C878F"/></linearGradient>' +
+    '<linearGradient id="kaGlas" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#C6E0EE"/>' +
+    '<stop offset="1" stop-color="#7FA9C2"/></linearGradient>' +
     // Sonnenlicht oben links, wie die Sonne im Titelbild
     '<radialGradient id="kaLicht" cx="40" cy="-30" r="420" gradientUnits="userSpaceOnUse">' +
     '<stop offset="0" stop-color="#FFF8E4" stop-opacity="0.45"/><stop offset="0.5" stop-color="#FFF8E4" stop-opacity="0.1"/>' +
@@ -3929,15 +4411,8 @@ function seekarteSvg(z) {
   });
   s += meerGlitzerSvg();
 
-  // Fische (Artenvielfalt): schwimmen langsam hin und her, siehe fischSvg
-  const r3 = zufallsfolge(57);
-  const fische = Math.round(k.artenvielfalt / 9);
-  for (let i = 0; i < 12; i++) {
-    const x = 40 + r3() * 700;
-    const y = 214 + r3() * 90;
-    const richtung = r3() > 0.5 ? 1 : -1;
-    if (i < fische) s += fischSvg(x, y, richtung, i);
-  }
+  // Fische (Artenvielfalt): mehr Tiere und mehr Arten, je besser es der Artenvielfalt geht (siehe FISCH_ARTEN)
+  s += fischeSvg(k.artenvielfalt);
 
   // Abwasserfahne vor dem Rohr (größer und dunkler bei hoher Abwasserbelastung)
   const abwasser = Math.max(0, DRUCK_START.wasser + w.druckWasser);
@@ -3954,13 +4429,8 @@ function seekarteSvg(z) {
 
   // Offshore-Windpark (links unten)
   if (istUmgesetzt(z, "windpark")) {
-    [[96, 262], [136, 286], [176, 260], [216, 284], [256, 262]].forEach(function (p) {
-      const x = p[0];
-      const y = p[1];
-      s += '<line x1="' + x + '" y1="' + y + '" x2="' + x + '" y2="' + (y - 20) + '" stroke="#ffffff" stroke-width="2"/>' +
-        '<path d="M' + x + "," + (y - 20) + " l-8,-4 M" + x + "," + (y - 20) + " l8,-4 M" + x + "," + (y - 20) +
-        ' l0,9" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round"/>' +
-        '<circle cx="' + x + '" cy="' + (y - 20) + '" r="1.8" fill="' + tinte + '"/>';
+    [[96, 262], [136, 286], [176, 260], [216, 284], [256, 262]].forEach(function (p, i) {
+      s += windradSvg(p[0], p[1], i);
     });
   }
 
@@ -3994,16 +4464,23 @@ function seekarteSvg(z) {
     s += brutSchildSvg(94, kuestenlinie(94) + STRAND_BREITE - 6, tinte);
   }
 
-  // Fluss mit Mündung
+  // Fluss mit Mündung: wird zum Meer hin breiter und öffnet sich trichterförmig. Feuchtes Ufer,
+  // tiefere Rinne in der Mitte, Lichtkante am linken (sonnigen) Ufer und Glanzstriche, die flussabwärts ziehen.
   const fluss = flussAbschnitte();
   const flussD = "M" + fluss[0][0].join(",") + " C" + fluss[0].slice(1).map(function (p) { return p.join(","); }).join(" ") +
     " C" + fluss[1].slice(1).map(function (p) { return p[0] + "," + p[1].toFixed(1); }).join(" ");
   // Der Fluss endet an der Schaumkante und geht dort ins Meer über (Ausschnitt nur über Land und Strand)
   s += '<clipPath id="kaFlussRaum"><polygon points="0,0 ' + linienPunkte(STRAND_BREITE + 1) + ' 800,0"/></clipPath>';
   s += '<g clip-path="url(#kaFlussRaum)">' +
-    '<path d="' + flussD + '" fill="none" stroke="#B8A477" stroke-opacity="0.45" stroke-width="20" stroke-linecap="round"/>' +
-    '<path d="' + flussD + '" fill="none" stroke="url(#kaFluss)" stroke-width="16" stroke-linecap="round"/>' +
-    '<path d="' + flussD + '" fill="none" stroke="#FFFFFF" stroke-opacity="0.25" stroke-width="3" stroke-linecap="round" stroke-dasharray="18 12"/>' +
+    '<path d="' + glatterPfad(flussUmriss(1, 4)) + '" fill="#B9A97C" opacity="0.6" filter="url(#kaWeich)"/>' +
+    '<path d="' + glatterPfad(flussUmriss(1, 1.4)) + '" fill="#9E8D62" opacity="0.45"/>' +
+    '<path d="' + glatterPfad(flussUmriss(1, 0)) + '" fill="url(#kaFluss)"/>' +
+    '<path d="' + glatterPfad(flussUmriss(0.42, 0)) + '" fill="' + farben.tief + '" opacity="0.28" filter="url(#kaWeich)"/>' +
+    '<path d="' + flussUferLinie(1, -1.2) + '" fill="none" stroke="#FFFFFF" stroke-opacity="0.45" stroke-width="0.9" stroke-linecap="round"/>' +
+    '<path class="ka-fluss-glanz" style="' + animStil(7) + '" d="' + flussD + '" fill="none" stroke="#FFFFFF" stroke-opacity="0.38" ' +
+    'stroke-width="1.1" stroke-linecap="round" stroke-dasharray="7 16"/>' +
+    '<path class="ka-fluss-glanz" style="' + animStil(11, 3) + '" d="' + flussUferLinie(-1, -3.2) + '" fill="none" stroke="#FFFFFF" ' +
+    'stroke-opacity="0.25" stroke-width="0.8" stroke-linecap="round" stroke-dasharray="3 20"/>' +
     "</g>";
 
   // Müll im Fluss: der Fluss trägt Müll aus dem Hinterland ins Meer
@@ -4015,7 +4492,7 @@ function seekarteSvg(z) {
     const p = bezierPunkt(fluss[1], 0.3);
     const qx = -p.ry;                     // quer zur Flussrichtung
     const qy = p.rx;
-    const halb = 17;                      // reicht über beide Ufer (Fluss ist 16 breit)
+    const halb = flussBreite(1.3) / 2 + 3;  // reicht über beide Ufer
     const schraeg = 3;                    // Versatz in Flussrichtung: Barriere liegt schräg
     const ax = p.x - qx * halb - p.rx * schraeg;
     const ay = p.y - qy * halb - p.ry * schraeg;
@@ -4038,7 +4515,7 @@ function seekarteSvg(z) {
       '<path d="M' + (kx - 1.3).toFixed(1) + "," + (ky - 3.5).toFixed(1) + " v7 M" + (kx + 1.3).toFixed(1) + "," + (ky - 3.5).toFixed(1) + " v7 M" +
       (kx - 4).toFixed(1) + "," + ky.toFixed(1) + ' h8" stroke="' + tinte + '" stroke-width="0.6"/>';
     [[0.43, "flasche"], [0.57, "tuete"], [0.66, "verpackung"]].forEach(function (t) {
-      s += muellSymbolSvg(t[1], ax + (bx - ax) * t[0] - p.rx * 3.2, ay + (by - ay) * t[0] - p.ry * 3.2, 30, 0.42);
+      s += muellSymbolSvg(t[1], ax + (bx - ax) * t[0] - p.rx * 3.2, ay + (by - ay) * t[0] - p.ry * 3.2, 30, 0.42, true);
     });
   }
 
@@ -4064,36 +4541,41 @@ function seekarteSvg(z) {
     if (gewerbe) s += rauchSvg(schornsteinSpitze(688, 56, 46, 24), 0.75, 1.3);
   }
 
-  // Gebäude mit weichem Schatten
-  s += '<g filter="url(#kaSchatten)">';
-  haeuser.forEach(function (h) {
-    s += h.gross ? hotelGrossSvg(h.x, h.y, tinte) : hotelKleinSvg(h.x, h.y, tinte);
+  // Gebäude mit weichem Schatten, von hinten nach vorne gezeichnet (nach Unterkante),
+  // damit vordere Gebäude die hinteren überdecken
+  const gebaeude = haeuser.map(function (h) {
+    return h.gross
+      ? { unten: h.y + 30, svg: hotelGrossSvg(h.x, h.y) }
+      : { unten: h.y + 13, svg: hotelKleinSvg(h.x, h.y) };
   });
-  // Fabrik mit Schornstein
-  s += fabrikSvg(616, 46, 62, 30, 4, 7.6, tinte);
-  // Gewerbegebiet erweitert: zweite, kleinere Fabrik rechts daneben
-  if (gewerbe) s += fabrikSvg(688, 56, 46, 24, 3, 6.2, tinte);
-  s += "</g>";
+  // Fabrik mit Schornstein; mit „Gewerbegebiet erweitern“ eine zweite, kleinere Fabrik rechts daneben
+  gebaeude.push({ unten: 76, svg: fabrikSvg(616, 46, 62, 30, 4, 7.6) });
+  if (gewerbe) gebaeude.push({ unten: 80, svg: fabrikSvg(688, 56, 46, 24, 3, 6.2) });
+  s += '<g filter="url(#kaSchatten)">' + gebaeude.sort(function (a, b) { return a.unten - b.unten; }).map(function (g) {
+    return g.svg;
+  }).join("") + "</g>";
 
 
   // Hafen: Steg mit Holzplanken und Pfählen; mit Kreuzfahrtanleger wird er zum T
   const yHafen = kuestenlinie(742) + STRAND_BREITE;
   const kreuzfahrt = istUmgesetzt(z, "kreuzfahrt");
-  const steg = stegSvg(yHafen - 4, kreuzfahrt, tinte);
+  // Steg und Schiffe mit weicherer Kante als die Schilder, passend zu den Gebäuden
+  const kante = "#3B5366";
+  const steg = stegSvg(yHafen - 4, kreuzfahrt, kante);
   s += '<g filter="url(#kaSchatten)">' + steg.svg;
   if (istUmgesetzt(z, "netzrueckgabe")) {
-    s += '<rect x="736" y="' + (yHafen + 6).toFixed(1) + '" width="10" height="8" rx="1.2" fill="#2E8B57" stroke="' + tinte + '" stroke-width="0.6"/>';
+    s += '<rect x="736" y="' + (yHafen + 6).toFixed(1) + '" width="10" height="8" rx="1.2" fill="#2E8B57" stroke="' + kante + '" stroke-width="0.6"/>';
   }
   // Fischkutter am Steg
-  s += kutterSvg(772, yHafen + 56, 1, false, tinte);
+  s += kutterSvg(772, yHafen + 56, 1, false, kante);
   // Zwei Kreuzfahrtschiffe am T-Stück: eines in der linken Ecke zwischen Steg und Querstück,
   // eines rechts unter dem Querstück
   if (kreuzfahrt) {
-    s += kreuzfahrtschiffSvg(703, steg.yEnde - 8, 0.9, tinte) + kreuzfahrtschiffSvg(768, steg.tUnten + 25, 0.9, tinte);
+    s += kreuzfahrtschiffSvg(703, steg.yEnde - 8, 0.9, kante) + kreuzfahrtschiffSvg(768, steg.tUnten + 25, 0.9, kante);
   }
   // Höhere Fangquoten: zwei weitere Kutter fischen auf See
   if (istUmgesetzt(z, "quoten")) {
-    s += kutterSvg(300, 205, 0.8, true, tinte) + kutterSvg(765, 300, 0.8, false, tinte);
+    s += kutterSvg(300, 205, 0.8, true, kante) + kutterSvg(765, 300, 0.8, false, kante);
   }
   s += "</g>";
 
@@ -4103,10 +4585,7 @@ function seekarteSvg(z) {
   }
 
   // Forschungsboje
-  if (istUmgesetzt(z, "forschung")) {
-    s += '<line x1="290" y1="238" x2="290" y2="226" stroke="' + tinte + '" stroke-width="1.4"/>' +
-      '<circle cx="290" cy="242" r="5.5" fill="#E2A92B" stroke="' + tinte + '" stroke-width="1.2"/>';
-  }
+  if (istUmgesetzt(z, "forschung")) s += bojeSvg(290, 244);
 
   // Treibgut im Wasser (Eintrag): Plastikflaschen und -tüten nahe dem Strand
   s += treibgutSvg(treibgutAnzahl(z));
@@ -4120,38 +4599,8 @@ function seekarteSvg(z) {
   // Licht von oben links, wie die Sonne im Titelbild
   s += '<rect width="' + KARTE_B + '" height="' + KARTE_H + '" fill="url(#kaLicht)" pointer-events="none"/>';
 
-  // Bereich der Runde: gestrichelte Umrandung in der Farbe des Bereichs (wie im Spaltenkopf der Ökologie)
-  if (!z.beendet) s += bereichUmrandungSvg(regionDerRunde(z.runde));
-
   s += "</svg>";
   return s;
-}
-
-// Umriss von Land, Strand oder Meer, entlang derselben Küstenlinie wie die Karte.
-// Der Umriss liegt eine halbe Linienbreite innerhalb des Kartenrands, damit er überall sichtbar bleibt.
-function bereichUmrandungSvg(region) {
-  const stil = BEREICH_STIL[region];
-  const r = 1.5;
-  const kante = function (versatz) {
-    const p = [];
-    for (let x = 0; x <= KARTE_B; x += 10) {
-      p.push(begrenzen(x, r, KARTE_B - r) + "," + (kuestenlinie(x) + versatz).toFixed(1));
-    }
-    return p;
-  };
-  let punkte;
-  if (region === "land") {
-    punkte = [r + "," + r].concat(kante(-r), [(KARTE_B - r) + "," + r]);
-  } else if (region === "strand") {
-    punkte = kante(r).concat(kante(STRAND_BREITE - r).reverse());
-  } else {
-    punkte = kante(STRAND_BREITE + r).concat([(KARTE_B - r) + "," + (KARTE_H - r), r + "," + (KARTE_H - r)]);
-  }
-  // heller Saum unter den Strichen: bleibt auf dunklem Wasser wie auf hellem Sand sichtbar
-  return '<polygon points="' + punkte.join(" ") + '" fill="none" stroke="#FFFFFF" stroke-opacity="0.55" ' +
-    'stroke-width="4.6" stroke-linejoin="round" pointer-events="none"/>' +
-    '<polygon points="' + punkte.join(" ") + '" fill="' + stil.farbe + '" fill-opacity="0.08" stroke="' +
-    stil.farbe + '" stroke-width="2.6" stroke-dasharray="10 6" stroke-linejoin="round" pointer-events="none"/>';
 }
 
 function seekarteAnzeigen() {
@@ -4160,7 +4609,7 @@ function seekarteAnzeigen() {
   el("kartenStatus").textContent = z.beendet
     ? "Endstand nach " + RUNDEN + " Runden"
     : "Ökologie-Maßnahmen dieser Runde gelten für den Bereich " + bereichName(regionDerRunde(z.runde)) +
-      " (auf der Karte gestrichelt umrandet). " + aktuellesLevel(z.runde).text;
+      ". " + aktuellesLevel(z.runde).text;
 
   // Legende: nur Symbole, die gerade auf der Karte zu sehen sind
   const w = aktiveWirkung(z, Math.min(z.runde, RUNDEN));
@@ -4172,8 +4621,8 @@ function seekarteAnzeigen() {
     [legendenSymbol("apfel", 0, 1.1), "Essensreste", arten.essen],
     [legendenSymbol("tuete", 10, 0.8), "Plastiktüte", treibgutAnzahl(z) > 0],
     [legendenSvg(muelleimerSvg(0, 0, "#12304A"), "-7 -12.5 14 13.5"), "Mülleimer", istUmgesetzt(z, "schilder")],
-    [legendenSvg('<rect x="-10.5" y="-7" width="25" height="14" rx="3.5" fill="#3F84B5"/>' + fischZeichen("#EAF4F8"),
-      "-10.5 -7 25 14"), "Fische", true],
+    [legendenSvg('<rect x="-10.5" y="-7" width="25" height="14" rx="3.5" fill="#3F84B5"/>' + FISCH_FORMEN.hering(),
+      "-10.5 -7 25 14"), fischLegende(z.kennzahlen.artenvielfalt), true],
     ["lg-wasser", "Wasserfarbe, Meeresgesundheit", true],
     ["lg-abwasser", "Abwasserfahne", DRUCK_START.wasser + w.druckWasser > 6],
     ["lg-schutz", "Meeresschutzgebiet", istUmgesetzt(z, "schutzgebiet")],
@@ -4716,7 +5165,7 @@ function anliegenOeffnen(index) {
   const p = PERSONEN[a.region];
   anliegenIndex = index;
   anliegenStart = Date.now();
-  el("anliegenFigur").innerHTML = figurSvg(p.farbe);
+  el("anliegenFigur").innerHTML = figurSvg(p);
   el("anliegenName").textContent = p.name;
   el("anliegenRolle").textContent = p.rolle + ", Region " + bereichName(a.region);
   el("anliegenText").textContent = "„" + a.text + "“";
@@ -5568,6 +6017,10 @@ function quellenZeigen() {
   } else {
     html += "<p>Gezeichnete Küstenszene, Teil des Spiels.</p>";
   }
+  html += "<h3>Fische auf der Karte</h3>" +
+    "<p>Arten und Aussehen (" + escapeHtml(FISCH_ARTEN.map(function (a) { return a.name; }).join(", ")) + ") nach: " +
+    '<a href="https://www.schutzstation-wattenmeer.de/wissen/tiere/fische/" target="_blank" rel="noopener noreferrer">' +
+    "Schutzstation Wattenmeer, Fische der Nordsee</a></p>";
   html += '<p class="klein">Die Fakten zeigen den Stand der jeweiligen Quelle. Zahlen zu Beständen ändern ' +
     "sich mit jeder neuen Zählung.</p>";
   el("quellenInhalt").innerHTML = html;
