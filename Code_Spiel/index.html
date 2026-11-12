@@ -188,19 +188,14 @@
 
   <!-- ===== Ladebildschirm ===== -->
   <!-- Erscheint nach Namenseingabe und Spielstart über dem bewegten Hintergrund des Startbildschirms.
-       Feste Gesamtdauer 12 s (LADEBILDSCHIRM in script.js). Alle 4 s erscheint ein neuer Meeresfakt
-       (MEERESFAKTEN in script.js), ohne Eingriff also 3 Fakten. Enter, Leertaste oder eine Maustaste
-       zeigen sofort den nächsten Fakt und starten die 4-s-Faktuhr neu; die 12 s ändern sich dadurch nicht.
+       Feste Gesamtdauer 8 s (LADEBILDSCHIRM in script.js). Alle 4 s erscheint ein neuer Meeresfakt
+       (MEERESFAKTEN in script.js), ohne Eingriff also 2 Fakten. Enter, Leertaste oder eine Maustaste
+       zeigen sofort den nächsten Fakt und starten die 4-s-Faktuhr neu; die 8 s ändern sich dadurch nicht.
        Jeder Fakt zeigt seine Quelle als Link unter dem Text. -->
   <div id="ladebildschirm" class="versteckt" role="region" aria-label="Spiel wird geladen">
     <div class="lade-inhalt">
       <div class="lade-fenster">
-        <div class="fakten-kopf">
-          <p class="fakten-label">Wusstest du?</p>
-          <span id="ladeNummer" class="fakt-nummer"></span>
-        </div>
-        <!-- Faktuhr: läuft in 4 s leer, dann kommt der nächste Fakt; beim Überspringen wieder voll -->
-        <div class="fakt-uhr" aria-hidden="true"><span id="ladeFaktUhr" class="fakt-uhr-fuellung"></span></div>
+        <p class="fakten-label">Wusstest du?</p>
         <div id="ladeKarte" class="fakt-karte lade-karte" aria-live="polite">
           <span id="ladeKategorie" class="fakt-kategorie"></span>
           <h2 id="ladeTitel" class="fakt-titel"></h2>
@@ -216,7 +211,7 @@
         <div id="ladeBalken" class="lade-balken" role="progressbar" aria-label="Ladefortschritt"
              aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
           <span id="ladeFuellung" class="lade-fuellung"></span>
-          <!-- Trennstriche bei 4 s und 8 s setzt das Skript (ladeMarkenSetzen) -->
+          <!-- Trennstrich bei 4 s (Faktwechsel) setzt das Skript (ladeMarkenSetzen) -->
           <span id="ladeMarken" class="lade-marken"></span>
         </div>
         <div class="lade-zeile">
