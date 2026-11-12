@@ -148,10 +148,9 @@ const ZB_TOLERANZ = 3;            // so viele Punkte unter dem Soll gelten noch 
 // Wissen: Anteil am Endergebnis
 const WISSEN_ANTEIL = 0.2;        // Endergebnis = 80 % Nachhaltigkeit + 20 % Wissen
 
-// Anhörung: Wer ein Anliegen schneller wegklickt, als man es lesen kann,
-// verliert am Rundenende Akzeptanz.
-const LESETEMPO = 5;              // Wörter pro Sekunde (zügiges Lesen)
-const MINDEST_LESEZEIT = 3;       // Sekunden, mindestens
+// Anhörung: Wer ein Anliegen schneller als nach MINDEST_LESEZEIT Sekunden wegklickt,
+// hat es nur überflogen und verliert am Rundenende Akzeptanz.
+const MINDEST_LESEZEIT = 2;       // Sekunden
 const ANHOERUNG_STRAFE = 3;       // Akzeptanzpunkte
 
 const BEREICHE = [
@@ -4358,25 +4357,26 @@ function muelleimerSvg(x, y, tinte) {
 }
 
 // Windrad auf See: Fundament im Wasser, weißer Turm mit Schattenseite, Gondel, Rotor dreht sich
-// langsam (CSS, Drehpunkt = Nabe). nummer versetzt die Drehung, damit nicht alle gleich stehen.
-function windradSvg(x, y, nummer) {
-  const naben = y - 22.6;
-  let s = '<ellipse cx="' + x + '" cy="' + (y + 0.6) + '" rx="4.6" ry="1.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.45" stroke-width="0.8"/>' +
-    '<ellipse cx="' + (x + 3) + '" cy="' + (y + 0.8) + '" rx="5" ry="1.2" fill="#0B2238" opacity="0.15"/>' +
-    '<rect x="' + (x - 1.7) + '" y="' + (y - 3.2) + '" width="3.4" height="3.6" fill="#E2A92B"/>' +
-    '<rect x="' + (x + 0.2) + '" y="' + (y - 3.2) + '" width="1.5" height="3.6" fill="#B9861D"/>' +
-    '<path d="M' + (x - 1.1) + "," + (y - 3.2) + " L" + (x - 0.6) + "," + (naben + 1) + " L" + (x + 0.6) + "," + (naben + 1) + " L" + (x + 1.1) + "," + (y - 3.2) +
-    ' Z" fill="#F4F6F7"/>' +
-    '<path d="M' + x + "," + (y - 3.2) + " L" + x + "," + (naben + 1) + " L" + (x + 0.6) + "," + (naben + 1) + " L" + (x + 1.1) + "," + (y - 3.2) +
-    ' Z" fill="#C9D2D8"/>' +
-    '<rect x="' + (x - 1.4) + '" y="' + (naben - 1.2) + '" width="4.4" height="2.5" rx="0.9" fill="#E9EDEF" stroke="#8C9AA4" stroke-width="0.35"/>';
-  let fluegel = "";
+// langsam (CSS). Gezeichnet um den Fußpunkt (0,0) und mit groesse skaliert. Ein unsichtbarer Kreis um
+// die Nabe macht sie zur Mitte der Rotorgruppe, damit der Rotor sich genau um die Nabe dreht.
+// nummer versetzt die Drehung, damit nicht alle gleich stehen.
+function windradSvg(x, y, nummer, groesse) {
+  const n = -22.6;                                  // Höhe der Nabe
+  let s = '<g transform="translate(' + x + "," + y + ") scale(" + (groesse || 1) + ')">';
+  s += '<ellipse cx="0" cy="0.6" rx="4.6" ry="1.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.45" stroke-width="0.6"/>' +
+    '<ellipse cx="3" cy="0.8" rx="5" ry="1.2" fill="#0B2238" opacity="0.15"/>' +
+    '<rect x="-1.7" y="-3.2" width="3.4" height="3.6" fill="#E2A92B"/>' +
+    '<rect x="0.2" y="-3.2" width="1.5" height="3.6" fill="#B9861D"/>' +
+    '<path d="M-1.1,-3.2 L-0.6,' + (n + 1) + " L0.6," + (n + 1) + ' L1.1,-3.2 Z" fill="#F4F6F7"/>' +
+    '<path d="M0,-3.2 L0,' + (n + 1) + " L0.6," + (n + 1) + ' L1.1,-3.2 Z" fill="#C9D2D8"/>' +
+    '<rect x="-1.4" y="' + (n - 1.2) + '" width="4.4" height="2.5" rx="0.9" fill="#E9EDEF" stroke="#8C9AA4" stroke-width="0.25"/>';
+  let fluegel = '<circle cx="0" cy="' + n + '" r="11.4" fill="none"/>';
   [0, 120, 240].forEach(function (w) {
-    fluegel += '<path transform="rotate(' + w + " " + x + " " + naben + ')" d="M' + x + "," + naben + " l-0.9,-1.2 l0.9,-10 l0.9,1.4 Z\" " +
-      'fill="#FAFBFB" stroke="#9AA7B0" stroke-width="0.3" stroke-linejoin="round"/>';
+    fluegel += '<path transform="rotate(' + w + " 0 " + n + ')" d="M0,' + n + ' l-0.9,-1.2 l0.9,-10 l0.9,1.4 Z" ' +
+      'fill="#FAFBFB" stroke="#9AA7B0" stroke-width="0.25" stroke-linejoin="round"/>';
   });
-  s += '<g class="ka-rotor" style="transform-origin:' + x + "px " + naben + "px;" + animStil(5 + nummer * 0.4, nummer * 0.7) + '">' + fluegel + "</g>";
-  return s + '<circle cx="' + x + '" cy="' + naben + '" r="1.1" fill="#DDE3E6" stroke="#8C9AA4" stroke-width="0.35"/>';
+  s += '<g class="ka-rotor" style="' + animStil(5 + nummer * 0.4, nummer * 0.7) + '">' + fluegel + "</g>";
+  return s + '<circle cx="0" cy="' + n + '" r="1.1" fill="#DDE3E6" stroke="#8C9AA4" stroke-width="0.25"/></g>';
 }
 
 // Forschungsboje: gelber Schwimmkörper mit rotem Band, kleiner Mast mit Antenne und Licht, Wellenring
@@ -4484,8 +4484,9 @@ function seekarteSvg(z) {
 
   // Offshore-Windpark (links unten)
   if (istUmgesetzt(z, "windpark")) {
-    [[96, 262], [136, 286], [176, 260], [216, 284], [256, 262]].forEach(function (p, i) {
-      s += windradSvg(p[0], p[1], i);
+    // doppelt so große Windräder, deshalb weiter auseinander (der Otter unten links bleibt frei)
+    [[112, 264], [170, 294], [228, 260], [286, 292], [344, 264]].forEach(function (p, i) {
+      s += windradSvg(p[0], p[1], i, 2);
     });
   }
 
@@ -4643,7 +4644,7 @@ function seekarteSvg(z) {
   }
 
   // Forschungsboje
-  if (istUmgesetzt(z, "forschung")) s += bojeSvg(290, 244);
+  if (istUmgesetzt(z, "forschung")) s += bojeSvg(420, 192);      // außerhalb des Windparks
 
   // Treibgut im Wasser (Eintrag): Plastikflaschen und -tüten nahe dem Strand
   s += treibgutSvg(treibgutAnzahl(z));
@@ -4900,20 +4901,19 @@ let aktuellerBericht = null;
 
 function berichtZeigen(bericht) {
   aktuellerBericht = bericht;
-  const rw = bericht.richtwerte;
   let html = "";
 
-  // Entscheidungen der drei Säulen
+  // Entscheidungen der drei Säulen: zuerst nur die Überschriften, die Erklärung klappt per ▼ auf
   html += '<section class="bericht-block"><h3>Deine Entscheidungen</h3>';
   bericht.entscheidungen.forEach(function (e) {
-    html += '<div class="bericht-entscheidung">' +
-      '<p class="bericht-saeule">' + e.saeule.name + "</p>";
-    if (e.massnahme) {
-      html += '<p class="bericht-massnahme">' + e.massnahme.name + "</p><p>" + e.erklaerung + "</p>";
-    } else {
-      html += '<p class="bericht-massnahme gedaempft">Zurückgestellt</p>';
-    }
-    html += "</div>";
+    const kopf = '<span class="bericht-saeule">' + e.saeule.name + "</span>" +
+      '<span class="bericht-massnahme' + (e.massnahme ? "" : " gedaempft") + '">' +
+      (e.massnahme ? e.massnahme.name : "Zurückgestellt") + "</span>";
+    html += e.massnahme
+      ? '<details class="bericht-entscheidung"><summary>' + kopf +
+        '<span class="bericht-pfeil" aria-hidden="true">▼</span></summary>' +
+        '<p class="bericht-erklaerung">' + e.erklaerung + "</p></details>"
+      : '<div class="bericht-entscheidung">' + kopf + "</div>";
   });
   html += "</section>";
 
@@ -4924,25 +4924,6 @@ function berichtZeigen(bericht) {
     '<span><span class="vb-vorher-zeichen" aria-hidden="true"></span>Stand vorher</span></p>' +
     '<p class="klein">Jede Kennzahl bewegt sich pro Runde höchstens ' + MAX_AENDERUNG +
     " Punkte auf ihren Richtwert zu. Der Richtwert ergibt sich aus dem Zustand der Region.</p></section>";
-
-  // Belastungen der Meeresgesundheit
-  const b = rw.belastungen;
-  const gesamt = b.muell + b.wasser + b.fischerei + b.klima;
-  const teile = [
-    { name: "Müll", wert: b.muell, klasse: "bl-muell" },
-    { name: "Abwasser", wert: b.wasser, klasse: "bl-wasser" },
-    { name: "Fischerei", wert: b.fischerei, klasse: "bl-fischerei" },
-    { name: "Erwärmung", wert: b.klima, klasse: "bl-klima" }
-  ];
-  html += '<section class="bericht-block"><h3>Belastungen der Meeresgesundheit</h3>' +
-    '<div class="belastung-balken">' + teile.map(function (t) {
-      return '<span class="' + t.klasse + '" style="width:' + t.wert + '%"></span>';
-    }).join("") + "</div>" +
-    '<ul class="belastung-legende">' + teile.map(function (t) {
-      return '<li><span class="lg ' + t.klasse + '" aria-hidden="true"></span>' + t.name + " " + t.wert + "</li>";
-    }).join("") + "</ul>" +
-    '<p class="klein">Richtwert der Meeresgesundheit = 100 − ' + gesamt + " = " + rw.meeresgesundheit +
-    " %. Die Artenvielfalt folgt der Meeresgesundheit mit einer Runde Verzögerung.</p></section>";
 
   // Anhörung
   if (bericht.anhoerung.length) {
@@ -5217,10 +5198,6 @@ function ereignisZeigen(ereignis) {
 let anliegenIndex = -1;
 let anliegenStart = 0;
 
-function mindestLesezeit(text) {
-  const woerter = text.trim().split(/\s+/).length;
-  return Math.max(MINDEST_LESEZEIT, woerter / LESETEMPO);
-}
 
 // Öffnet das Anliegen. Es lässt sich nur einmal öffnen.
 function anliegenOeffnen(index) {
@@ -5243,7 +5220,7 @@ function anliegenSchliessen() {
   if (!a) return;
   const sekunden = (Date.now() - anliegenStart) / 1000;
   a.gelesen = true;
-  a.zuSchnell = sekunden < mindestLesezeit(a.text);
+  a.zuSchnell = sekunden < MINDEST_LESEZEIT;
   anliegenIndex = -1;
   markerAnzeigen();
   rundenKnopfAnzeigen();
@@ -5447,6 +5424,15 @@ function spielinfoZeigen() {
 }
 
 // ---------- Endauswertung ----------
+// Bewertungstext zum Endergebnis (0 bis 100), abgestuft statt „erreicht / nicht erreicht“
+function bewertungsText(ergebnis) {
+  const wert = runden1(ergebnis);
+  if (wert >= 100) return "Perfekt!! Alles richtig umgesetzt.";
+  if (wert >= 90) return "Wow, fast perfekt!";
+  if (wert >= 80) return "Gut, weiter so!";
+  if (wert >= 75) return "Naja, schon gut, aber geht noch besser.";
+  return "Da geht noch mehr. Probier es gleich noch einmal!";
+}
 const REIHEN = [
   { id: "meeresgesundheit", name: "Meeresgesundheit", farbe: "#1F6FB2" },
   { id: "artenvielfalt",    name: "Artenvielfalt",    farbe: "#2E8B57" },
@@ -5490,55 +5476,16 @@ function auswertungZeigen() {
   const ende = endScore(z);
   const nachhaltigkeit = gesamtScore(z);
   const wissen = wissensScore(z);
-  const ziel = zielAuswertung(z);
   let html = "";
 
-  html += '<div class="ergebnis ' + (ziel.erreicht ? "ergebnis-ok" : "ergebnis-offen") + '">' +
+  html += '<div class="ergebnis ' + (runden1(ende) >= 75 ? "ergebnis-ok" : "ergebnis-offen") + '">' +
     '<div class="ergebnis-score"><span class="ergebnis-zahl">' + zahl(ende, 1) + "</span>" +
     '<span class="ergebnis-einheit">Endergebnis von 100</span></div>' +
-    '<div class="ergebnis-text"><p class="ergebnis-titel">' +
-    (ziel.erreicht ? "Guter Umweltzustand erreicht" : "Guter Umweltzustand nicht erreicht") + "</p>" +
-    "<p>" + (ziel.erreicht
-      ? "Du hast alle Mindestbedingungen in den Runden " + (RUNDEN - ZIEL_RUNDEN + 1) + " bis " + RUNDEN + " gehalten."
-      : "Diese Bedingungen waren in den Runden " + (RUNDEN - ZIEL_RUNDEN + 1) + " bis " + RUNDEN + " nicht durchgehend erfüllt: " +
-        ziel.details.filter(function (d) { return !d.erfuellt; }).map(function (d) { return d.ziel.text; }).join("; ") + ".") +
-    "</p>" +
+    '<div class="ergebnis-text"><p class="ergebnis-titel">' + bewertungsText(ende) + "</p>" +
     '<p class="ergebnis-teile">Nachhaltigkeit <strong>' + zahl(nachhaltigkeit, 1) + "</strong> × " +
     Math.round((1 - WISSEN_ANTEIL) * 100) + " % + Wissen <strong>" + (wissen === null ? "–" : zahl(wissen, 1)) +
     "</strong> × " + Math.round(WISSEN_ANTEIL * 100) + " %</p>" +
     "</div></div>";
-
-  // Vergleich mit „Weiter so“ und Säulen im Verlauf
-  const bau = weiterSoVerlauf();
-  const bauEnde = bau.verlauf[bau.verlauf.length - 1];
-  const dein = z.verlauf[z.verlauf.length - 1];
-  const vorsprung = runden1(nachhaltigkeit - bau.score);
-  const saeulenReihen = z.verlauf.map(function (v, i) {
-    return { runde: v.runde, oeko: v.saeulen.oeko, oekonomie: v.saeulen.oekonomie, sozial: v.saeulen.sozial,
-      score: v.score, bau: bau.verlauf[i].score };
-  });
-  const SAEULEN_REIHEN = [
-    { id: "oeko", name: "Ökologie", farbe: "#2E8B57" },
-    { id: "oekonomie", name: "Ökonomie", farbe: "#1D4F8C" },
-    { id: "sozial", name: "Soziales", farbe: "#7A4FA0" },
-    { id: "score", name: "Rundenscore", farbe: "#12304A", dick: true },
-    { id: "bau", name: "„Weiter so“ (ohne Maßnahmen)", farbe: "#E8662A", gestrichelt: true }
-  ];
-  html += '<section class="bericht-block"><h3>Dein Weg im Vergleich zu „Weiter so“</h3>' +
-    '<div class="vergleich-kasten"><p>Ohne eine einzige Maßnahme hätte die Region <strong>' + zahl(bau.score, 1) +
-    "</strong> Punkte erreicht (Ökologie " + zahl(bau.saeulen.oeko) + ", Ökonomie " + zahl(bau.saeulen.oekonomie) +
-    ", Soziales " + zahl(bau.saeulen.sozial) + "). Du hast <strong>" + zahl(nachhaltigkeit, 1) + "</strong> erreicht: " +
-    "<strong>" + vorzeichen(vorsprung) + "</strong> Punkte.</p>" +
-    "<p>Ohne Eingreifen stünde die Region in Runde " + RUNDEN + " bei Meeresgesundheit " + bauEnde.meeresgesundheit +
-    " %, Strandmüll " + zahl(bauEnde.strandmuell) + " Teilen und Akzeptanz " + bauEnde.akzeptanz +
-    " %. Bei dir: Meeresgesundheit " + dein.meeresgesundheit + " %, Strandmüll " + zahl(dein.strandmuell) +
-    " Teile, Akzeptanz " + dein.akzeptanz + " %.</p></div>" +
-    '<div class="diagramm">' + diagrammSvg(saeulenReihen, SAEULEN_REIHEN, 100, null, "#12304A") + "</div>" +
-    '<ul class="diagramm-legende">' + SAEULEN_REIHEN.map(function (r) {
-      return '<li><span class="linie' + (r.gestrichelt ? " gestrichelt orange" : "") + '"' +
-        (r.gestrichelt ? "" : ' style="background:' + r.farbe + '"') + "></span>" + r.name + "</li>";
-    }).join("") + "</ul>" +
-    '<p class="klein">Die Linien zeigen, wie nah jede Säule am Sollkurs war (100 = auf oder über dem Kurs).</p></section>';
 
   html += '<section class="bericht-block"><h3>Verlauf der Kennzahlen</h3>' +
     '<div class="diagramm">' + diagrammSvg(z.verlauf, REIHEN, 100, GUTER_ZUSTAND.meeresgesundheit, "#12304A") + "</div>" +
@@ -5581,21 +5528,31 @@ function auswertungZeigen() {
     "beantwortet und <strong>" + freiwilligGelesen + " von " + freiwillige.length +
     "</strong> freiwilligen Infopunkten gelesen.</p></section>";
 
-  // Deine Entscheidungen
-  const entscheidungen = [];
-  for (const id in z.umgesetzt) {
+  // Deine Entscheidungen: jede Runde eine Zeile, je Säule eine Spalte. So steht jede umgesetzte
+  // Maßnahme an ihrem Platz, auch wiederholte (z. B. Aufräumaktion in mehreren Runden).
+  const proRunde = [];
+  for (let r = 1; r <= RUNDEN; r++) proRunde.push({ oeko: [], oekonomie: [], sozial: [] });
+  let anzahlMassnahmen = 0;
+  Object.keys(z.umgesetzt).forEach(function (id) {
     const m = massnahmeFinden(id);
+    if (!m) return;
     z.umgesetzt[id].forEach(function (r) {
-      entscheidungen.push({ runde: r, name: m.name, saeule: saeuleFinden(m.saeule).name });
+      if (r < 1 || r > RUNDEN) return;
+      proRunde[r - 1][m.saeule].push(m.name);
+      anzahlMassnahmen += 1;
     });
-  }
-  entscheidungen.sort(function (a, b) { return a.runde - b.runde; });
+  });
   html += '<section class="bericht-block"><h3>Deine Entscheidungen</h3>' +
-    (entscheidungen.length
-      ? '<ol class="entscheidungen">' + entscheidungen.map(function (e) {
-          return '<li><span class="runde-marke">Runde ' + e.runde + "</span>" + e.name +
-            ' <span class="gedaempft">(' + e.saeule + ")</span></li>";
-        }).join("") + "</ol>"
+    (anzahlMassnahmen
+      ? '<p class="klein">' + anzahlMassnahmen + " Maßnahmen in " + RUNDEN + " Runden. „–“ heißt: in dieser Säule zurückgestellt.</p>" +
+        '<div class="entscheidungen-rahmen"><table class="entscheidungen-tabelle"><thead><tr><th scope="col">Runde</th>' +
+        SAEULEN.map(function (sl) { return '<th scope="col">' + sl.name + "</th>"; }).join("") + "</tr></thead><tbody>" +
+        proRunde.map(function (zeile, i) {
+          return '<tr><th scope="row">' + (i + 1) + "</th>" + SAEULEN.map(function (sl) {
+            const namen = zeile[sl.id];
+            return '<td data-saeule="' + sl.name + '">' + (namen.length ? namen.join("<br>") : '<span class="gedaempft">–</span>') + "</td>";
+          }).join("") + "</tr>";
+        }).join("") + "</tbody></table></div>"
       : "<p>Du hast keine Maßnahme umgesetzt.</p>") + "</section>";
 
   html += '<section class="bericht-block reflexion"><h3>Zum Nachdenken</h3><ul class="liste-kompakt">' +

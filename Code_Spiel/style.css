@@ -426,9 +426,10 @@ button {
 /* Fluss: Glanzstriche ziehen langsam flussabwärts (Summe des Strichmusters = 23) */
 .seekarte .ka-fluss-glanz { animation: ka-fliessen 7s linear infinite; }
 
-/* Windräder: Rotor dreht sich um die Nabe (Drehpunkt setzt script.js) */
+/* Windräder: Rotor dreht sich um die Nabe (die Nabe ist die Mitte der Rotorgruppe, siehe windradSvg) */
 .seekarte .ka-rotor {
-  transform-box: view-box;
+  transform-box: fill-box;
+  transform-origin: center;
   animation: ka-drehen 5s linear infinite;
 }
 
@@ -1091,18 +1092,6 @@ button {
   font-size: 0.82rem;
   color: var(--tinte-3);
 }
-
-.vergleich-kasten {
-  padding: 12px 14px;
-  background: var(--wasser);
-  border-radius: var(--radius);
-  font-size: 0.94rem;
-}
-
-.vergleich-kasten p { margin: 0; }
-.vergleich-kasten p + p { margin-top: 6px; }
-
-.linie.gestrichelt.orange { border-top-color: var(--orange); }
 
 .trend {
   font-size: 0.8rem;
@@ -2271,13 +2260,27 @@ p + .info-tabelle { margin-top: 10px; }
   border: 1.5px solid var(--tinte);
 }
 
-/* Rundenbericht: Balken wandern animiert vom alten zum neuen Stand */
+/* Rundenbericht: Balken wandern animiert vom alten zum neuen Stand.
+   Kompakt: jede Kennzahl ist eine Zeile aus Name | Balken | Werte, darunter klein der Richtwert. */
 .vb-liste {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
-  margin-top: 4px;
+  gap: 8px;
+  margin-top: 2px;
 }
+
+.vb-zeile {
+  display: grid;
+  grid-template-columns: 8.2rem minmax(0, 1fr) auto;
+  column-gap: 14px;
+  align-items: center;
+}
+
+.vb-zeile .vb-kopf { display: contents; }
+.vb-zeile .vb-name { grid-column: 1; grid-row: 1; }
+.vb-zeile .vb-werte { grid-column: 3; grid-row: 1; }
+.vb-zeile .vb-balken { grid-column: 2; grid-row: 1; height: 8px; margin-bottom: 0; }
+.vb-zeile .vb-fuss { grid-column: 2; grid-row: 2; margin-top: 10px; }
 
 .vb-kopf {
   display: flex;
@@ -2361,22 +2364,23 @@ p + .info-tabelle { margin-top: 10px; }
 
 .vb-fuss {
   margin-top: -2px;
-  font-size: 0.8rem;
+  font-size: 0.74rem;
+  line-height: 1.2;
   color: var(--tinte-3);
 }
 
 .vb-muellbilanz {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: -6px;
+  gap: 6px;
+  margin-top: 0;
 }
 
 .vb-posten {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px 10px;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 8px;
   font-size: 0.8rem;
   color: var(--tinte-3);
   background: var(--papier);
@@ -2387,7 +2391,7 @@ p + .info-tabelle { margin-top: 10px; }
 
 .vb-posten strong {
   font-family: var(--schrift-schmal);
-  font-size: 1.2rem;
+  font-size: 1rem;
   font-weight: 600;
 }
 
@@ -2395,10 +2399,10 @@ p + .info-tabelle { margin-top: 10px; }
 .vb-posten.schlecht strong { color: var(--rot); }
 .vb-posten.aktiv { border-color: var(--tinte); background: var(--flaeche); }
 
-.vb-eintrag { margin-top: -8px; }
+.vb-eintrag { margin-top: -2px; }
 
 .vb-budget {
-  padding-top: 12px;
+  padding-top: 8px;
   border-top: 1px solid var(--linie);
 }
 
@@ -2409,7 +2413,7 @@ p + .info-tabelle { margin-top: 10px; }
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 8px;
-  margin-top: 14px;
+  margin-top: 10px;
   font-size: 0.8rem;
   color: var(--tinte-3);
 }
@@ -2439,49 +2443,6 @@ p + .info-tabelle { margin-top: 10px; }
   background: repeating-linear-gradient(-45deg, #C9D6DE 0 3px, transparent 3px 6px);
   border-left: 2px dotted var(--tinte-2);
 }
-
-.belastung-balken {
-  display: flex;
-  height: 14px;
-  overflow: hidden;
-  background: #EAF3EE;
-  border: 1px solid var(--linie);
-  border-radius: 2px;
-}
-
-.belastung-balken span {
-  display: block;
-  height: 100%;
-}
-
-.belastung-legende {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 16px;
-  margin: 8px 0 0;
-  padding: 0;
-  font-size: 0.86rem;
-  list-style: none;
-}
-
-.belastung-legende li {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.lg.bl-muell,
-.lg.bl-wasser,
-.lg.bl-fischerei,
-.lg.bl-klima {
-  width: 10px;
-  height: 10px;
-}
-
-.bl-muell { background: var(--rot); }
-.bl-wasser { background: #8A6A3B; }
-.bl-fischerei { background: var(--tinte-2); }
-.bl-klima { background: var(--gelb); }
 
 /* ===== Endauswertung ===== */
 .ergebnis {
@@ -2566,26 +2527,34 @@ p + .info-tabelle { margin-top: 10px; }
 
 .linie.gestrichelt.gruen { border-top-color: var(--gruen); }
 
-.entscheidungen {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px 24px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 0.92rem;
+/* Endauswertung: Entscheidungen als Tabelle (Runde × Säule) */
+.entscheidungen-rahmen { overflow-x: auto; }
+
+.entscheidungen-tabelle {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  line-height: 1.35;
 }
 
-.entscheidungen li {
-  display: flex;
-  gap: 10px;
-  padding: 4px 0;
+.entscheidungen-tabelle th,
+.entscheidungen-tabelle td {
+  padding: 5px 10px 5px 0;
+  text-align: left;
+  vertical-align: top;
   border-bottom: 1px solid var(--linie);
 }
 
-.runde-marke {
-  flex: none;
-  width: 4.6rem;
+.entscheidungen-tabelle thead th {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--tinte-3);
+  border-bottom-width: 1.5px;
+}
+
+.entscheidungen-tabelle tbody th {
+  width: 3.6rem;
+  font-weight: 600;
   color: var(--tinte-3);
 }
 
@@ -2910,10 +2879,47 @@ p + .info-tabelle { margin-top: 10px; }
 .zb-status + .bericht-block { margin-top: 18px; }
 
 /* ===== Rundenbericht: Entscheidungen der drei Säulen ===== */
+/* Zuerst nur Säule und Maßnahme; ▼ klappt die Erklärung auf */
 .bericht-entscheidung + .bericht-entscheidung {
-  margin-top: 12px;
-  padding-top: 10px;
   border-top: 1px dashed var(--linie);
+}
+
+.bericht-entscheidung > summary,
+div.bericht-entscheidung {
+  display: grid;
+  grid-template-columns: 6.2rem minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 0;
+}
+
+.bericht-entscheidung > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.bericht-entscheidung > summary::-webkit-details-marker { display: none; }
+.bericht-entscheidung > summary:hover .bericht-massnahme { text-decoration: underline; }
+
+.bericht-entscheidung > summary:focus-visible {
+  outline: 3px solid var(--orange);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.bericht-pfeil {
+  font-size: 0.8rem;
+  color: var(--tinte-3);
+  transition: transform 0.2s ease;
+}
+
+.bericht-entscheidung[open] .bericht-pfeil { transform: rotate(180deg); }
+
+.bericht-erklaerung {
+  margin: 0 0 10px 6.2rem;
+  padding-left: 10px;
+  font-size: 0.92rem;
+  border-left: 2px solid var(--linie);
 }
 
 .bericht-saeule {
@@ -2981,10 +2987,13 @@ p + .info-tabelle { margin-top: 10px; }
   .runden-abschluss    { order: 4; }
   .ziel-tafel          { order: 5; }
   .marke-name { display: inline; }
-  .ziel-liste,
-  .entscheidungen { grid-template-columns: minmax(0, 1fr); }
+  .ziel-liste { grid-template-columns: minmax(0, 1fr); }
   .bilanz { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .vb-kopf { flex-wrap: wrap; }
+  .vb-zeile { grid-template-columns: minmax(0, 1fr) auto; }
+  .vb-zeile .vb-werte { grid-column: 2; }
+  .vb-zeile .vb-balken { grid-column: 1 / -1; grid-row: 2; margin-top: 6px; }
+  .vb-zeile .vb-fuss { grid-column: 1 / -1; grid-row: 3; }
+  .bericht-erklaerung { margin-left: 0; }
   .vb-posten { padding: 6px 8px; }
   .ergebnis {
     grid-template-columns: minmax(0, 1fr);
