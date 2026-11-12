@@ -379,7 +379,7 @@ button {
 }
 
 /* ===== Seekarte: Bewegung =====
-   Wenige, ruhige Bewegungen wie im Titelbild: Fische, Rauch aus den Schornsteinen, Abwasserfahne.
+   Wenige, ruhige Bewegungen wie im Titelbild: Fische, Rauch, Abwasserfahne, Flussströmung, Windräder.
    Dauer und Startpunkt setzt script.js pro Teil (animStil), damit beim Neuzeichnen nichts springt.
    Bei „Bewegung reduzieren“ schaltet die Regel am Ende der Datei alles ab. */
 .seekarte .ka-fisch {
@@ -418,6 +418,35 @@ button {
 .seekarte .ka-teilchen {
   opacity: 0;
   animation: ka-treiben 7s linear infinite;
+}
+
+/* Fluss: Glanzstriche ziehen langsam flussabwärts (Summe des Strichmusters = 23) */
+.seekarte .ka-fluss-glanz { animation: ka-fliessen 7s linear infinite; }
+
+/* Windräder: Rotor dreht sich um die Nabe (Drehpunkt setzt script.js) */
+.seekarte .ka-rotor {
+  transform-box: view-box;
+  animation: ka-drehen 5s linear infinite;
+}
+
+/* Nagelrochen: „fliegt“ mit langsamen Flügelschlägen */
+.seekarte .ka-rochen-fluegel {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ka-fluegelschlag 2.6s ease-in-out infinite alternate;
+}
+
+@keyframes ka-fliessen {
+  to { stroke-dashoffset: -23; }
+}
+
+@keyframes ka-drehen {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ka-fluegelschlag {
+  from { transform: scaleY(1); }
+  to   { transform: scaleY(0.8); }
 }
 
 /* Fisch schwimmt geradeaus (Kopf voran), wendet, schwimmt zurück und wendet wieder */
