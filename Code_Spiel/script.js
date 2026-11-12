@@ -1377,11 +1377,12 @@ const START_VERSION = "Version 10";
 
 // Ladebildschirm nach Namenseingabe und Spielstart (siehe Abschnitt „Ladebildschirm“ unten).
 // Feste Gesamtdauer: Der Ladebildschirm steht immer genau gesamtDauer ms, egal wie oft übersprungen wird.
-// Ohne Eingriff wechselt der Fakt alle faktDauer ms (bei 12 s / 4 s also 3 Fakten).
+// Ohne Eingriff wechselt der Fakt alle faktDauer ms (bei 8 s / 4 s also 2 Fakten, jeder volle 4 s).
+// gesamtDauer sollte ein Vielfaches von faktDauer sein, sonst wird der letzte Fakt abgeschnitten.
 // Überspringen (Enter, Leertaste, Maustaste) zeigt sofort den nächsten Fakt und startet nur die
 // Faktuhr neu, die Gesamtuhr läuft unverändert weiter.
 const LADEBILDSCHIRM = {
-  gesamtDauer: 9000,      // ms, feste Gesamtlaufzeit des Ladebildschirms
+  gesamtDauer: 8000,      // ms, feste Gesamtlaufzeit des Ladebildschirms (2 × faktDauer)
   faktDauer: 4000          // ms, so lange steht ein Fakt, wenn niemand überspringt
 };
 
@@ -1415,200 +1416,180 @@ const FAKT_KATEGORIEN = {
 
 // Fakten für den Ladebildschirm. Jeder Fakt hat eine überprüfbare Quelle (Name + Link), die im
 // Ladebildschirm unter dem Text und im Pop-up „Quellen“ erscheint.
-// Pro Ladung werden ohne Eingriff 3 Fakten gezeigt; der Rest ist Puffer fürs Überspringen.
+// Aufbau: titel = die Kernaussage (kurz, mit der wichtigsten Zahl), text = ein bis zwei kurze
+// Sätze Zusatzinfo. In 4 s muss beides lesbar sein, also knapp halten.
+// Pro Ladung werden ohne Eingriff 2 Fakten gezeigt; der Rest ist Puffer fürs Überspringen.
 // Erst wenn alle Fakten einmal dran waren, wird neu gemischt (siehe naechsterFakt).
 const MEERESFAKTEN = [
   {
-    id: "schweinswal-ostsee", kategorie: "bedroht", titel: "Der letzte Wal vor der Haustür",
-    text: "Der Schweinswal ist der einzige Wal, der in deutschen Meeren heimisch ist. In der zentralen " +
-      "Ostsee leben nur noch rund 500 Tiere, die Population gilt als akut vom Aussterben bedroht. " +
-      "Viele verenden als Beifang in Stellnetzen.",
+    id: "schweinswal-ostsee", kategorie: "bedroht",
+    titel: "Nur noch rund 500 Schweinswale in der Ostsee",
+    text: "Deutschlands einziger heimischer Wal ist dort akut vom Aussterben bedroht. Viele sterben als Beifang in Stellnetzen.",
     quelle: { name: "Deutsche Umwelthilfe, 2021",
       url: "https://www.duh.de/presse/pressemitteilungen/pressemitteilung/ostsee-schweinswal-vom-aussterben-bedroht-umweltschuetzer-starten-petition-gegen-stellnetze-in-meere/" }
   },
   {
-    id: "schweinswal-nordsee", kategorie: "nordsee", titel: "Schweinswale zählen aus der Luft",
-    text: "Bei Zählflügen im Sommer 2019 schätzten Fachleute knapp 28.000 Schweinswale in der deutschen " +
-      "Nordsee. Im Schutzgebiet Sylter Außenriff stellte das Monitoring in den Jahren davor einen starken " +
-      "Rückgang fest.",
+    id: "schweinswal-nordsee", kategorie: "nordsee",
+    titel: "Knapp 28.000 Schweinswale in der Nordsee",
+    text: "So viele schätzten Fachleute 2019 nach Zählflügen. Am Sylter Außenriff ging der Bestand zuvor stark zurück.",
     quelle: { name: "Bundesamt für Naturschutz, Monitoringbericht 2019",
       url: "https://www.bfn.de/sites/default/files/2022-05/2019-monitoringbericht-schweinswale.pdf" }
   },
   {
-    id: "seehund", kategorie: "wattenmeer", titel: "Weniger Seehunde im Watt",
-    text: "Im August 2023 zählten Fachleute im Wattenmeer von Dänemark, Deutschland und den Niederlanden " +
-      "22.621 Seehunde: der niedrigste Stand seit 2010 und der dritte Rückgang in Folge. Die Ursache ist " +
-      "noch unklar. Diskutiert werden Nahrungsmangel, Störungen, Beifang und die Konkurrenz durch Kegelrobben.",
+    id: "seehund", kategorie: "wattenmeer",
+    titel: "Seehunde: tiefster Stand seit 2010",
+    text: "2023 zählten Fachleute im Wattenmeer 22.621 Tiere, der dritte Rückgang in Folge. Die Ursache ist noch unklar.",
     quelle: { name: "ORF nach Gemeinsamem Wattenmeersekretariat, 2023", url: "https://orf.at/stories/3338410/" }
   },
   {
-    id: "auster", kategorie: "rueckkehr", titel: "Die verschwundene Auster",
-    text: "Die Europäische Auster galt in der deutschen Nordsee im 20. Jahrhundert als fast ausgestorben, " +
-      "vor allem durch Überfischung. Inzwischen wird sie wieder angesiedelt, etwa auf einem Pilotriff im " +
-      "Borkum Riffgrund. Eine einzige Auster kann am Tag bis zu 240 Liter Meerwasser filtern.",
+    id: "auster", kategorie: "rueckkehr",
+    titel: "Eine Auster filtert bis zu 240 Liter am Tag",
+    text: "In der Nordsee war sie durch Überfischung fast ausgestorben. Heute wird sie wieder angesiedelt, etwa im Borkum Riffgrund.",
     quelle: { name: "Bundesamt für Naturschutz, Faltblatt 2022",
       url: "https://www.bfn.de/sites/default/files/2022-08/2022-faltblatt-die-wiederansiedlung-der-europaeischen-auster-bfn.pdf" }
   },
   {
-    id: "rochen", kategorie: "bedroht", titel: "Haie und Rochen in Not",
-    text: "In deutschen Meeren leben zehn Arten von Haien und Rochen dauerhaft. Bis auf den Kleingefleckten " +
-      "Katzenhai gelten alle als bedroht. Der Glattrochen ist hier bereits verschollen, Nagelrochen und " +
-      "Dornhai sind vom Aussterben bedroht. Hauptursache ist der Beifang in Schleppnetzen.",
+    id: "rochen", kategorie: "bedroht",
+    titel: "Fast alle Haie und Rochen sind bedroht",
+    text: "Von zehn heimischen Arten ist nur der Kleingefleckte Katzenhai nicht gefährdet. Hauptursache ist Beifang.",
     quelle: { name: "Umwelt im Unterricht (Bundesumweltministerium)",
       url: "https://www.umwelt-im-unterricht.de/hintergrund/gefaehrdete-arten-rochen-und-haie-in-deutschen-meeren/" }
   },
   {
-    id: "eissturmvogel", kategorie: "nordsee", titel: "Plastik im Vogelmagen",
-    text: "89 % der Eissturmvögel, die zwischen 2019 und 2023 tot an der deutschen Nordseeküste gefunden " +
-      "wurden, hatten Plastik im Magen. Bei rund 48 % waren es mehr als 0,1 Gramm. Das Ziel der " +
-      "Nordsee-Anrainerstaaten liegt bei höchstens 10 %.",
+    id: "eissturmvogel", kategorie: "nordsee",
+    titel: "89 % der Eissturmvögel haben Plastik im Magen",
+    text: "Untersucht wurden tote Vögel von der Nordseeküste (2019–2023). Bei 48 % war es über 0,1 g, Ziel sind höchstens 10 %.",
     quelle: { name: "Umweltbundesamt, Indikator Kunststoffmüll in der Nordsee",
       url: "https://www.umweltbundesamt.de/daten/umweltindikatoren/indikator-kunststoffmuell-in-der-nordsee" }
   },
   {
-    id: "zugvoegel", kategorie: "wattenmeer", titel: "Drehkreuz für Zugvögel",
-    text: "Das Wattenmeer ist seit 2009 UNESCO-Weltnaturerbe. Jedes Jahr rasten hier 10 bis 12 Millionen " +
-      "Zugvögel, und rund 10.000 Tier- und Pflanzenarten leben in diesem Lebensraum.",
+    id: "zugvoegel", kategorie: "wattenmeer",
+    titel: "Bis zu 12 Millionen Zugvögel rasten im Watt",
+    text: "Und das jedes Jahr. Das Wattenmeer ist seit 2009 UNESCO-Weltnaturerbe und Heimat von rund 10.000 Arten.",
     quelle: { name: "Landesportal Schleswig-Holstein",
       url: "https://www.schleswig-holstein.de/DE/landesportal/land-und-leute/landschaft-natur/wattenmeer" }
   },
   {
-    id: "stoer", kategorie: "bedroht", titel: "Der größte Fisch, den es hier nicht mehr gibt",
-    text: "Der Europäische Stör wurde bis zu 5,4 m lang und 800 kg schwer. In Deutschland gilt er seit den " +
-      "1970er-Jahren als ausgestorben. Seit 2008 setzen Forschende Jungstöre in Elbe und Havel aus, " +
-      "bis 2015 rund 19.000 Tiere.",
+    id: "stoer", kategorie: "bedroht",
+    titel: "Der Stör wurde bis zu 5,4 Meter lang",
+    text: "In Deutschland gilt er seit den 1970er-Jahren als ausgestorben. Seit 2008 werden Jungstöre in Elbe und Havel ausgesetzt.",
     quelle: { name: "Leibniz-Institut für Gewässerökologie (IGB), 2015", url: "https://idw-online.de/de/news630239" }
   },
   {
-    id: "ocean-census", kategorie: "entdeckt", titel: "866 neue Meeresarten",
-    text: "Das Forschungsprogramm Ocean Census meldete im April 2025 866 neu entdeckte Meeresarten, darunter " +
-      "einen Hai. Bis eine neue Art offiziell beschrieben ist, können über 13 Jahre vergehen. Fachleute " +
-      "schätzen, dass erst rund 10 % des Lebens im Meer bekannt sind.",
+    id: "ocean-census", kategorie: "entdeckt",
+    titel: "866 neue Meeresarten entdeckt",
+    text: "Das meldete Ocean Census 2025, darunter ein Hai. Bekannt sind erst rund 10 % des Lebens im Meer.",
     quelle: { name: "University of Essex, 2025",
       url: "https://www.essex.ac.uk/news/2025/04/14/ocean-census-and-university-of-essex-discover-866-new-species" }
   },
   {
-    id: "korallen", kategorie: "weltmeer", titel: "Die größte Korallenbleiche",
-    text: "Seit 2023 läuft die vierte weltweite Korallenbleiche. Bis zum Frühjahr 2025 waren 84 % der " +
-      "Korallenriffe der Welt in 82 Ländern und Gebieten von Hitzestress betroffen. Ursache ist ungewöhnlich " +
-      "warmes Meerwasser.",
+    id: "korallen", kategorie: "weltmeer",
+    titel: "84 % der Korallenriffe leiden unter Hitze",
+    text: "Die vierte weltweite Korallenbleiche läuft seit 2023 und hat Riffe in 82 Ländern und Gebieten erfasst.",
     quelle: { name: "NOAA und International Coral Reef Initiative, 2025",
       url: "https://maritime-executive.com/article/unprecedented-bleaching-event-affects-84-percent-of-world-s-corals" }
   },
   {
-    id: "hochsee", kategorie: "weltmeer", titel: "Schutz für die Hohe See",
-    text: "Seit dem 17. Januar 2026 gilt das UN-Hochseeabkommen. Damit lassen sich erstmals auch Schutzgebiete " +
-      "in Meeren ausweisen, die keinem Staat gehören. Es ist ein wichtiger Schritt zum Ziel, 30 % der " +
-      "Meere unter Schutz zu stellen.",
+    id: "hochsee", kategorie: "weltmeer",
+    titel: "Erstmals Schutz für die Hohe See",
+    text: "Seit Januar 2026 gilt das UN-Hochseeabkommen. Es erlaubt Schutzgebiete in Meeren, die keinem Staat gehören.",
     quelle: { name: "SeafoodSource, 2025",
       url: "https://www.seafoodsource.com/news/environment-sustainability/high-seas-treaty-crosses-ratification-threshold-enters-force-in-january-2026" }
   },
   {
-    id: "thunfisch", kategorie: "rueckkehr", titel: "Der Thunfisch ist zurück",
-    text: "Große Blauflossenthunfische waren in den nordischen Meeren über ein halbes Jahrhundert lang sehr " +
-      "selten. Inzwischen tauchen sie im Spätsommer und Herbst wieder auf. Forschende haben 18 Tiere mit " +
-      "Satellitensendern markiert, um ihre Wanderungen zu verfolgen.",
+    id: "thunfisch", kategorie: "rueckkehr",
+    titel: "Der Blauflossenthunfisch ist zurück",
+    text: "Über 50 Jahre war er in den nordischen Meeren selten. Heute taucht er wieder auf, Satellitensender verfolgen seine Wege.",
     quelle: { name: "Aarestrup et al., Scientific Reports 2022", url: "https://doi.org/10.1038/s41598-022-15819-x" }
   },
   // ----- Erweiterung: Meeresmüll, Klima, Wattenmeer -----
   {
-    id: "plastik-eintrag", kategorie: "muell", titel: "Millionen Tonnen Plastik pro Jahr",
-    text: "Aus 192 Küstenländern gelangten im Jahr 2010 schätzungsweise 4,8 bis 12,7 Millionen Tonnen " +
-      "Plastikmüll ins Meer. Grundlage der Schätzung sind Daten zu Abfallmengen, Bevölkerungsdichte und " +
-      "Abfallentsorgung der einzelnen Länder.",
+    id: "plastik-eintrag", kategorie: "muell",
+    titel: "Bis zu 12,7 Millionen Tonnen Plastik ins Meer",
+    text: "So viel Plastikmüll gelangte 2010 schätzungsweise aus 192 Küstenländern ins Meer, in nur einem Jahr.",
     quelle: { name: "Jambeck et al., Science 2015", url: "https://doi.org/10.1126/science.1260352" }
   },
   {
-    id: "geisternetze", kategorie: "muell", titel: "Geisternetze im Müllstrudel",
-    text: "Im Großen Pazifischen Müllteppich treiben auf 1,6 Millionen Quadratkilometern mindestens 79.000 " +
-      "Tonnen Plastik. Mindestens 46 % dieser Masse sind verlorene oder zurückgelassene Fischernetze, " +
-      "sogenannte Geisternetze.",
+    id: "geisternetze", kategorie: "muell",
+    titel: "Fast die Hälfte ist altes Fischernetz",
+    text: "Mindestens 46 % des Großen Pazifischen Müllteppichs sind verlorene Netze, sogenannte Geisternetze.",
     quelle: { name: "Lebreton et al., Scientific Reports 2018", url: "https://doi.org/10.1038/s41598-018-22939-w" }
   },
   {
-    id: "tiefsee-tuete", kategorie: "muell", titel: "Plastik am tiefsten Punkt",
-    text: "Im Marianengraben filmte ein Tauchroboter eine Plastiktüte in 10.898 Metern Tiefe. Eine " +
-      "Auswertung von 30 Jahren Tiefseeaufnahmen zeigte außerdem: 89 % der gefundenen Plastikteile " +
-      "waren Einwegprodukte.",
+    id: "tiefsee-tuete", kategorie: "muell",
+    titel: "Eine Plastiktüte in 10.898 Metern Tiefe",
+    text: "Ein Tauchroboter filmte sie im Marianengraben. 89 % des gefundenen Tiefseeplastiks waren Einwegprodukte.",
     quelle: { name: "Chiba et al., Marine Policy 2018", url: "https://doi.org/10.1016/j.marpol.2018.03.022" }
   },
   {
-    id: "spuelsaum", kategorie: "muell", titel: "Müll im Spülsaum",
-    text: "Auf 100 Metern Nordseestrand finden sich im Mittel knapp 400 Müllteile, an der Ostsee sind es " +
-      "rund 70. Mindestens 70 % davon sind Kunststoffe.",
+    id: "spuelsaum", kategorie: "muell",
+    titel: "Rund 400 Müllteile auf 100 m Strand",
+    text: "So viel liegt im Mittel an der Nordsee, an der Ostsee rund 70. Mindestens 70 % davon sind Kunststoff.",
     quelle: { name: "Umweltbundesamt, Runder Tisch Meeresmüll",
       url: "https://www.umweltbundesamt.de/presse/pressemitteilungen/runder-tisch-gegen-meeresmuell-geht-in-die-zweite" }
   },
   {
-    id: "reifenabrieb", kategorie: "muell", titel: "Mikroplastik von der Straße",
-    text: "Reifenabrieb ist die größte Quelle für Mikroplastik in Deutschland. Fachleute schätzen die Menge " +
-      "auf 60.000 bis 100.000 Tonnen im Jahr, rechnerisch rund 1 Kilogramm pro Kopf. Über Luft und " +
-      "Regenwasser gelangt er in Flüsse und schließlich ins Meer.",
+    id: "reifenabrieb", kategorie: "muell",
+    titel: "Reifenabrieb: Mikroplastik-Quelle Nr. 1",
+    text: "In Deutschland bis zu 100.000 Tonnen im Jahr. Über Regenwasser und Flüsse gelangt er bis ins Meer.",
     quelle: { name: "Fraunhofer UMSICHT, 2024", url: "https://idw-online.de/de/news826927" }
   },
   {
-    id: "sauerstoff", kategorie: "weltmeer", titel: "Jeder zweite Atemzug",
-    text: "Etwa die Hälfte des Sauerstoffs, der auf der Erde entsteht, stammt aus dem Meer. Den größten " +
-      "Teil produziert Plankton, also winzige Algen, Pflanzen und Bakterien, die im Wasser treiben und " +
-      "Photosynthese betreiben.",
+    id: "sauerstoff", kategorie: "weltmeer",
+    titel: "Jeder zweite Atemzug kommt aus dem Meer",
+    text: "Etwa die Hälfte des Sauerstoffs der Erde stammt aus dem Meer, vor allem von winzigem Plankton.",
     quelle: { name: "NOAA Ocean Service", url: "https://oceanservice.noaa.gov/facts/ocean-oxygen.html" }
   },
   {
-    id: "versauerung", kategorie: "klima", titel: "Das Meer wird saurer",
-    text: "Das Meer nimmt rund 30 % des Kohlendioxids auf, das in die Atmosphäre gelangt. Dadurch ist der " +
-      "pH-Wert an der Meeresoberfläche seit Beginn der Industrialisierung um etwa 0,1 gesunken. Das " +
-      "entspricht rund 30 % mehr Säure und erschwert Muscheln und Korallen den Bau ihrer Kalkschalen.",
+    id: "versauerung", kategorie: "klima",
+    titel: "Das Meer ist rund 30 % saurer geworden",
+    text: "Es schluckt etwa 30 % des CO₂ aus der Luft. Muscheln und Korallen fällt der Bau ihrer Kalkschalen dadurch schwerer.",
     quelle: { name: "NOAA, Ocean Acidification",
       url: "https://www.noaa.gov/education/resource-collections/ocean-coasts/ocean-acidification" }
   },
   {
-    id: "ozeanwaerme", kategorie: "klima", titel: "Der größte Wärmespeicher",
-    text: "Rund 90 % der zusätzlichen Wärme, die durch den menschengemachten Treibhauseffekt entsteht, hat " +
-      "das Meer aufgenommen. Das meiste davon steckt in den oberen 700 Metern.",
+    id: "ozeanwaerme", kategorie: "klima",
+    titel: "90 % der Extra-Wärme steckt im Meer",
+    text: "Das Meer hat fast die gesamte zusätzliche Wärme des Treibhauseffekts aufgenommen, vor allem in den oberen 700 m.",
     quelle: { name: "NASA, Vital Signs: Ocean Warming", url: "https://climate.nasa.gov/vital-signs/ocean-warming/" }
   },
   {
-    id: "seegras", kategorie: "klima", titel: "Klimaschützer am Meeresgrund",
-    text: "Seegraswiesen bedecken nur etwa 0,2 % des Meeresbodens, speichern aber rund 10 % des im Meer " +
-      "gebundenen Kohlenstoffs. Pro Fläche können sie Kohlenstoff bis zu 35-mal schneller binden als " +
-      "tropischer Regenwald. Auch im Wattenmeer wachsen Seegraswiesen.",
+    id: "seegras", kategorie: "klima",
+    titel: "Seegras bindet CO₂ bis zu 35-mal schneller",
+    text: "Schneller als tropischer Regenwald, pro Fläche. Auf 0,2 % des Meeresbodens speichert es 10 % des Kohlenstoffs im Meer.",
     quelle: { name: "UN-Umweltprogramm (UNEP)",
       url: "https://www.unep.org/news-and-stories/story/seagrass-secret-weapon-fight-against-global-heating" }
   },
   {
-    id: "watt-weltrekord", kategorie: "wattenmeer", titel: "Das größte Watt der Welt",
-    text: "Das Wattenmeer von Dänemark, Deutschland und den Niederlanden ist das größte zusammenhängende " +
-      "System aus Sand- und Schlickwatt der Erde. Es gehört zu den letzten großen Gezeitenlandschaften, " +
-      "in denen natürliche Prozesse weitgehend ungestört ablaufen.",
+    id: "watt-weltrekord", kategorie: "wattenmeer",
+    titel: "Das größte Watt der Welt liegt vor unserer Küste",
+    text: "Nirgends gibt es mehr zusammenhängendes Sand- und Schlickwatt. Die Natur läuft hier weitgehend ungestört ab.",
     quelle: { name: "UNESCO-Welterbezentrum", url: "https://whc.unesco.org/en/list/1314" }
   },
   {
-    id: "kegelrobbe", kategorie: "rueckkehr", titel: "Rekord bei den Kegelrobben",
-    text: "Die Kegelrobbe ist das größte Raubtier Deutschlands. Im Frühjahr 2024 zählten Fachleute im " +
-      "Wattenmeer und auf Helgoland 11.515 Tiere, 9 % mehr als im Vorjahr. Im Winter davor kamen 2.547 " +
-      "Jungtiere zur Welt.",
+    id: "kegelrobbe", kategorie: "rueckkehr",
+    titel: "Rekord: 11.515 Kegelrobben gezählt",
+    text: "So viele lebten 2024 im Wattenmeer und auf Helgoland, 9 % mehr als im Vorjahr. Sie ist Deutschlands größtes Raubtier.",
     quelle: { name: "Gemeinsames Wattenmeersekretariat, 2024", url: "https://waddensea-worldheritage.org/node/2239" }
   },
   {
-    id: "schutzgebiete", kategorie: "nordsee", titel: "Fast die Hälfte geschützt",
-    text: "Rund 45 % der deutschen Meeresgebiete in Nord- und Ostsee sind als Schutzgebiete ausgewiesen, " +
-      "in der Nordsee etwa 43 %, in der Ostsee etwa 51 % (Stand April 2024). Die küstenfernen Gebiete " +
-      "gehören zum europäischen Schutzgebietsnetz Natura 2000.",
+    id: "schutzgebiete", kategorie: "nordsee",
+    titel: "45 % unserer Meere sind Schutzgebiete",
+    text: "In der Nordsee sind es etwa 43 %, in der Ostsee etwa 51 % (Stand April 2024).",
     quelle: { name: "Bundesamt für Naturschutz, Hintergrundpapier 2026",
       url: "https://www.bfn.de/sites/default/files/2026-01/2026%2001%2016%20Hintergrund%20Meere_Schutzgebiete_aktualisiert_pac.pdf" }
   },
   {
-    id: "kabeljau", kategorie: "nordsee", titel: "Der Kabeljau zieht nach Norden",
-    text: "Mit dem wärmeren Wasser verändert sich die Nordsee: Kälteliebende Fische wie der Kabeljau weichen " +
-      "nach Norden aus, wärmeliebende Arten aus dem Süden wandern ein. Am Südrand seines Verbreitungsgebiets " +
-      "ist der Kabeljau inzwischen fast verschwunden.",
+    id: "kabeljau", kategorie: "nordsee",
+    titel: "Der Kabeljau flieht nach Norden",
+    text: "Das wärmere Wasser vertreibt ihn, wärmeliebende Arten wandern ein. Im Süden seines Gebiets ist er fast verschwunden.",
     quelle: { name: "Umweltbundesamt, Monitoringbericht Klimaanpassung",
       url: "https://www.umweltbundesamt.de/monitoring-zur-das/handlungsfelder/fischerei/fi-i-1/indikator" }
   },
   {
-    id: "tiefsee-gesehen", kategorie: "entdeckt", titel: "Kaum ein Blick in die Tiefe",
-    text: "Weniger als 0,001 % des Tiefseebodens haben Menschen bisher mit eigenen Augen oder Kameras " +
-      "gesehen. Das entspricht etwa der Fläche des kleinsten US-Bundesstaats Rhode Island.",
+    id: "tiefsee-gesehen", kategorie: "entdeckt",
+    titel: "Weniger als 0,001 % der Tiefsee gesehen",
+    text: "Mehr haben Menschen bisher nicht vom Tiefseeboden beobachtet: eine Fläche etwa so groß wie Rhode Island.",
     quelle: { name: "NPR nach Bell et al., Science Advances 2025",
       url: "https://www.npr.org/2025/05/07/nx-s1-5387502/deep-seafloor-ocean-mapped-rhode-island" }
   }
@@ -3134,9 +3115,14 @@ function mischfarbe(a, b, t) {
   return "rgb(" + a.map(function (c, i) { return Math.round(c + (b[i] - c) * t); }).join(",") + ")";
 }
 
-function meerFarbe(meeresgesundheit) {
+// Wasserfarbe nach Meeresgesundheit: trübes Graugrün (schlecht) bis klares Blau wie im Titelbild (gut).
+// flach = am Ufer, tief = offene See
+function meerFarben(meeresgesundheit) {
   const t = begrenzen((meeresgesundheit - 25) / 65, 0, 1);
-  return mischfarbe([139, 168, 152], [74, 152, 206], t);
+  return {
+    flach: mischfarbe([164, 180, 150], [98, 166, 206], t),
+    tief: mischfarbe([104, 128, 112], [36, 92, 136], t)
+  };
 }
 
 // ---------- Hilfsfunktionen für die Kartengrafiken ----------
@@ -3211,20 +3197,198 @@ function abwasserFahneSvg(ox, oy, groesse) {
     return glatterPfad(links.concat(rechts.reverse()));
   };
 
-  const deckkraft = begrenzen(0.14 + groesse / 70, 0.15, 0.45);
-  let s = '<path d="' + umriss(1, 0.4) + '" fill="#8A6A3B" opacity="' + deckkraft.toFixed(2) + '" ' +
-    'stroke="#8A6A3B" stroke-opacity="0.45" stroke-width="0.8" stroke-dasharray="3 3"/>';
-  s += '<path d="' + umriss(0.62, 1.7) + '" fill="#6E5230" opacity="' + (deckkraft * 0.9).toFixed(2) + '"/>';
-  // Schwebstoffe im Wasser
+  const deckkraft = begrenzen(0.18 + groesse / 70, 0.2, 0.5);
+  // Die Fahne „atmet“ langsam vom Rohr aus (Drehpunkt = Rohrmündung), der dunkle Kern pulsiert
+  let s = '<g class="ka-abwasser" style="transform-origin:' + ox + "px " + oy + "px;" + animStil(9) + '">';
+  s += '<path d="' + umriss(1, 0.4) + '" fill="#8A6A3B" opacity="' + deckkraft.toFixed(2) + '" filter="url(#kaWeich)"/>';
+  s += '<path d="' + umriss(1, 0.4) + '" fill="none" stroke="#8A6A3B" stroke-opacity="0.4" stroke-width="0.8" stroke-dasharray="3 3"/>';
+  s += '<path class="ka-abwasser-kern" style="' + animStil(6) + '" d="' + umriss(0.62, 1.7) + '" fill="#6E5230" fill-opacity="' +
+    (deckkraft * 0.9).toFixed(2) + '" filter="url(#kaWeich)"/>';
+  s += "</g>";
+  // Wirbel an der Rohrmündung: kleine Ringe, die sich ausbreiten und verblassen
+  for (let i = 0; i < 2; i++) {
+    s += '<ellipse class="ka-wirbel" style="' + animStil(3.2, i * 1.6) + '" cx="' + ox + '" cy="' + (oy - 2) +
+      '" rx="5" ry="2.6" fill="none" stroke="#E9DCC0" stroke-width="0.9"/>';
+  }
+  // Schwebstoffe: treiben von der Mündung die Fahne entlang hinaus und lösen sich auf
   const r = zufallsfolge(91);
-  const teilchen = Math.round(3 + groesse / 3);
+  const teilchen = Math.round(4 + groesse / 3);
   for (let i = 0; i < teilchen; i++) {
-    const s1 = 0.25 + r() * 0.65;
+    const s1 = 0.55 + r() * 0.4;
     const q = (r() - 0.5) * breite * 0.9 * s1;
-    s += '<circle cx="' + (ox + dx * laenge * s1 + nx * q).toFixed(1) + '" cy="' + (oy + dy * laenge * s1 + ny * q).toFixed(1) +
-      '" r="' + (0.9 + r() * 0.8).toFixed(1) + '" fill="#5B4428" opacity="0.55"/>';
+    const zx = dx * laenge * s1 + nx * q;
+    const zy = dy * laenge * s1 + ny * q;
+    const dauer = 6 + r() * 3;
+    s += '<circle class="ka-teilchen" cx="' + ox + '" cy="' + oy + '" r="' + (0.9 + r() * 0.8).toFixed(1) + '" fill="#5B4428" ' +
+      'style="--zx:' + zx.toFixed(1) + "px;--zy:" + zy.toFixed(1) + "px;" + animStil(dauer, i * dauer / teilchen) + '"/>';
   }
   return s;
+}
+
+// ---------- Bewegte Teile der Karte: Fische, Rauch, Abwasser ----------
+// Die Bewegungen laufen als CSS-Animationen (style.css, Abschnitt „Seekarte: Bewegung“).
+// Die Karte wird nach jeder Entscheidung neu gezeichnet. Damit dabei nichts springt, bekommt jede
+// Animation eine negative Verzögerung aus der laufenden Uhr: Sie steht nach dem Neuzeichnen genau
+// dort, wo sie ohne Neuzeichnen gerade wäre. Bei „Bewegung reduzieren“ steht alles still.
+function animStil(dauer, versatz) {
+  const t = performance.now() / 1000 + (versatz || 0);
+  return "animation-duration:" + dauer.toFixed(2) + "s;animation-delay:-" + (t % dauer).toFixed(2) + "s;";
+}
+
+// Lichtreflexe auf dem Meer wie im Titelbild: kurze, helle Striche, nach unten seltener
+function meerGlitzerSvg() {
+  const r = zufallsfolge(73);
+  let d = "";
+  for (let i = 0; i < 34; i++) {
+    const x = r() * KARTE_B;
+    const y = kuestenlinie(x) + STRAND_BREITE + 14 + Math.pow(r(), 1.3) * 180;
+    if (y > KARTE_H - 4) continue;
+    d += "M" + x.toFixed(1) + "," + y.toFixed(1) + " h" + (6 + r() * 18).toFixed(1) + " ";
+  }
+  return '<path d="' + d + '" stroke="#FFFFFF" stroke-opacity="0.22" stroke-width="1.2" stroke-linecap="round"/>';
+}
+
+// Wiese: weiche, etwas dunklere Grasflecken und kleine grüne Grasbüschel im Binnenland
+// (hinter der Dünenkante). Hotels, Fabrik und Fluss bleiben frei.
+function wiesenSvg() {
+  const r = zufallsfolge(83);
+  let s = '<g filter="url(#kaWeich)" fill="#A9BC7C">';
+  [[60, 40, 38, 14], [300, 30, 46, 12], [250, 76, 40, 10], [380, 60, 30, 10], [600, 18, 34, 9], [770, 60, 26, 12]].forEach(function (f) {
+    s += '<ellipse cx="' + f[0] + '" cy="' + f[1] + '" rx="' + f[2] + '" ry="' + f[3] + '" opacity="0.45"/>';
+  });
+  s += "</g>";
+  const farben = ["#7E9A4E", "#91AB5B", "#6B8743", "#A3B868"];
+  s += '<g fill="none" stroke-linecap="round" stroke-width="0.8" opacity="0.8">';
+  for (let i = 0; i < 90; i++) {
+    const x = 6 + r() * (KARTE_B - 12);
+    const y = 6 + r() * (kuestenlinie(x) - 26);
+    if (x > 118 && x < 218) continue;                              // Fluss
+    if (x > 420 && x < 760 && y > 14) continue;                    // Ort und Fabrik
+    let d = "";
+    for (let j = 0; j < 3; j++) {
+      const neigung = (j - 1) * 1.6 + (r() - 0.5);
+      const hoehe = 3 + r() * 2.5;
+      d += "M" + (x + j * 0.8).toFixed(1) + "," + y.toFixed(1) + " l" + neigung.toFixed(1) + "," + (-hoehe).toFixed(1) + " ";
+    }
+    s += '<path d="' + d + '" stroke="' + farben[Math.floor(r() * farben.length)] + '"/>';
+  }
+  return s + "</g>";
+}
+
+// Bäume auf den freien Landflächen: runde Laubbäume und schlanke Kiefern, flach gezeichnet
+// mit Licht von oben links (wie die Sonne im Titelbild) und weichem Schatten nach rechts unten.
+// Die Plätze halten Abstand zu Infopunkten, Personen, Gebäuden, Fluss und den Müll-Schwerpunkten.
+const BAEUME = [
+  // x, y (Fuß), Größe, Art
+  [22, 44, 1.25, "laub"], [52, 27, 1.05, "kiefer"], [80, 66, 1.35, "laub"], [104, 36, 1, "laub"], [38, 88, 0.95, "kiefer"],
+  [224, 26, 1.05, "kiefer"], [294, 78, 1.25, "laub"], [396, 72, 1, "kiefer"],
+  [400, 28, 1, "laub"], [568, 24, 0.85, "laub"], [786, 28, 1.1, "kiefer"], [772, 56, 0.95, "laub"]
+];
+
+function baumSvg(x, y, g, art) {
+  const t = function (wert) { return wert.toFixed(1); };
+  let s = '<ellipse cx="' + t(x + 4 * g) + '" cy="' + t(y) + '" rx="' + t(8 * g) + '" ry="' + t(2.6 * g) + '" fill="#0B2238" opacity="0.16"/>';
+  if (art === "kiefer") {
+    s += '<rect x="' + t(x - 0.9 * g) + '" y="' + t(y - 5 * g) + '" width="' + t(1.8 * g) + '" height="' + t(5 * g) + '" fill="#6E5236"/>';
+    [[0, 9, 6.5], [-5.5, 8, 5.2], [-10.5, 6.5, 4]].forEach(function (ebene, i) {
+      const unten = y - 4 * g + ebene[0] * g;
+      const oben = unten - ebene[1] * g;
+      const b = ebene[2] * g;
+      s += '<path d="M' + t(x - b) + "," + t(unten) + " L" + t(x) + "," + t(oben) + " L" + t(x + b) + "," + t(unten) + ' Z" fill="' +
+        (i === 2 ? "#4F7444" : "#456A3C") + '"/>' +
+        '<path d="M' + t(x - b) + "," + t(unten) + " L" + t(x) + "," + t(oben) + " L" + t(x - b * 0.15) + "," + t(unten) + ' Z" fill="#6C9157"/>';
+    });
+    return s;
+  }
+  s += '<rect x="' + t(x - 1 * g) + '" y="' + t(y - 7 * g) + '" width="' + t(2 * g) + '" height="' + t(7 * g) + '" rx="' + t(0.6 * g) + '" fill="#7A5A3A"/>';
+  s += '<g fill="#5F8243">' +
+    '<circle cx="' + t(x - 4 * g) + '" cy="' + t(y - 10 * g) + '" r="' + t(5 * g) + '"/>' +
+    '<circle cx="' + t(x + 4.2 * g) + '" cy="' + t(y - 10.5 * g) + '" r="' + t(5 * g) + '"/>' +
+    '<circle cx="' + t(x) + '" cy="' + t(y - 15 * g) + '" r="' + t(6 * g) + '"/></g>';
+  s += '<g fill="#7FA157">' +
+    '<circle cx="' + t(x - 5 * g) + '" cy="' + t(y - 11.5 * g) + '" r="' + t(3.2 * g) + '"/>' +
+    '<circle cx="' + t(x - 1.6 * g) + '" cy="' + t(y - 16.8 * g) + '" r="' + t(3.8 * g) + '"/></g>';
+  s += '<circle cx="' + t(x - 2.8 * g) + '" cy="' + t(y - 18 * g) + '" r="' + t(1.6 * g) + '" fill="#A3BE73"/>';
+  return s;
+}
+
+function baeumeSvg() {
+  return BAEUME.slice().sort(function (a, b) { return a[1] - b[1]; }).map(function (b) {
+    return baumSvg(b[0], b[1], b[2], b[3]);
+  }).join("");
+}
+
+// Strandhafer auf der Dünenkante: kleine Büschel aus drei bis fünf Halmen (Farben wie im Titelbild).
+// Hotels, Fabrik und Fluss bleiben frei.
+function strandhaferSvg() {
+  const r = zufallsfolge(47);
+  const farben = ["#A8A05E", "#8D8A4B", "#B4A86A", "#6E7442"];
+  const frei = function (x, y) {
+    if (x > 120 && x < 230) return false;                        // Fluss und Mündung
+    if (x > 420 && x < 770 && y < 104) return false;             // Ort, Fabrik, Steg
+    return true;
+  };
+  let s = '<g fill="none" stroke-linecap="round" opacity="0.85">';
+  for (let i = 0; i < 70; i++) {
+    const x = 6 + r() * (KARTE_B - 12);
+    const naheKueste = r() < 0.75;
+    const y = naheKueste ? kuestenlinie(x) - 1 - r() * 12 : 10 + r() * (kuestenlinie(x) - 30);
+    if (!frei(x, y)) continue;
+    const farbe = farben[Math.floor(r() * farben.length)];
+    const halme = 3 + Math.floor(r() * 3);
+    let d = "";
+    for (let j = 0; j < halme; j++) {
+      const neigung = (j - (halme - 1) / 2) * 2.2 + (r() - 0.3) * 1.8;
+      const hoehe = 5 + r() * 4;
+      d += "M" + (x + j * 0.7).toFixed(1) + "," + y.toFixed(1) + " q" + (neigung * 0.3).toFixed(1) + "," + (-hoehe * 0.6).toFixed(1) +
+        " " + neigung.toFixed(1) + "," + (-hoehe).toFixed(1) + " ";
+    }
+    s += '<path d="' + d + '" stroke="' + farbe + '" stroke-width="0.9"/>';
+  }
+  return s + "</g>";
+}
+
+// Fisch als helle Silhouette (Kopf links bei richtung = 1). Er schwimmt ein Stück geradeaus,
+// wendet und schwimmt zurück; die Schwanzflosse schlägt dabei leicht.
+const FISCH_KOERPER = "M-8,0 C-6,-3.4 1,-4.2 6.5,-1.2 L6.5,1.2 C1,4.2 -6,3.4 -8,0 Z";
+const FISCH_SCHWANZ = "M6,0 L11.5,-4 Q10.2,0 11.5,4 Z";
+
+function fischZeichen(farbe) {
+  return '<path d="' + FISCH_KOERPER + '" fill="' + farbe + '"/>' +
+    '<path class="ka-fisch-schwanz" d="' + FISCH_SCHWANZ + '" fill="' + farbe + '"/>' +
+    '<circle cx="-5" cy="-0.8" r="0.7" fill="#24506F" opacity="0.7"/>';
+}
+
+function fischSvg(x, y, richtung, nummer) {
+  const r = zufallsfolge(200 + nummer * 13);
+  const weg = 26 + r() * 30;
+  // nicht über den Kartenrand hinausschwimmen
+  const sx = richtung === 1 ? Math.max(x, 14 + weg) : Math.min(x, KARTE_B - 14 - weg);
+  const dauer = 14 + r() * 10;
+  return '<g transform="translate(' + sx.toFixed(1) + "," + y.toFixed(1) + ") scale(" + richtung + ',1)">' +
+    '<g class="ka-fisch" style="--weg:-' + weg.toFixed(1) + "px;" + animStil(dauer, r() * dauer) + '" opacity="0.88">' +
+    fischZeichen("#EAF4F8") + "</g></g>";
+}
+
+// Oberkante des Schornsteins einer Fabrik (gleiche Maße wie in fabrikSvg)
+function schornsteinSpitze(x, y, b, h) {
+  const kb = Math.max(6, b * 0.145);
+  return { x: x + b * 0.76 + kb / 2, y: y - (h + 2) };
+}
+
+// Rauchwolken: steigen aus dem Schornstein, treiben mit dem Wind nach rechts, wachsen und verblassen
+function rauchSvg(spitze, groesse, versatz) {
+  const wolken = 5;
+  const dauer = 6.5;
+  let s = '<g filter="url(#kaRauchWeich)">';
+  for (let i = 0; i < wolken; i++) {
+    const zx = (30 + i * 3) * groesse;               // Wind von links: Rauch zieht flach nach rechts
+    const zy = -(9 + (i % 2) * 3) * groesse;
+    s += '<circle class="ka-rauch" cx="' + spitze.x.toFixed(1) + '" cy="' + (spitze.y + 1).toFixed(1) + '" r="' + (5.2 * groesse).toFixed(1) +
+      '" fill="' + (i % 2 ? "#8F9BA4" : "#7A8791") + '" style="--zx:' + zx.toFixed(1) + "px;--zy:" + zy.toFixed(1) + "px;" +
+      animStil(dauer, versatz + i * dauer / wolken) + '"/>';
+  }
+  return s + "</g>";
 }
 
 // Großes Hotel: Fenster in Reihen, Schild „Hotel“, Eingang mit Vordach, Fahne
@@ -3730,23 +3894,50 @@ function seekarteSvg(z) {
   const tinte = "#12304A";
   let s = "";
 
+  const farben = meerFarben(k.meeresgesundheit);
   s += '<svg viewBox="0 0 ' + KARTE_B + " " + KARTE_H + '" xmlns="http://www.w3.org/2000/svg" ' +
     'preserveAspectRatio="xMidYMid slice" focusable="false">';
   s += "<defs>" +
     '<pattern id="schraffur" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">' +
     '<line x1="0" y1="0" x2="0" y2="9" stroke="#B0307A" stroke-width="1.2" opacity="0.35"/></pattern>' +
-    '<linearGradient id="tiefe" x1="0" y1="0" x2="0" y2="1">' +
-    '<stop offset="0" stop-color="#ffffff" stop-opacity="0.28"/>' +
-    '<stop offset="1" stop-color="#0b2238" stop-opacity="0.12"/></linearGradient>' +
+    // Meer: hell am Ufer, dunkler zur offenen See (wie das Meer im Titelbild)
+    '<linearGradient id="kaMeer" x1="0" y1="' + (104 + STRAND_BREITE) + '" x2="0" y2="' + KARTE_H + '" gradientUnits="userSpaceOnUse">' +
+    '<stop offset="0" stop-color="' + farben.flach + '"/><stop offset="1" stop-color="' + farben.tief + '"/></linearGradient>' +
+    '<linearGradient id="kaLand" x1="0" y1="0" x2="0" y2="1">' +
+    '<stop offset="0" stop-color="#C9D6AC"/><stop offset="1" stop-color="#DCDAAE"/></linearGradient>' +
+    '<linearGradient id="kaSand" x1="0" y1="90" x2="0" y2="140" gradientUnits="userSpaceOnUse">' +
+    '<stop offset="0" stop-color="#EDE0BF"/><stop offset="1" stop-color="#DCC89C"/></linearGradient>' +
+    '<linearGradient id="kaDuene" x1="0" y1="80" x2="0" y2="118" gradientUnits="userSpaceOnUse">' +
+    '<stop offset="0" stop-color="#C7C08F" stop-opacity="0"/><stop offset="1" stop-color="#B8A477" stop-opacity="0.75"/></linearGradient>' +
+    '<linearGradient id="kaFluss" x1="0" y1="0" x2="0" y2="1">' +
+    '<stop offset="0" stop-color="#8FC3DE"/><stop offset="1" stop-color="' + farben.flach + '"/></linearGradient>' +
+    // Sonnenlicht oben links, wie die Sonne im Titelbild
+    '<radialGradient id="kaLicht" cx="40" cy="-30" r="420" gradientUnits="userSpaceOnUse">' +
+    '<stop offset="0" stop-color="#FFF8E4" stop-opacity="0.45"/><stop offset="0.5" stop-color="#FFF8E4" stop-opacity="0.1"/>' +
+    '<stop offset="1" stop-color="#FFF8E4" stop-opacity="0"/></radialGradient>' +
+    '<filter id="kaSchatten" x="-20%" y="-20%" width="150%" height="160%">' +
+    '<feDropShadow dx="1.6" dy="2.2" stdDeviation="1.4" flood-color="#0B2238" flood-opacity="0.28"/></filter>' +
+    '<filter id="kaWeich" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.6"/></filter>' +
+    '<filter id="kaRauchWeich" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="0.9"/></filter>' +
     "</defs>";
 
-  // Meer mit Tiefenverlauf und Tiefenlinien
-  s += '<rect width="' + KARTE_B + '" height="' + KARTE_H + '" fill="' + meerFarbe(k.meeresgesundheit) + '"/>';
-  s += '<rect width="' + KARTE_B + '" height="' + KARTE_H + '" fill="url(#tiefe)"/>';
-  [52, 104, 160].forEach(function (versatz, i) {
-    s += '<polyline points="' + linienPunkte(versatz) + '" fill="none" stroke="' + tinte + '" ' +
-      'stroke-opacity="0.22" stroke-width="1"' + (i === 1 ? ' stroke-dasharray="6 5"' : "") + "/>";
+  // Meer mit Tiefenverlauf, sanften Dünungslinien und Lichtreflexen
+  s += '<rect width="' + KARTE_B + '" height="' + KARTE_H + '" fill="url(#kaMeer)"/>';
+  [52, 104, 160].forEach(function (versatz) {
+    s += '<polyline points="' + linienPunkte(versatz) + '" fill="none" stroke="#FFFFFF" ' +
+      'stroke-opacity="0.1" stroke-width="1.3"/>';
   });
+  s += meerGlitzerSvg();
+
+  // Fische (Artenvielfalt): schwimmen langsam hin und her, siehe fischSvg
+  const r3 = zufallsfolge(57);
+  const fische = Math.round(k.artenvielfalt / 9);
+  for (let i = 0; i < 12; i++) {
+    const x = 40 + r3() * 700;
+    const y = 214 + r3() * 90;
+    const richtung = r3() > 0.5 ? 1 : -1;
+    if (i < fische) s += fischSvg(x, y, richtung, i);
+  }
 
   // Abwasserfahne vor dem Rohr (größer und dunkler bei hoher Abwasserbelastung)
   const abwasser = Math.max(0, DRUCK_START.wasser + w.druckWasser);
@@ -3773,10 +3964,21 @@ function seekarteSvg(z) {
     });
   }
 
-  // Strand und Land
-  s += '<polygon points="0,0 ' + linienPunkte(STRAND_BREITE) + ' 800,0" fill="#EAD7A4"/>';
-  s += '<polygon points="0,0 ' + linienPunkte(0) + ' 800,0" fill="#D5E0C3"/>';
-  s += '<polyline points="' + linienPunkte(STRAND_BREITE) + '" fill="none" stroke="' + tinte + '" stroke-width="1.4"/>';
+  // Strand und Land: Sandverlauf, nasser Sand und Schaumkante am Wasser, Dünenkante mit Strandhafer
+  s += '<polyline points="' + linienPunkte(STRAND_BREITE + 5) + '" fill="none" stroke="' + farben.flach + '" ' +
+    'stroke-width="12" stroke-opacity="0.55" filter="url(#kaWeich)"/>';
+  s += '<polygon points="0,0 ' + linienPunkte(STRAND_BREITE) + ' 800,0" fill="url(#kaSand)"/>';
+  s += '<polyline points="' + linienPunkte(STRAND_BREITE - 2.5) + '" fill="none" stroke="#C4AD80" stroke-width="5" stroke-opacity="0.45"/>';
+  s += '<polyline points="' + linienPunkte(STRAND_BREITE + 0.6) + '" fill="none" stroke="#FFFFFF" stroke-width="2.2" ' +
+    'stroke-opacity="0.9" stroke-linejoin="round"/>';
+  s += '<polyline points="' + linienPunkte(STRAND_BREITE + 5) + '" fill="none" stroke="#FFFFFF" stroke-width="1.2" ' +
+    'stroke-opacity="0.45" stroke-dasharray="38 14 10 24" stroke-linecap="round"/>';
+  s += '<polygon points="0,0 ' + linienPunkte(0) + ' 800,0" fill="url(#kaLand)"/>';
+  s += '<polygon points="0,' + (kuestenlinie(0) - 16).toFixed(1) + " " + linienPunkte(-16) + " " +
+    linienPunkte(0).split(" ").reverse().join(" ") + '" fill="url(#kaDuene)"/>';
+  s += wiesenSvg();
+  s += strandhaferSvg();
+  s += baeumeSvg();
 
   // Brutzone am Strand: rot gestrichelter Bereich links der Flussmündung, mit Schild.
   // Das Schild steht links, damit Müllfänger und Infopunkte am Strand frei bleiben.
@@ -3794,9 +3996,15 @@ function seekarteSvg(z) {
 
   // Fluss mit Mündung
   const fluss = flussAbschnitte();
-  s += '<path d="M' + fluss[0][0].join(",") + " C" + fluss[0].slice(1).map(function (p) { return p.join(","); }).join(" ") +
-    " C" + fluss[1].slice(1).map(function (p) { return p[0] + "," + p[1].toFixed(1); }).join(" ") +
-    '" fill="none" stroke="#86B9D6" stroke-width="16" stroke-linecap="round"/>';
+  const flussD = "M" + fluss[0][0].join(",") + " C" + fluss[0].slice(1).map(function (p) { return p.join(","); }).join(" ") +
+    " C" + fluss[1].slice(1).map(function (p) { return p[0] + "," + p[1].toFixed(1); }).join(" ");
+  // Der Fluss endet an der Schaumkante und geht dort ins Meer über (Ausschnitt nur über Land und Strand)
+  s += '<clipPath id="kaFlussRaum"><polygon points="0,0 ' + linienPunkte(STRAND_BREITE + 1) + ' 800,0"/></clipPath>';
+  s += '<g clip-path="url(#kaFlussRaum)">' +
+    '<path d="' + flussD + '" fill="none" stroke="#B8A477" stroke-opacity="0.45" stroke-width="20" stroke-linecap="round"/>' +
+    '<path d="' + flussD + '" fill="none" stroke="url(#kaFluss)" stroke-width="16" stroke-linecap="round"/>' +
+    '<path d="' + flussD + '" fill="none" stroke="#FFFFFF" stroke-opacity="0.25" stroke-width="3" stroke-linecap="round" stroke-dasharray="18 12"/>' +
+    "</g>";
 
   // Müll im Fluss: der Fluss trägt Müll aus dem Hinterland ins Meer
   s += flussMuellSvg(z, wirksam("muellfaenger"));
@@ -3844,29 +4052,35 @@ function seekarteSvg(z) {
   if (gewerbe) {
     haeuser.push({ x: 428, y: 40, gross: true }, { x: 468, y: 64, gross: false }, { x: 552, y: 74, gross: false });
   }
+  // Abwasserrohr zum Meer (unter den Gebäuden, damit es aus der Fabrik kommt)
+  const yRohrEnde = (kuestenlinie(652) + STRAND_BREITE + 6).toFixed(1);
+  s += '<line x1="652" y1="76" x2="652" y2="' + yRohrEnde + '" stroke="#4D5B66" stroke-width="3.4" stroke-linecap="round"/>' +
+    '<line x1="652" y1="76" x2="652" y2="' + yRohrEnde + '" stroke="#A9B3BA" stroke-width="1.4" stroke-linecap="round"/>';
+
+  // Rauch steigt aus den Schornsteinen, solange das CO2-Gesetz noch nicht wirkt.
+  // Er liegt unter den Gebäuden und quillt so oben aus dem Schornstein heraus.
+  if (!wirksam("co2")) {
+    s += rauchSvg(schornsteinSpitze(616, 46, 62, 30), 1, 0);
+    if (gewerbe) s += rauchSvg(schornsteinSpitze(688, 56, 46, 24), 0.75, 1.3);
+  }
+
+  // Gebäude mit weichem Schatten
+  s += '<g filter="url(#kaSchatten)">';
   haeuser.forEach(function (h) {
     s += h.gross ? hotelGrossSvg(h.x, h.y, tinte) : hotelKleinSvg(h.x, h.y, tinte);
   });
-
-  // Fabrik mit Schornstein; Rauch nur, solange das CO2-Gesetz noch nicht wirkt
+  // Fabrik mit Schornstein
   s += fabrikSvg(616, 46, 62, 30, 4, 7.6, tinte);
-  if (!wirksam("co2")) {
-    s += '<circle cx="668" cy="10" r="5" fill="#8C99A3" opacity="0.6"/>' +
-      '<circle cx="677" cy="5" r="6" fill="#8C99A3" opacity="0.45"/>' +
-      '<circle cx="689" cy="3" r="7" fill="#8C99A3" opacity="0.3"/>';
-  }
   // Gewerbegebiet erweitert: zweite, kleinere Fabrik rechts daneben
   if (gewerbe) s += fabrikSvg(688, 56, 46, 24, 3, 6.2, tinte);
+  s += "</g>";
 
-  // Abwasserrohr zum Meer
-  s += '<line x1="652" y1="76" x2="652" y2="' + (kuestenlinie(652) + STRAND_BREITE + 6).toFixed(1) +
-    '" stroke="' + tinte + '" stroke-width="2"/>';
 
   // Hafen: Steg mit Holzplanken und Pfählen; mit Kreuzfahrtanleger wird er zum T
   const yHafen = kuestenlinie(742) + STRAND_BREITE;
   const kreuzfahrt = istUmgesetzt(z, "kreuzfahrt");
   const steg = stegSvg(yHafen - 4, kreuzfahrt, tinte);
-  s += steg.svg;
+  s += '<g filter="url(#kaSchatten)">' + steg.svg;
   if (istUmgesetzt(z, "netzrueckgabe")) {
     s += '<rect x="736" y="' + (yHafen + 6).toFixed(1) + '" width="10" height="8" rx="1.2" fill="#2E8B57" stroke="' + tinte + '" stroke-width="0.6"/>';
   }
@@ -3881,6 +4095,7 @@ function seekarteSvg(z) {
   if (istUmgesetzt(z, "quoten")) {
     s += kutterSvg(300, 205, 0.8, true, tinte) + kutterSvg(765, 300, 0.8, false, tinte);
   }
+  s += "</g>";
 
   // Mülleimer: verteilt am Strand, je einer am Hotel und an der Fabrik
   if (istUmgesetzt(z, "schilder")) {
@@ -3896,24 +4111,14 @@ function seekarteSvg(z) {
   // Treibgut im Wasser (Eintrag): Plastikflaschen und -tüten nahe dem Strand
   s += treibgutSvg(treibgutAnzahl(z));
 
-  // Fische (Artenvielfalt)
-  const r3 = zufallsfolge(57);
-  const fische = Math.round(k.artenvielfalt / 9);
-  for (let i = 0; i < 12; i++) {
-    const x = 40 + r3() * 700;
-    const y = 214 + r3() * 90;
-    const richtung = r3() > 0.5 ? 1 : -1;
-    if (i < fische) {
-      s += '<g transform="translate(' + x.toFixed(1) + "," + y.toFixed(1) + ") scale(" + richtung + ',1)" fill="' + tinte + '" opacity="0.72">' +
-        '<ellipse rx="7.5" ry="3.2"/><path d="M6,0 L12,-4 L12,4 Z"/></g>';
-    }
-  }
-
   // Müll am Strand und an Land, gebündelt an den Verursachern.
   // Hinten liegende Teile zuerst, damit vordere sie überdecken.
   strandMuellListe(z).concat(landMuellListe(z)).sort(function (a, b) { return a.y - b.y; }).forEach(function (m) {
     s += muellSymbolSvg(m.form, m.x, m.y, m.winkel, m.groesse);
   });
+
+  // Licht von oben links, wie die Sonne im Titelbild
+  s += '<rect width="' + KARTE_B + '" height="' + KARTE_H + '" fill="url(#kaLicht)" pointer-events="none"/>';
 
   // Bereich der Runde: gestrichelte Umrandung in der Farbe des Bereichs (wie im Spaltenkopf der Ökologie)
   if (!z.beendet) s += bereichUmrandungSvg(regionDerRunde(z.runde));
@@ -3942,7 +4147,10 @@ function bereichUmrandungSvg(region) {
   } else {
     punkte = kante(STRAND_BREITE + r).concat([(KARTE_B - r) + "," + (KARTE_H - r), r + "," + (KARTE_H - r)]);
   }
-  return '<polygon points="' + punkte.join(" ") + '" fill="' + stil.farbe + '" fill-opacity="0.08" stroke="' +
+  // heller Saum unter den Strichen: bleibt auf dunklem Wasser wie auf hellem Sand sichtbar
+  return '<polygon points="' + punkte.join(" ") + '" fill="none" stroke="#FFFFFF" stroke-opacity="0.55" ' +
+    'stroke-width="4.6" stroke-linejoin="round" pointer-events="none"/>' +
+    '<polygon points="' + punkte.join(" ") + '" fill="' + stil.farbe + '" fill-opacity="0.08" stroke="' +
     stil.farbe + '" stroke-width="2.6" stroke-dasharray="10 6" stroke-linejoin="round" pointer-events="none"/>';
 }
 
@@ -3964,8 +4172,8 @@ function seekarteAnzeigen() {
     [legendenSymbol("apfel", 0, 1.1), "Essensreste", arten.essen],
     [legendenSymbol("tuete", 10, 0.8), "Plastiktüte", treibgutAnzahl(z) > 0],
     [legendenSvg(muelleimerSvg(0, 0, "#12304A"), "-7 -12.5 14 13.5"), "Mülleimer", istUmgesetzt(z, "schilder")],
-    [legendenSvg('<g fill="#12304A" opacity="0.72"><ellipse rx="7.5" ry="3.2"/><path d="M6,0 L12,-4 L12,4 Z"/></g>',
-      "-8.5 -6 21 12"), "Fische", true],
+    [legendenSvg('<rect x="-10.5" y="-7" width="25" height="14" rx="3.5" fill="#3F84B5"/>' + fischZeichen("#EAF4F8"),
+      "-10.5 -7 25 14"), "Fische", true],
     ["lg-wasser", "Wasserfarbe, Meeresgesundheit", true],
     ["lg-abwasser", "Abwasserfahne", DRUCK_START.wasser + w.druckWasser > 6],
     ["lg-schutz", "Meeresschutzgebiet", istUmgesetzt(z, "schutzgebiet")],
@@ -5022,18 +5230,18 @@ function startbildschirmVerbergen() {
 }
 
 // ---------- Ladebildschirm ----------
-// Ablauf: Name bestätigen → ladebildschirmStarten() → genau LADEBILDSCHIRM.gesamtDauer (12 s) lang
+// Ablauf: Name bestätigen → ladebildschirmStarten() → genau LADEBILDSCHIRM.gesamtDauer (8 s) lang
 // Meeresfakten → danach startet das Spiel (Einführung).
 //
 // Zwei voneinander unabhängige Uhren:
-//   1. Gesamtuhr  (gesamtDauer, 12 s): startet einmal und wird NIE verlängert oder verkürzt.
+//   1. Gesamtuhr  (gesamtDauer, 8 s): startet einmal und wird NIE verlängert oder verkürzt.
 //                 Sie steuert den großen Ladebalken und das Ende des Ladebildschirms.
 //   2. Faktuhr    (faktDauer, 4 s): läuft pro Fakt. Ist sie abgelaufen, erscheint der nächste Fakt.
 //                 Beim Überspringen startet sie sofort neu. Ohne Eingriff: Fakt 1 bei 0 s,
-//                 Fakt 2 bei 4 s, Fakt 3 bei 8 s, Ende bei 12 s.
+//                 Fakt 2 bei 4 s, Ende bei 8 s. Die Faktuhr ist unsichtbar (kein Balken über dem Fakt).
 //
 // Die Uhren laufen über setTimeout und Zeitstempel (performance.now), nicht über die Bildrate.
-// requestAnimationFrame zeichnet nur die Balken. So bleiben die 12 s auch bei ruckelnder
+// requestAnimationFrame zeichnet nur den Ladebalken. So bleiben die 8 s auch bei ruckelnder
 // Darstellung oder einem Tab im Hintergrund exakt (der Browser pausiert dort nur das Zeichnen).
 //
 // Alle Eingabe-Listener hängen an einem AbortController: Ein einziges abort() beim Beenden
@@ -5044,14 +5252,14 @@ function startbildschirmVerbergen() {
 //   startZeit    performance.now() beim Start; Ende = startZeit + gesamtDauer
 //   faktStart    performance.now(), seit der aktuelle Fakt steht
 //   fakt         der angezeigte Fakt
-//   anzahl       wie viele Fakten in dieser Ladung schon gezeigt wurden (für „Fakt 2“)
+//   anzahl       wie viele Fakten in dieser Ladung schon gezeigt wurden
 //   endeTimer    setTimeout-ID der Gesamtuhr
 //   faktTimer    setTimeout-ID der Faktuhr
 //   schleife     requestAnimationFrame-ID der Zeichenschleife
 //   abbruch      AbortController der Eingabe-Listener
 //   stapel       gemischte Fakten; gezogen wird von oben, leer → neu mischen.
 //                So wiederholt sich kein Fakt, bevor alle einmal dran waren.
-//   fertig       Rückruf, der genau einmal nach Ablauf der 12 s läuft
+//   fertig       Rückruf, der genau einmal nach Ablauf der 8 s läuft
 const lade = {
   aktiv: false,
   startZeit: 0, faktStart: 0,
@@ -5066,12 +5274,6 @@ const lade = {
 function ladeGesamtFortschritt(verstrichen, einstellung) {
   const e = einstellung || LADEBILDSCHIRM;
   return Math.min(1, Math.max(0, verstrichen / e.gesamtDauer));
-}
-
-// Anteil 0…1 der verstrichenen Zeit des aktuellen Fakts (für die Faktuhr in der Karte)
-function faktFortschritt(seitFaktStart, einstellung) {
-  const e = einstellung || LADEBILDSCHIRM;
-  return Math.min(1, Math.max(0, seitFaktStart / e.faktDauer));
 }
 
 // Phase 0, 1 oder 2 der Gesamtzeit (je ein Drittel); bestimmt die Statuszeile unter dem Balken.
@@ -5134,7 +5336,7 @@ function ladebildschirmStarten(fertig) {
   lade.schleife = requestAnimationFrame(ladeSchleife);
 }
 
-// Trennstriche im großen Balken: dort wechselt der Fakt, wenn niemand überspringt (4 s, 8 s)
+// Trennstriche im Ladebalken: dort wechselt der Fakt, wenn niemand überspringt (bei 4 s)
 function ladeMarkenSetzen() {
   const anzahl = Math.round(LADEBILDSCHIRM.gesamtDauer / LADEBILDSCHIRM.faktDauer);
   let html = "";
@@ -5152,11 +5354,11 @@ function ladeNaechsterFakt() {
   lade.fakt = naechsterFakt(lade.fakt);
   lade.anzahl += 1;
   lade.faktStart = performance.now();
-  ladeFaktZeigen(lade.fakt, lade.anzahl);
+  ladeFaktZeigen(lade.fakt);
   lade.faktTimer = setTimeout(ladeNaechsterFakt, LADEBILDSCHIRM.faktDauer);
 }
 
-function ladeFaktZeigen(f, nummer) {
+function ladeFaktZeigen(f) {
   const kat = FAKT_KATEGORIEN[f.kategorie];
   const karte = el("ladeKarte");
   karte.classList.remove("fakt-ein");
@@ -5170,7 +5372,6 @@ function ladeFaktZeigen(f, nummer) {
   quelle.textContent = f.quelle.name;
   quelle.href = f.quelle.url;
   quelle.title = f.quelle.url;                     // volle Adresse beim Überfahren
-  el("ladeNummer").textContent = "Fakt " + nummer;
   karte.classList.add("fakt-ein");
 }
 
@@ -5181,12 +5382,11 @@ function ladeSchleife(zeit) {
   lade.schleife = requestAnimationFrame(ladeSchleife);
 }
 
-// Zeichnet großen Balken, Prozentzahl, Statuszeile und Faktuhr für den Zeitpunkt "jetzt"
+// Zeichnet Ladebalken, Prozentzahl und Statuszeile für den Zeitpunkt "jetzt"
 function ladeZeichnen(jetzt) {
   const verstrichen = jetzt - lade.startZeit;
   const gesamt = ladeGesamtFortschritt(verstrichen);
   el("ladeFuellung").style.transform = "scaleX(" + gesamt.toFixed(4) + ")";
-  el("ladeFaktUhr").style.transform = "scaleX(" + (1 - faktFortschritt(jetzt - lade.faktStart)).toFixed(4) + ")";
 
   const prozent = Math.round(gesamt * 100);
   if (prozent !== lade.prozent) {                  // Text und ARIA nur bei Änderung anfassen
@@ -5202,7 +5402,7 @@ function ladeZeichnen(jetzt) {
 }
 
 // Aktuellen Fakt überspringen: sofort der nächste Fakt, Faktuhr startet neu.
-// Die Gesamtuhr bleibt unberührt, das Ende nach 12 s verschiebt sich also nicht.
+// Die Gesamtuhr bleibt unberührt, das Ende nach 8 s verschiebt sich also nicht.
 function ladeUeberspringen() {
   if (!lade.aktiv) return;
   ladeNaechsterFakt();
@@ -6134,7 +6334,7 @@ function oberflaecheVerbinden() {
   });
 
   // Ladebildschirm: Die Listener fürs Überspringen meldet ladebildschirmStarten() selbst an
-  // und ladeAufraeumen() nach Ablauf der 12 s wieder ab (siehe ladeListenerAnmelden).
+  // und ladeAufraeumen() nach Ablauf der 8 s wieder ab (siehe ladeListenerAnmelden).
 }
 
 // Prüft, ob index.html und style.css zur Version dieses Skripts passen.
@@ -6142,7 +6342,7 @@ function oberflaecheVerbinden() {
 const BENOETIGTE_ELEMENTE = ["anzeigeWissen", "auswahlUebersicht", "popupInfo", "infoOk", "popupQuiz",
   "quizWeiter", "popupZwischenbilanz", "zbWeiter", "massnahmenListe", "personen", "muellInfoKnopf",
   "popupMuell", "muellInhalt", "muellSchliessen", "entscheidungen", "startSzene", "startBilder", "ladebildschirm",
-  "ladeKarte", "ladeFuellung", "ladeBalken", "ladeMarken", "ladeFaktUhr", "ladeWeiter", "startVollbild", "popupQuellen", "popupUeber", "bildNachweis", "ueberBewertung", "startSonne", "startWolken", "startMeer", "startWindsack", "startHalme",
+  "ladeKarte", "ladeFuellung", "ladeBalken", "ladeMarken", "ladeWeiter", "startVollbild", "popupQuellen", "popupUeber", "bildNachweis", "ueberBewertung", "startSonne", "startWolken", "startMeer", "startWindsack", "startHalme",
   "popupOtter", "otterOk", "otterInhalt", "zielZusatz"];
 
 function versionPruefen() {
@@ -6182,7 +6382,7 @@ if (typeof module !== "undefined" && module.exports) {
     abschlussFragen: abschlussFragen, quizAntwortWerten: quizAntwortWerten, FRAGEN: FRAGEN, INFOPUNKTE: INFOPUNKTE,
     istUmgesetzt: istUmgesetzt, einnahmenBerechnen: einnahmenBerechnen,
     MEERESFAKTEN: MEERESFAKTEN, FAKT_KATEGORIEN: FAKT_KATEGORIEN, LADEBILDSCHIRM: LADEBILDSCHIRM,
-    ladeGesamtFortschritt: ladeGesamtFortschritt, faktFortschritt: faktFortschritt, ladePhase: ladePhase,
+    ladeGesamtFortschritt: ladeGesamtFortschritt, ladePhase: ladePhase,
     naechsterFakt: naechsterFakt, faktenZiehen: faktenZiehen
   };
 
