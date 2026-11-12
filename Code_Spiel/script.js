@@ -896,7 +896,7 @@ const FOERDERPROGRAMME = [
 // deren Bedingung zutrifft und die noch nicht gesagt wurde.
 // wenn(z, w): z = Spielzustand, w = aktive Wirkungen der Runde
 const PERSONEN = {
-  strand: { name: "Merle", rolle: "betreibt den Strandkiosk", x: 41.3, y: 36.5, farbe: "#E2A92B", kleidung: "kiosk" },
+  strand: { name: "Merle", rolle: "betreibt den Strandkiosk", x: 70.8, y: 36.2, farbe: "#E2A92B", kleidung: "kiosk" },
   meer:   { name: "Jannik", rolle: "Kutterfischer im Hafen", x: 92.6, y: 56.5, farbe: "#1D4F8C", kleidung: "fischer" },
   land:   { name: "Ole", rolle: "Schichtleiter im Gewerbegebiet", x: 74.5, y: 28.5, farbe: "#5E7D4E", kleidung: "arbeiter" }
 };
@@ -2716,19 +2716,15 @@ function bereichSymbolSvg(region) {
   return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + inhalt + "</svg>";
 }
 
-// Kopf des Entscheidungsfensters: Bereich dieser Runde, dazu der Anteil seiner Müllquelle am neuen Müll
+// Kopf des Entscheidungsfensters: Bereich dieser Runde
 function bereichBannerHtml(z, region) {
   const stil = BEREICH_STIL[region];
-  const quelle = QUELLEN.find(function (q) { return q.id === region; });
-  const anteil = z.eintrag && z.eintrag.gesamt > 0 ? Math.round(100 * z.eintrag[region] / z.eintrag.gesamt) : null;
   return '<div class="bereich-banner" style="--bereich:' + stil.farbe + ";--bereich-flaeche:" + stil.flaeche + '">' +
       '<span class="bereich-symbol">' + bereichSymbolSvg(region) + "</span>" +
       '<span class="bereich-text">' +
         '<span class="bereich-label">Bereich dieser Runde</span>' +
         '<strong class="bereich-name">' + bereichName(region) + "</strong>" +
       "</span>" +
-      (anteil === null ? "" : '<span class="bereich-quelle">Müllquelle hier: ' + quelle.name + ",<br>" + anteil +
-        " % des neuen Mülls</span>") +
     "</div>";
 }
 
@@ -3147,7 +3143,7 @@ function markerAnzeigen() {
 // Müllsymbole an Strand und Land = Strandmüll und Eintrag, gebündelt an den Verursachern (Glas bei der
 // Industrie, Essensreste bei den Hotels, Plastik an Flussmündung und Kiosk), Müll im Fluss und
 // schwimmender Plastikmüll = Eintrag, Fische = Artenvielfalt.
-// Beschriftet sind nur Fabrik und große Hotels; die Legende steht darunter.
+// Beschriftet sind nur Fabrik, große Hotels und der Kiosk; die Legende steht darunter.
 const KARTE_B = 800;
 const KARTE_H = 320;
 const STRAND_BREITE = 22;
@@ -3270,8 +3266,8 @@ function glatterPfad(punkte) {
 // Abwasserfahne: beginnt schmal am Rohr, wird weiter draußen breiter und
 // franst unregelmäßig aus. groesse = Belastung durch Abwasser (Punkte).
 function abwasserFahneSvg(ox, oy, groesse) {
-  const laenge = 26 + groesse * 3.2;
-  const breite = 8 + groesse * 1.5;               // halbe Breite an der breitesten Stelle
+  const laenge = Math.min(2 * (26 + groesse * 3.2), (KARTE_H - 8 - oy) * 1.07);   // doppelte Größe, endet vor dem Kartenrand
+  const breite = 2 * (8 + groesse * 1.5);         // halbe Breite an der breitesten Stelle
   const ax = -0.38;                                // Fahne treibt leicht nach links
   const ay = 1;
   const al = Math.hypot(ax, ay);
@@ -3602,7 +3598,7 @@ function fischSvg(art, x, y, richtung, nummer) {
   // nicht über den Kartenrand hinausschwimmen
   const sx = richtung === 1 ? Math.max(x, 18 + weg) : Math.min(x, KARTE_B - 18 - weg);
   const dauer = art.boden ? 22 + r() * 12 : 14 + r() * 10;
-  const g = (art.groesse || 1) * 1.15;
+  const g = (art.groesse || 1) * 1.5;
   let inhalt = "";
   if (art.schwarm) {
     [[0, 0], [8, -5], [10, 4.5]].slice(0, art.schwarm).forEach(function (v) {
@@ -3720,48 +3716,105 @@ function rauchSvg(spitze, groesse, versatz) {
   return s + "</g>";
 }
 
-// Großes Hotel: Flachdach mit Dachaufbau und Fahne, Schild „Hotel“, Fensterreihen mit Balkonen,
-// Eingang mit Vordach. x, y = linke obere Ecke der früheren Vorderansicht (34 × 30), Unterkante bleibt.
-function hotelGrossSvg(x, y) {
-  const b = 34;
-  const h = 25;
-  const t = 14;
-  const oben = y + 30 - h;
-  const unten = oben + h;
-  const d = schraeg(t);
+// Großes Hotel: Flachdach mit Dachaufbau und Fahne, Schild „Hotel“, drei Fensterreihen mit Balkonen,
+// Eingang mit Vordach. x = linke Kante der Vorderseite, unten = Unterkante (Boden).
+const HOTEL_MASSE = { b: 46, h: 32, t: 18 };
+
+function hotelGrossSvg(x, unten) {
+  const b = HOTEL_MASSE.b;
+  const h = HOTEL_MASSE.h;
+  const t = HOTEL_MASSE.t;
+  const oben = unten - h;
   let s = quaderSvg(x, oben, b, h, t, { front: "url(#kaWandHell)", seite: "#D8CCB3", dach: "#EEE9DE" });
-  // Dachfläche mit Attika (heller Rand) und Dachaufbau
-  const innen = function (k, rand) {
+  // Dachfläche mit Attika (heller Rand)
+  const dachPunkt = function (k, dx) {
     const p = schraeg(t * k);
-    return [x + rand + p.x, oben + p.y];
+    return [x + dx + p.x, oben + p.y];
   };
-  s += '<path d="' + vieleck([innen(0.12, 1.4), innen(0.88, 1.4), [innen(0.88, 1.4)[0] + b - 2.8, innen(0.88, 1.4)[1]],
-    [innen(0.12, 1.4)[0] + b - 2.8, innen(0.12, 1.4)[1]]]) + '" fill="#DAD3C4"/>';
+  s += '<path d="' + vieleck([dachPunkt(0.12, 1.6), dachPunkt(0.88, 1.6), dachPunkt(0.88, b - 1.6), dachPunkt(0.12, b - 1.6)]) + '" fill="#DAD3C4"/>';
+  // Dachaufbau
   const aufbau = schraeg(t * 0.3);
-  s += quaderSvg(x + 5 + aufbau.x, oben + aufbau.y - 3, 8, 3, t * 0.4, { front: "#E6DDCB", seite: "#C9BC9F", dach: "#F4F0E7" });
+  s += quaderSvg(x + 6 + aufbau.x, oben + aufbau.y - 4, 11, 4, t * 0.4, { front: "#E6DDCB", seite: "#C9BC9F", dach: "#F4F0E7" });
   // Fahne hinten rechts auf dem Dach
   const f = schraeg(t * 0.7);
-  const fx = x + b - 4 + f.x;
+  const fx = x + b - 5 + f.x;
   const fy = oben + f.y;
-  s += '<line x1="' + fx.toFixed(1) + '" y1="' + fy.toFixed(1) + '" x2="' + fx.toFixed(1) + '" y2="' + (fy - 10).toFixed(1) +
-    '" stroke="#5E5A52" stroke-width="0.8"/>' +
-    '<path d="M' + fx.toFixed(1) + "," + (fy - 10).toFixed(1) + " q3,-0.6 6,1.4 q-3,0.8 -6,1.8 Z\" fill=\"#E2A92B\"/>";
+  s += '<line x1="' + fx.toFixed(1) + '" y1="' + fy.toFixed(1) + '" x2="' + fx.toFixed(1) + '" y2="' + (fy - 12).toFixed(1) +
+    '" stroke="#5E5A52" stroke-width="0.9"/>' +
+    '<path d="M' + fx.toFixed(1) + "," + (fy - 12).toFixed(1) + " q3.6,-0.7 7.2,1.7 q-3.6,1 -7.2,2.2 Z\" fill=\"#E2A92B\"/>";
   // Schild
-  s += '<rect x="' + (x + 4) + '" y="' + (oben + 2) + '" width="' + (b - 8) + '" height="6.6" rx="1" fill="#1D4F8C"/>' +
-    '<text x="' + (x + b / 2) + '" y="' + (oben + 7.1) + '" text-anchor="middle" font-size="5.8" font-weight="700" ' +
-    'letter-spacing="0.4" fill="#ffffff">Hotel</text>';
-  // Fenster: zwei Reihen à vier mit Balkonbrüstung, dazu Fenster auf der Seitenwand
-  for (let reihe = 0; reihe < 2; reihe++) {
-    const fy2 = oben + 10.5 + reihe * 5.6;
-    for (let spalte = 0; spalte < 4; spalte++) s += fensterSvg(x + 3.5 + spalte * 7.4, fy2, 4.2, 3.4);
+  s += '<rect x="' + (x + 6) + '" y="' + (oben + 2.4) + '" width="' + (b - 12) + '" height="8" rx="1.2" fill="#1D4F8C"/>' +
+    '<text x="' + (x + b / 2) + '" y="' + (oben + 8.6) + '" text-anchor="middle" font-size="7" font-weight="700" ' +
+    'letter-spacing="0.5" fill="#ffffff">Hotel</text>';
+  // Fenster: drei Reihen à fünf mit Balkonbrüstung, dazu Fenster auf der Seitenwand
+  for (let reihe = 0; reihe < 3; reihe++) {
+    const fy2 = oben + 13 + reihe * 5.6;
+    for (let spalte = 0; spalte < 5; spalte++) s += fensterSvg(x + 3.6 + spalte * 8.3, fy2, 5, 3.4);
     s += '<rect x="' + (x + 2.4) + '" y="' + (fy2 + 3.2).toFixed(1) + '" width="' + (b - 4.8) + '" height="1" fill="#FFFFFF" opacity="0.75"/>';
-    s += seitenFensterSvg(x + b, fy2, t * 0.18, t * 0.42, 3.2) + seitenFensterSvg(x + b, fy2, t * 0.58, t * 0.82, 3.2);
+    s += seitenFensterSvg(x + b, fy2, t * 0.16, t * 0.4, 3.2) + seitenFensterSvg(x + b, fy2, t * 0.58, t * 0.82, 3.2);
   }
   // Eingang mit Vordach
-  s += '<rect x="' + (x + b / 2 - 2.8) + '" y="' + (unten - 4.6) + '" width="5.6" height="4.6" fill="#3D4F5E"/>' +
-    '<path d="' + vieleck([[x + b / 2 - 5, unten - 5.4], [x + b / 2 + 5, unten - 5.4], [x + b / 2 + 5.8, unten - 6.8], [x + b / 2 - 4.2, unten - 6.8]]) +
+  s += '<rect x="' + (x + b / 2 - 3.2) + '" y="' + (unten - 5) + '" width="6.4" height="5" fill="#3D4F5E"/>' +
+    '<path d="' + vieleck([[x + b / 2 - 6, unten - 5.8], [x + b / 2 + 6, unten - 5.8], [x + b / 2 + 6.8, unten - 7.4], [x + b / 2 - 5.2, unten - 7.4]]) +
     '" fill="#2F64A0"/>' +
-    '<rect x="' + (x + b / 2 - 5) + '" y="' + (unten - 5.4) + '" width="10" height="0.9" fill="#1D4F8C"/>';
+    '<rect x="' + (x + b / 2 - 6) + '" y="' + (unten - 5.8) + '" width="12" height="1" fill="#1D4F8C"/>';
+  return s;
+}
+
+// Strandkiosk: kleine Holzbude mit Pultdach, Schild „KIOSK“ auf dem Dach, rot-weiß gestreifte Markise
+// über der Verkaufsklappe, Tresen mit Getränken, Eis-Aufsteller davor.
+// x = linke Kante der Vorderseite, unten = Unterkante (Boden).
+const KIOSK_MASSE = { b: 22, h: 12, t: 10 };
+
+function kioskSvg(x, unten) {
+  const b = KIOSK_MASSE.b;
+  const h = KIOSK_MASSE.h;
+  const t = KIOSK_MASSE.t;
+  const oben = unten - h;
+  const d = schraeg(t);
+  let s = quaderSvg(x, oben, b, h, t, { front: "url(#kaHolz)", seite: "#A9805A", dach: "#5E7F8F" });
+  // senkrechte Bretterfugen
+  let fugen = "";
+  for (let fx = x + 3; fx < x + b; fx += 3) fugen += "M" + fx + "," + (oben + 0.4) + " V" + (unten - 0.4) + " ";
+  s += '<path d="' + fugen + '" stroke="#8A6440" stroke-opacity="0.35" stroke-width="0.4"/>';
+  // Verkaufsklappe mit Tresen und Getränken
+  s += '<rect x="' + (x + 3) + '" y="' + (oben + 3.4) + '" width="' + (b - 6) + '" height="5" fill="#4A3A2C"/>' +
+    '<rect x="' + (x + 2.4) + '" y="' + (oben + 8.2) + '" width="' + (b - 4.8) + '" height="1.3" fill="#E9D7B4"/>';
+  [[4.4, "#E8662A"], [6.4, "#6FA8CB"], [8.4, "#2E8B57"], [13.6, "#E2A92B"], [15.6, "#C8382E"]].forEach(function (g) {
+    s += '<rect x="' + (x + g[0]) + '" y="' + (oben + 6.4) + '" width="1.2" height="1.8" rx="0.3" fill="' + g[1] + '"/>';
+  });
+  // Markise: rot-weiß gestreift, steht schräg nach vorne heraus
+  const markise = [[x - 1, oben + 4.6], [x + b + 1, oben + 4.6], [x + b, oben + 0.6], [x, oben + 0.6]];
+  s += '<path d="' + vieleck(markise) + '" fill="#FFFFFF"' + BAU_KANTE + "/>";
+  let streifen = "";
+  for (let i = 0; i < 6; i++) {
+    const a = (b + 2) / 6;
+    if (i % 2) continue;
+    streifen += vieleck([[x - 1 + i * a, oben + 4.6], [x - 1 + (i + 1) * a, oben + 4.6],
+      [x + (i + 1) * b / 6, oben + 0.6], [x + i * b / 6, oben + 0.6]]) + " ";
+  }
+  s += '<path d="' + streifen + '" fill="#D9473C"/>';
+  let zacken = "M" + (x - 1) + "," + (oben + 4.6);
+  for (let i = 0; i < 6; i++) {
+    const a = (b + 2) / 6;
+    zacken += " q" + (a / 2).toFixed(2) + ",2 " + a.toFixed(2) + ",0";
+  }
+  s += '<path d="' + zacken + '" fill="#D9473C" stroke="#9E2E26" stroke-opacity="0.5" stroke-width="0.4"/>';
+  // Schild „KIOSK“ auf dem Dach (steht in der Mitte der Dachfläche)
+  const m = schraeg(t * 0.45);
+  const sx = x + 1.5 + m.x;
+  const sy = oben + m.y - 7.6;
+  s += '<path d="M' + (sx + 3) + "," + (sy + 7.6) + " V" + (sy + 6) + " M" + (sx + b - 6) + "," + (sy + 7.6) + " V" + (sy + 6) +
+    '" stroke="#5E5A52" stroke-width="0.8"/>';
+  s += '<rect x="' + sx.toFixed(1) + '" y="' + sy.toFixed(1) + '" width="' + (b - 3) + '" height="6.4" rx="1.2" fill="#E2A92B" stroke="#9A6E14" stroke-opacity="0.6" stroke-width="0.5"/>' +
+    '<text x="' + (sx + (b - 3) / 2).toFixed(1) + '" y="' + (sy + 5).toFixed(1) + '" text-anchor="middle" font-size="5.2" font-weight="700" ' +
+    'letter-spacing="0.5" fill="#12304A">KIOSK</text>';
+  // Eis-Aufsteller rechts vor der Bude
+  const ax = x + b + d.x * 0.2 + 3;
+  s += '<path d="M' + (ax - 2) + "," + unten + " L" + ax + "," + (unten - 6.4) + " L" + (ax + 2) + "," + unten + '" fill="none" stroke="#5E5A52" stroke-width="0.6"/>' +
+    '<rect x="' + (ax - 2.2) + '" y="' + (unten - 7.4) + '" width="4.4" height="4.6" rx="0.6" fill="#FFFFFF" stroke="#6C7880" stroke-opacity="0.6" stroke-width="0.4"/>' +
+    '<path d="M' + (ax - 0.9) + "," + (unten - 5.4) + " L" + ax + "," + (unten - 3.2) + " L" + (ax + 0.9) + "," + (unten - 5.4) + ' Z" fill="#D9A55A"/>' +
+    '<circle cx="' + ax + '" cy="' + (unten - 5.9) + '" r="1" fill="#F2A7B8"/>';
   return s;
 }
 
@@ -3960,11 +4013,11 @@ function muellSymbolSvg(form, x, y, winkel, groesse, schwimmt) {
 // Infopunkte und Personen stehen in Prozent der Karte; hier in Karteneinheiten umgerechnet.
 function muellSperrflaechen(z) {
   const flaechen = [
-    [612, 26, 74, 54], [482, 22, 44, 44], [527, 38, 26, 28],     // Fabrik, Hotel, Gästehaus
+    [612, 26, 74, 54], [466, 32, 60, 56], [518, 76, 42, 28],     // Fabrik, Hotel, Kiosk
     [730, 90, 22, 80], [647, 76, 10, 34]                           // Hafensteg, Abwasserrohr
   ];
   if (istUmgesetzt(z, "gewerbe")) {
-    flaechen.push([684, 46, 58, 38], [424, 30, 44, 44], [465, 52, 26, 28], [549, 62, 26, 28]);
+    flaechen.push([684, 46, 58, 38], [412, 30, 60, 52], [516, 40, 30, 32], [496, 16, 30, 30]);
   }
   INFOPUNKTE.forEach(function (p) {
     flaechen.push([p.x * 8 - 15, p.y * 3.2 - 14, 30, 38]);       // Knopf und Beschriftung
@@ -4010,12 +4063,12 @@ function abstandZumFluss(x, y, punkte) {
 const MUELL_HOTSPOTS = {
   strand: [
     { id: "muendung",  x: 160, b: 140, arten: { plastik: 1 }, plaetze: 8 },
-    { id: "kiosk",     x: 350, b: 62,  arten: { plastik: 0.85, essen: 0.15 }, plaetze: 5 },
-    { id: "hotels",    x: 420, b: 170, arten: { essen: 0.7, plastik: 0.3 }, plaetze: 10 },
+    { id: "hotels",    x: 316, b: 188, arten: { essen: 0.7, plastik: 0.3 }, plaetze: 10 },
+    { id: "kiosk",     x: 506, b: 92,  arten: { plastik: 0.85, essen: 0.15 }, plaetze: 5 },
     { id: "industrie", x: 600, b: 128, arten: { glas: 0.75, plastik: 0.25 }, plaetze: 8 }
   ],
   land: [
-    { id: "hotels",    x: 505, y: 74, rx: 92, ry: 24, arten: { essen: 0.75, plastik: 0.25 }, plaetze: 8, quelle: "strand" },
+    { id: "hotels",    x: 470, y: 70, rx: 96, ry: 24, arten: { essen: 0.75, plastik: 0.25 }, plaetze: 8, quelle: "strand" },
     { id: "industrie", x: 664, y: 80, rx: 86, ry: 30, arten: { glas: 0.65, plastik: 0.35 }, plaetze: 7, quelle: "land" },
     { id: "fluss", amFluss: true, arten: { plastik: 0.8, glas: 0.2 }, plaetze: 6, quelle: "land" }
   ]
@@ -4344,10 +4397,10 @@ function bojeSvg(x, y) {
 
 // Mülleimer: verteilt am Strand, einer am Hotel, einer an der Fabrik (y = Boden)
 function muelleimerOrte() {
-  const strand = [40, 262, 395, 575, 700].map(function (x) {
+  const strand = [40, 262, 395, 553, 700].map(function (x) {
     return { x: x, y: kuestenlinie(x) + 13 };
   });
-  return strand.concat([{ x: 528, y: 82 }, { x: 628, y: 97 }]);
+  return strand.concat([{ x: 460, y: 90 }, { x: 628, y: 97 }]);
 }
 
 function seekarteSvg(z) {
@@ -4393,6 +4446,8 @@ function seekarteSvg(z) {
     '<stop offset="0.45" stop-color="#AEB7BD"/><stop offset="1" stop-color="#7C878F"/></linearGradient>' +
     '<linearGradient id="kaGlas" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#C6E0EE"/>' +
     '<stop offset="1" stop-color="#7FA9C2"/></linearGradient>' +
+    '<linearGradient id="kaHolz" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D9B48A"/>' +
+    '<stop offset="1" stop-color="#BF9466"/></linearGradient>' +
     // Sonnenlicht oben links, wie die Sonne im Titelbild
     '<radialGradient id="kaLicht" cx="40" cy="-30" r="420" gradientUnits="userSpaceOnUse">' +
     '<stop offset="0" stop-color="#FFF8E4" stop-opacity="0.45"/><stop offset="0.5" stop-color="#FFF8E4" stop-opacity="0.1"/>' +
@@ -4522,12 +4577,14 @@ function seekarteSvg(z) {
   // Ort: zu Beginn ein Hotel und ein Gästehaus. Mit „Gewerbegebiet erweitern“
   // wächst der Ort um ein zweites Hotel und zwei Gästehäuser.
   const gewerbe = istUmgesetzt(z, "gewerbe");
+  // Hotel und Kiosk stehen nah am Strand: das Hotel an der Dünenkante, der Kiosk direkt am Sand.
+  // unten = Unterkante (Boden) des Gebäudes
   const haeuser = [
-    { x: 486, y: 32, gross: true },
-    { x: 530, y: 50, gross: false }
+    { art: "hotel", x: 470, unten: 86 },
+    { art: "kiosk", x: 524, unten: 101 }
   ];
   if (gewerbe) {
-    haeuser.push({ x: 428, y: 40, gross: true }, { x: 468, y: 64, gross: false }, { x: 552, y: 74, gross: false });
+    haeuser.push({ art: "hotel", x: 416, unten: 80 }, { art: "gast", x: 520, unten: 70 }, { art: "gast", x: 500, unten: 44 });
   }
   // Abwasserrohr zum Meer (unter den Gebäuden, damit es aus der Fabrik kommt)
   const yRohrEnde = (kuestenlinie(652) + STRAND_BREITE + 6).toFixed(1);
@@ -4544,9 +4601,10 @@ function seekarteSvg(z) {
   // Gebäude mit weichem Schatten, von hinten nach vorne gezeichnet (nach Unterkante),
   // damit vordere Gebäude die hinteren überdecken
   const gebaeude = haeuser.map(function (h) {
-    return h.gross
-      ? { unten: h.y + 30, svg: hotelGrossSvg(h.x, h.y) }
-      : { unten: h.y + 13, svg: hotelKleinSvg(h.x, h.y) };
+    const svg = h.art === "hotel" ? hotelGrossSvg(h.x, h.unten)
+      : h.art === "kiosk" ? kioskSvg(h.x, h.unten)
+      : hotelKleinSvg(h.x, h.unten - 13);
+    return { unten: h.unten, svg: svg };
   });
   // Fabrik mit Schornstein; mit „Gewerbegebiet erweitern“ eine zweite, kleinere Fabrik rechts daneben
   gebaeude.push({ unten: 76, svg: fabrikSvg(616, 46, 62, 30, 4, 7.6) });
@@ -4606,16 +4664,22 @@ function seekarteSvg(z) {
 function seekarteAnzeigen() {
   const z = zustand;
   el("seekarte").innerHTML = seekarteSvg(z);
-  el("kartenStatus").textContent = z.beendet
-    ? "Endstand nach " + RUNDEN + " Runden"
-    : "Ökologie-Maßnahmen dieser Runde gelten für den Bereich " + bereichName(regionDerRunde(z.runde)) +
-      ". " + aktuellesLevel(z.runde).text;
 
   // Legende: nur Symbole, die gerade auf der Karte zu sehen sind
   const w = aktiveWirkung(z, Math.min(z.runde, RUNDEN));
   const arten = { plastik: false, glas: false, essen: false };
   strandMuellListe(z).concat(landMuellListe(z)).forEach(function (m) { arten[m.art] = true; });
+  // Gebäude für die Legende: Defs (Verläufe) liegen in der Karte; hier eigene, gleich benannte Verläufe
+  const gebaeudeDefs = '<defs><linearGradient id="lgWand" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFBF2"/>' +
+    '<stop offset="1" stop-color="#EADFC8"/></linearGradient><linearGradient id="lgHolz" x1="0" y1="0" x2="0" y2="1">' +
+    '<stop offset="0" stop-color="#D9B48A"/><stop offset="1" stop-color="#BF9466"/></linearGradient></defs>';
+  const legendeGebaeude = function (svg) {
+    return gebaeudeDefs + svg.replace(/url\(#kaWandHell\)/g, "url(#lgWand)").replace(/url\(#kaHolz\)/g, "url(#lgHolz)")
+      .replace(/url\(#kaGlas\)/g, "#A9CFE3");
+  };
   const eintraege = [
+    [legendenSvg(legendeGebaeude(hotelGrossSvg(0, 0)), "-2 -56 62 58"), "Hotel", true],
+    [legendenSvg(legendeGebaeude(kioskSvg(0, 0)), "-3 -24 34 25"), "Strandkiosk", true],
     [legendenSymbol("flasche", -20, 1.1), "Plastikmüll", arten.plastik],
     [legendenSymbol("scherbe", -15, 1.05), "Glas", arten.glas],
     [legendenSymbol("apfel", 0, 1.1), "Essensreste", arten.essen],
