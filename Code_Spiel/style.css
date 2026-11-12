@@ -328,7 +328,7 @@ button {
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--seitenleiste);
   gap: var(--abstand);
-  max-width: 1440px;
+  max-width: 1680px;
   margin: 0 auto;
   padding: calc(var(--kopfhoehe) + var(--abstand)) var(--abstand) var(--abstand);
 }
@@ -367,7 +367,10 @@ button {
 }
 
 /* ===== Seekarte ===== */
-.karten-tafel { padding: 16px 18px 14px; }
+/* Die Karte reicht fast bis an den Rand der Tafel; Überschrift und Legende bleiben eingerückt */
+.karten-tafel { padding: 14px 6px 12px; }
+.karten-tafel .tafel-kopf { margin: 0 12px 10px; }
+.karten-tafel .legende { padding: 0 12px; }
 .karten-rahmen { position: relative; }
 
 .seekarte {
@@ -2735,15 +2738,6 @@ p + .info-tabelle { margin-top: 10px; }
   font-family: var(--schrift-schmal);
   font-size: 1.35rem;
   color: var(--bereich);
-}
-
-.bereich-quelle {
-  margin-left: 6px;
-  padding-left: 12px;
-  border-left: 1px solid var(--bereich);
-  font-size: 0.78rem;
-  line-height: 1.35;
-  color: var(--tinte-2);
 }
 
 .saeule-oeko { border-left-color: var(--saeule-oeko); }
