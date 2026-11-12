@@ -892,7 +892,7 @@ const FOERDERPROGRAMME = [
 // deren Bedingung zutrifft und die noch nicht gesagt wurde.
 // wenn(z, w): z = Spielzustand, w = aktive Wirkungen der Runde
 const PERSONEN = {
-  strand: { name: "Merle", rolle: "betreibt den Strandkiosk", x: 70.8, y: 36.2, farbe: "#E2A92B", kleidung: "kiosk" },
+  strand: { name: "Merle", rolle: "betreibt den Strandkiosk", x: 70.3, y: 37, farbe: "#E2A92B", kleidung: "kiosk" },
   meer:   { name: "Jannik", rolle: "Kutterfischer im Hafen", x: 92.6, y: 56.5, farbe: "#1D4F8C", kleidung: "fischer" },
   land:   { name: "Ole", rolle: "Schichtleiter im Gewerbegebiet", x: 74.5, y: 28.5, farbe: "#5E7D4E", kleidung: "arbeiter" }
 };
@@ -1907,18 +1907,6 @@ function gesamtScore(z) {
   return runden1(summe / gewicht);
 }
 
-// Mittlere Säulenindizes über alle gespielten Runden (für die Auswertung)
-function saeulenDurchschnitt(z) {
-  const gespielt = z.verlauf.filter(function (s) { return s.runde >= 1; });
-  const out = { oeko: 0, oekonomie: 0, sozial: 0 };
-  if (!gespielt.length) return out;
-  SAEULEN.forEach(function (sa) {
-    out[sa.id] = runden1(gespielt.reduce(function (a, s) { return a + rundenGewicht(s.runde) * s.saeulen[sa.id]; }, 0) /
-      gespielt.reduce(function (a, s) { return a + rundenGewicht(s.runde); }, 0));
-  });
-  return out;
-}
-
 // Kennzahlen einer Säule, die in einer Momentaufnahme hinter dem Sollkurs liegen
 function rueckstaende(s, saeuleId) {
   return Object.keys(SAEULEN_KENNZAHLEN[saeuleId]).filter(function (id) {
@@ -1996,20 +1984,6 @@ function kompetenzProfil(z) {
       beleg: wissen === null ? "Keine Quizfrage beantwortet." : z.quiz.richtig + " von " + z.quiz.gestellt + " Quizfragen richtig." }
   ];
   return liste;
-}
-
-// Vergleichslinie „Weiter so“: Was wäre ohne eine einzige Maßnahme geschehen?
-let bauCache = null;
-function weiterSoVerlauf() {
-  if (bauCache) return bauCache;
-  const z = neuerZustand(function () { return 0.5; });
-  z.ereignisPlan = {};
-  for (let r = 1; r <= RUNDEN; r++) {
-    z.auswahl = leereAuswahl();
-    rundeAbschliessen(z, {});
-  }
-  bauCache = { verlauf: z.verlauf, score: gesamtScore(z), saeulen: saeulenDurchschnitt(z) };
-  return bauCache;
 }
 
 // Wissensscore: Anteil richtiger Antworten (Rundenquiz und Abschlussquiz)
@@ -2417,7 +2391,6 @@ function alleAnzeigen() {
   seekarteAnzeigen();
   markerAnzeigen();
   muellAnzeigen();
-  zieleAnzeigen();
   kennzahlenAnzeigen();
   massnahmenAnzeigen();
   rundenKnopfAnzeigen();
@@ -2513,32 +2486,6 @@ function muellPopupZeigen() {
   el("muellInhalt").innerHTML = muellPopupHtml();
   el("muellInhalt").scrollTop = 0;
   popupOeffnen("popupMuell");
-}
-
-function zieleAnzeigen() {
-  const z = zustand;
-  const s = momentaufnahme(z, z.runde);
-  el("zielZusatz").textContent = "Alle Bedingungen müssen in Runde " + zielFenster().von + " bis " +
-    zielFenster().bis + " gleichzeitig erfüllt sein";
-  const liste = el("zielListe");
-  liste.innerHTML = "";
-  ZIELE.forEach(function (ziel) {
-    const ok = ziel.pruefen(s);
-    const li = document.createElement("li");
-    li.className = ok ? "ziel-ok" : "ziel-offen";
-    li.innerHTML =
-      '<span class="ziel-punkt" aria-hidden="true"></span>' +
-      '<span class="ziel-text">' + ziel.text + "</span>" +
-      '<span class="ziel-wert">' + ziel.wert(s) + "</span>" +
-      '<span class="sr-only">' + (ok ? "erfüllt" : "nicht erfüllt") + "</span>";
-    liste.appendChild(li);
-  });
-  const score = gesamtScore(z);
-  el("anzeigeScore").textContent = score === null ? "noch keine Runde gespielt" : zahl(score, 1) + " von 100";
-  const wissen = wissensScore(z);
-  el("anzeigeWissen").textContent = wissen === null
-    ? "noch keine Frage beantwortet"
-    : zahl(wissen, 1) + " von 100 (" + z.quiz.richtig + " von " + z.quiz.gestellt + " richtig)";
 }
 
 function kennzahlenErstellen() {
@@ -3070,13 +3017,45 @@ function meerFarben(meeresgesundheit) {
 // ---------- Hilfsfunktionen für die Kartengrafiken ----------
 
 // Verlauf des Flusses als zwei Bézier-Abschnitte [Start, Kontrolle 1, Kontrolle 2, Ende].
-// Der Müllfänger nutzt dieselben Punkte, damit er genau quer im Fluss liegt.
-function flussAbschnitte() {
-  const yMuendung = kuestenlinie(196) + STRAND_BREITE;
-  return [
-    [[146, -4], [118, 26], [206, 44], [176, 70]],
-    [[176, 70], [146, 96], [196, yMuendung - 18], [196, yMuendung + 4]]
-  ];
+// Lage s im Fluss: 0 = Quelle (oben), 1 = Ende des ersten Abschnitts, 2 = Mündung.
+const FLUSS_ABSCHNITTE = [
+  [[146, -4], [118, 26], [206, 44], [176, 70]],
+  [[176, 70], [146, 96], [196, kuestenlinie(196) + STRAND_BREITE - 18], [196, kuestenlinie(196) + STRAND_BREITE + 4]]
+];
+
+// Mit „Flussaue renaturieren“ (aue = true) schlängelt sich der Fluss: Die Mitte schwingt quer zur
+// Flussrichtung, zur Mündung hin läuft die Schwingung aus, damit die Mündung an ihrem Platz bleibt.
+const MAEANDER = { weite: 11, wellen: 1.75 };
+
+// Grundverlauf (ohne Mäander) an der Stelle t als [x, y]
+function flussGrund(t) {
+  const a = FLUSS_ABSCHNITTE[Math.min(1, Math.floor(t))];
+  const u = t - Math.min(1, Math.floor(t));
+  const v = 1 - u;
+  return [0, 1].map(function (k) {
+    return v * v * v * a[0][k] + 3 * v * v * u * a[1][k] + 3 * v * u * u * a[2][k] + u * u * u * a[3][k];
+  });
+}
+
+// Normierte Richtung zwischen zwei Punkten
+function richtung(p1, p2) {
+  const l = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) || 1;
+  return [(p2[0] - p1[0]) / l, (p2[1] - p1[1]) / l];
+}
+
+// Punkt auf der Flussmitte an der Stelle s, mit normierter Flussrichtung (rx, ry)
+function flussPunkt(s, aue) {
+  const h = 0.01;
+  const lage = function (t) {
+    const b = flussGrund(t);
+    if (!aue) return b;
+    const d = richtung(flussGrund(Math.max(0, t - h)), flussGrund(Math.min(2, t + h)));
+    const aus = MAEANDER.weite * Math.sin(t * Math.PI * 2 * MAEANDER.wellen) * Math.min(1, (2 - t) / 0.45);
+    return [b[0] - d[1] * aus, b[1] + d[0] * aus];
+  };
+  const p = lage(s);
+  const d = richtung(lage(Math.max(0, s - h)), lage(Math.min(2, s + h)));
+  return { x: p[0], y: p[1], rx: d[0], ry: d[1], s: s };
 }
 
 // Breite des Flusses an der Stelle s (0 = Quelle oben, 2 = Mündung): zum Meer hin breiter,
@@ -3085,25 +3064,19 @@ function flussBreite(s) {
   return 9 + 2.6 * s + 11 * Math.pow(Math.max(0, (s - 1.55) / 0.45), 2);
 }
 
-// Punkte entlang der Flussmitte mit Lage s, fein genug für weiche Ufer
-function flussMitte(schritte) {
+// Punkte entlang der Flussmitte, schritte pro Abschnitt (fein genug für weiche Ufer)
+function flussMitte(schritte, aue) {
   const punkte = [];
-  flussAbschnitte().forEach(function (abschnitt, i) {
-    for (let k = i === 0 ? 0 : 1; k <= schritte; k++) {
-      const p = bezierPunkt(abschnitt, k / schritte);
-      p.s = i + k / schritte;
-      punkte.push(p);
-    }
-  });
+  for (let k = 0; k <= 2 * schritte; k++) punkte.push(flussPunkt(k / schritte, aue));
   return punkte;
 }
 
 // Umriss des Flusses als geschlossene Punktliste: halbe Breite × faktor + zusatz zu beiden Seiten.
 // Das Ufer schwingt leicht, damit es natürlich wirkt.
-function flussUmriss(faktor, zusatz) {
+function flussUmriss(faktor, zusatz, aue) {
   const links = [];
   const rechts = [];
-  flussMitte(14).forEach(function (p) {
+  flussMitte(aue ? 30 : 14, aue).forEach(function (p) {
     const halb = flussBreite(p.s) / 2 * faktor + zusatz;
     const welle = 0.5 * Math.sin(p.s * 23) * faktor;
     links.push([p.x - p.ry * (halb + welle), p.y + p.rx * (halb + welle)]);
@@ -3113,22 +3086,11 @@ function flussUmriss(faktor, zusatz) {
 }
 
 // Offene Linie parallel zu einem Ufer (seite 1 = links, -1 = rechts), abstand vom Ufer nach außen (+) oder innen (-)
-function flussUferLinie(seite, abstand) {
-  return "M" + flussMitte(14).map(function (p) {
+function flussUferLinie(seite, abstand, aue) {
+  return "M" + flussMitte(aue ? 30 : 14, aue).map(function (p) {
     const halb = (flussBreite(p.s) / 2 + abstand) * seite;
     return (p.x - p.ry * halb).toFixed(1) + "," + (p.y + p.rx * halb).toFixed(1);
   }).join(" L");
-}
-
-// Punkt und Flussrichtung (normiert) auf einem Bézier-Abschnitt, t von 0 bis 1
-function bezierPunkt(a, t) {
-  const u = 1 - t;
-  const x = u * u * u * a[0][0] + 3 * u * u * t * a[1][0] + 3 * u * t * t * a[2][0] + t * t * t * a[3][0];
-  const y = u * u * u * a[0][1] + 3 * u * u * t * a[1][1] + 3 * u * t * t * a[2][1] + t * t * t * a[3][1];
-  const dx = 3 * (u * u * (a[1][0] - a[0][0]) + 2 * u * t * (a[2][0] - a[1][0]) + t * t * (a[3][0] - a[2][0]));
-  const dy = 3 * (u * u * (a[1][1] - a[0][1]) + 2 * u * t * (a[2][1] - a[1][1]) + t * t * (a[3][1] - a[2][1]));
-  const laenge = Math.hypot(dx, dy) || 1;
-  return { x: x, y: y, rx: dx / laenge, ry: dy / laenge };
 }
 
 // Geschlossene, weiche Umrisslinie durch alle Punkte (Catmull-Rom als Bézier-Pfad)
@@ -3264,8 +3226,8 @@ function wiesenSvg() {
 const BAEUME = [
   // x, y (Fuß), Größe, Art
   [22, 44, 1.25, "laub"], [52, 27, 1.05, "kiefer"], [80, 66, 1.35, "laub"], [104, 36, 1, "laub"], [38, 88, 0.95, "kiefer"],
-  [224, 26, 1.05, "kiefer"], [294, 78, 1.25, "laub"], [396, 72, 1, "kiefer"],
-  [400, 28, 1, "laub"], [568, 24, 0.85, "laub"], [786, 28, 1.1, "kiefer"], [772, 56, 0.95, "laub"]
+  [224, 26, 1.05, "kiefer"], [294, 78, 1.25, "laub"], [340, 30, 1, "laub"],
+  [786, 28, 1.1, "kiefer"], [772, 56, 0.95, "laub"]
 ];
 
 function baumSvg(x, y, g, art) {
@@ -3600,6 +3562,9 @@ function rauchSvg(spitze, groesse, versatz) {
   return s + "</g>";
 }
 
+// Hotel, Kiosk und Gästehäuser werden auf der Karte so stark vergrößert (deutlich größer als die Fische)
+const ORT_GROESSE = 1.3;
+
 // Großes Hotel: Flachdach mit Dachaufbau und Fahne, Schild „Hotel“, drei Fensterreihen mit Balkonen,
 // Eingang mit Vordach. x = linke Kante der Vorderseite, unten = Unterkante (Boden).
 const HOTEL_MASSE = { b: 46, h: 32, t: 18 };
@@ -3897,17 +3862,22 @@ function muellSymbolSvg(form, x, y, winkel, groesse, schwimmt) {
 // Infopunkte und Personen stehen in Prozent der Karte; hier in Karteneinheiten umgerechnet.
 function muellSperrflaechen(z) {
   const flaechen = [
-    [612, 26, 74, 54], [466, 32, 60, 56], [518, 76, 42, 28],     // Fabrik, Hotel, Kiosk
+    [612, 26, 74, 54], [434, 16, 76, 76], [508, 72, 44, 33],     // Fabrik, Hotel, Kiosk
     [730, 90, 22, 80], [647, 76, 10, 34]                           // Hafensteg, Abwasserrohr
   ];
   if (istUmgesetzt(z, "gewerbe")) {
-    flaechen.push([684, 46, 58, 38], [412, 30, 60, 52], [516, 40, 30, 32], [496, 16, 30, 30]);
+    flaechen.push([684, 46, 58, 38], [374, 14, 76, 72], [516, 34, 36, 38], [548, 16, 36, 38]);
   }
   INFOPUNKTE.forEach(function (p) {
     flaechen.push([p.x * 8 - 15, p.y * 3.2 - 14, 30, 38]);       // Knopf und Beschriftung
   });
   if (istUmgesetzt(z, "schilder")) {
     muelleimerOrte().forEach(function (o) { flaechen.push([o.x - 6, o.y - 14, 12, 15]); });
+    hinweisSchildOrte().forEach(function (o) { flaechen.push([o.x - 9, o.y - 26, 18, 27]); });
+  }
+  if (istUmgesetzt(z, "muellfaenger")) {
+    const m = muellfaengerLage(istUmgesetzt(z, "aue")).rechts;
+    flaechen.push([m[0] - 6, m[1] - 24, 34, 30]);
   }
   Object.keys(PERSONEN).forEach(function (id) {
     const p = PERSONEN[id];
@@ -3920,20 +3890,6 @@ function imRechteck(x, y, flaechen) {
   return flaechen.some(function (f) {
     return x > f[0] && x < f[0] + f[2] && y > f[1] && y < f[1] + f[3];
   });
-}
-
-// Punkte auf der Flussmitte, für Abstände zum Fluss und für Müll im Fluss
-function flussPunkte() {
-  const fluss = flussAbschnitte();
-  const punkte = [];
-  fluss.forEach(function (abschnitt, i) {
-    for (let t = 0; t <= 1; t += 0.05) {
-      const p = bezierPunkt(abschnitt, t);
-      p.s = i + t;                                             // Lage im Fluss: 0 = Quelle, 2 = Mündung
-      punkte.push(p);
-    }
-  });
-  return punkte;
 }
 
 // Abstand zum Ufer (nicht zur Flussmitte), weil der Fluss zur Mündung hin breiter wird
@@ -3985,7 +3941,8 @@ function muellTeil(art, form, x, y, r, groesseLiegend, groesseAufrecht) {
 // Rang = Platznummer / Plätze: Bei weniger Müll leeren sich alle Hotspots gleichmäßig.
 function hotspotPlaetze(z, lage) {
   const sperre = muellSperrflaechen(z);
-  const fluss = flussPunkte();
+  const aue = istUmgesetzt(z, "aue");
+  const fluss = flussMitte(20, aue);
   const r = zufallsfolge(lage === "strand" ? 7 : 13);
   const alle = [];
   MUELL_HOTSPOTS[lage].forEach(function (h) {
@@ -3999,7 +3956,7 @@ function hotspotPlaetze(z, lage) {
       } else if (h.amFluss) {
         // Ufer im Mittel- und Unterlauf, abwechselnd links und rechts
         const stelle = 0.5 + r() * 1.25;
-        const p = bezierPunkt(flussAbschnitte()[Math.min(1, Math.floor(stelle))], stelle - Math.floor(stelle));
+        const p = flussPunkt(stelle, aue);
         const seite = (r() < 0.5 ? -1 : 1) * (14 + r() * 7);
         x = p.x - p.ry * seite;
         y = p.y + p.rx * seite;
@@ -4049,13 +4006,12 @@ const FLUSS_MUELL_MAX = 7;
 function flussMuellSvg(z, muellfaengerWirkt) {
   const anzahl = Math.min(FLUSS_MUELL_MAX, Math.round(z.eintrag.land / 3.2));
   const r = zufallsfolge(19);
-  const fluss = flussAbschnitte();
+  const aue = istUmgesetzt(z, "aue");
   let s = "";
   for (let i = 0; i < FLUSS_MUELL_MAX; i++) {
     let lage = 0.1 + (i + r()) / FLUSS_MUELL_MAX * 1.8;                   // 0 bis 2 über beide Abschnitte
     if (muellfaengerWirkt) lage = 0.1 + (lage - 0.1) * (1.22 / 1.9);       // nur oberhalb der Barriere
-    const abschnitt = fluss[Math.min(1, Math.floor(lage))];
-    const p = bezierPunkt(abschnitt, lage - Math.floor(lage));
+    const p = flussPunkt(lage, aue);
     const quer = (r() - 0.5) * 6;
     const form = MUELL_ARTEN.plastik[Math.floor(r() * MUELL_ARTEN.plastik.length)];
     const winkel = Math.atan2(p.ry, p.rx) * 180 / Math.PI + (r() - 0.5) * 30;
@@ -4280,12 +4236,101 @@ function bojeSvg(x, y) {
     '" fill="none" stroke="#FFFFFF" stroke-opacity="0.6" stroke-width="0.8" stroke-linecap="round"/>';
 }
 
+// Hinweisschild „Müll in den Eimer“: gelbe Raute mit weißem Rand auf einem Pfosten, darauf eine Figur,
+// die Abfall in einen Mülleimer wirft (wie das bekannte Piktogramm). (x, boden) = Fuß des Pfostens.
+function hinweisSchildSvg(x, boden) {
+  const t = "#1F1F1F";
+  return '<g transform="translate(' + x.toFixed(1) + "," + boden.toFixed(1) + ') scale(1.15)">' +
+    '<ellipse cx="2" cy="0.2" rx="3.4" ry="0.9" fill="#0B2238" opacity="0.2"/>' +
+    '<rect x="-0.6" y="-10" width="1.2" height="10" fill="#6B6258"/>' +
+    '<path d="M0,-21.6 L7.4,-14.2 L0,-6.8 L-7.4,-14.2 Z" fill="#FFFFFF" stroke="#8C8478" stroke-opacity="0.5" stroke-width="0.3"/>' +
+    '<path d="M0,-20.4 L6.2,-14.2 L0,-8 L-6.2,-14.2 Z" fill="#E9B92F"/>' +
+    '<path d="M0,-19.4 L5.2,-14.2 L0,-9 L-5.2,-14.2 Z" fill="none" stroke="' + t + '" stroke-width="0.35"/>' +
+    // Mülleimer mit Gitter
+    '<path d="M-3.4,-13.6 H-0.6 L-0.9,-10.6 H-3.1 Z" fill="none" stroke="' + t + '" stroke-width="0.4"/>' +
+    '<path d="M-3.2,-12.6 H-0.8 M-3,-11.6 H-1 M-2,-13.6 V-10.6" stroke="' + t + '" stroke-width="0.25"/>' +
+    // Abfall im Flug und Figur
+    '<rect x="-2.6" y="-15.4" width="1.2" height="0.9" transform="rotate(-20 -2 -15)" fill="' + t + '"/>' +
+    '<circle cx="1.9" cy="-17" r="0.8" fill="' + t + '"/>' +
+    '<path d="M1.7,-15.9 L2.2,-12.9 M2.2,-12.9 L1.3,-10.4 M2.2,-12.9 L2.9,-10.4 M1.8,-15.2 L-0.6,-15.4" fill="none" stroke="' + t + '" ' +
+    'stroke-width="0.85" stroke-linecap="round"/>' +
+    "</g>";
+}
+
+function hinweisSchildOrte() {
+  return [236, 345, 718].map(function (x) {
+    return { x: x, y: kuestenlinie(x) + 15 };
+  });
+}
+
 // Mülleimer: verteilt am Strand, einer am Hotel, einer an der Fabrik (y = Boden)
 function muelleimerOrte() {
-  const strand = [40, 262, 395, 553, 700].map(function (x) {
+  const strand = [40, 262, 395, 590, 700].map(function (x) {
     return { x: x, y: kuestenlinie(x) + 13 };
   });
-  return strand.concat([{ x: 460, y: 90 }, { x: 628, y: 97 }]);
+  return strand.concat([{ x: 474, y: 100 }, { x: 628, y: 97 }]);
+}
+
+// Müllauffangstation im Fluss (nach dem Vorbild schwimmender Flussreiniger): Eine Schwimmbarriere aus
+// Bojen liegt schräg im Fluss und leitet den Müll zum rechten Ufer. Dort hebt ein Förderband ihn aus dem
+// Wasser in einen Container auf einem Ponton; ein Dach mit Solarmodul liefert den Strom.
+function muellfaengerLage(aue) {
+  const p = flussPunkt(1.3, aue);
+  const halb = flussBreite(1.3) / 2;
+  // quer zur Flussrichtung: (-ry, rx) zeigt zum linken Ufer
+  return {
+    p: p,
+    links: [p.x - p.ry * (halb + 2) - p.rx * 5, p.y + p.rx * (halb + 2) - p.ry * 5],
+    rechts: [p.x + p.ry * (halb - 1) + p.rx * 2, p.y - p.rx * (halb - 1) + p.ry * 2]
+  };
+}
+
+function muellfaengerSvg(aue) {
+  const m = muellfaengerLage(aue);
+  const a = m.links;
+  const e = m.rechts;
+  const winkel = Math.atan2(e[1] - a[1], e[0] - a[0]) * 180 / Math.PI;
+  // Schwimmbarriere: Seil mit abwechselnd gelben und orangen Schwimmkörpern
+  let s = '<line x1="' + a[0].toFixed(1) + '" y1="' + a[1].toFixed(1) + '" x2="' + e[0].toFixed(1) + '" y2="' + e[1].toFixed(1) +
+    '" stroke="#5E5A52" stroke-width="0.6"/>';
+  for (let i = 0; i <= 6; i++) {
+    const t = i / 6;
+    s += '<ellipse cx="' + (a[0] + (e[0] - a[0]) * t).toFixed(1) + '" cy="' + (a[1] + (e[1] - a[1]) * t).toFixed(1) + '" rx="1.7" ry="1.1" ' +
+      'transform="rotate(' + Math.round(winkel) + " " + (a[0] + (e[0] - a[0]) * t).toFixed(1) + " " + (a[1] + (e[1] - a[1]) * t).toFixed(1) + ')" ' +
+      'fill="' + (i % 2 ? "#F2C14E" : "#E8662A") + '" stroke="#9A5A1E" stroke-opacity="0.6" stroke-width="0.3"/>';
+  }
+  // aufgestauter Müll vor der Barriere (flussaufwärts)
+  [[0.4, "flasche"], [0.58, "tuete"], [0.74, "verpackung"], [0.88, "flasche"]].forEach(function (t, i) {
+    s += muellSymbolSvg(t[1], a[0] + (e[0] - a[0]) * t[0] - m.p.rx * 3, a[1] + (e[1] - a[1]) * t[0] - m.p.ry * 3, winkel + i * 40, 0.42, true);
+  });
+  // Ponton am rechten Ufer, Vorderkante unten links bei (x, y)
+  const x = e[0] + 1;
+  const y = e[1] + 4;
+  s += quaderSvg(x, y - 3.5, 20, 3.5, 9, { front: "#56636D", seite: "#434F57", dach: "#7F8D97" });
+  // Förderband vom Wasser schräg hinauf zum Container, mit Querleisten
+  s += '<path d="' + vieleck([[x - 5, y - 0.6], [x - 3, y - 2.4], [x + 8, y - 13], [x + 6, y - 11.2]]) + '" fill="#2F3A42"/>';
+  let leisten = "";
+  for (let k = 1; k < 6; k++) {
+    const t = k / 6;
+    leisten += "M" + (x - 5 + 11 * t).toFixed(1) + "," + (y - 0.6 - 10.6 * t).toFixed(1) + " l2,-1.8 ";
+  }
+  s += '<path d="' + leisten + '" stroke="#9AA7B0" stroke-width="0.5"/>';
+  // Container (oben offen, Müll schaut heraus) mit Recycling-Kreis
+  const cu = y - 4.5;
+  s += quaderSvg(x + 7, cu - 8, 12, 8, 6, { front: "#3E8E5A", seite: "#2F6E45", dach: "#24392C" });
+  [["#EEF5F8", 9.5], ["#6E9E4A", 12.5], ["#E8662A", 15.5]].forEach(function (b) {
+    s += '<rect x="' + (x + b[1]).toFixed(1) + '" y="' + (cu - 10.2).toFixed(1) + '" width="2.2" height="1.5" rx="0.4" fill="' + b[0] + '"/>';
+  });
+  s += '<circle cx="' + (x + 13) + '" cy="' + (cu - 4) + '" r="2" fill="none" stroke="#FFFFFF" stroke-width="0.7" stroke-dasharray="2.8 0.8"/>';
+  // Dach mit Solarmodul auf zwei Stützen
+  const d = schraeg(6);
+  s += '<path d="M' + (x + 7.6) + "," + (cu - 8) + " V" + (cu - 14) + " M" + (x + 18.4) + "," + (cu - 8) + " V" + (cu - 14) +
+    '" stroke="#5E5A52" stroke-width="0.7"/>';
+  s += '<path d="' + vieleck([[x + 6, cu - 14], [x + 20, cu - 14], [x + 20 + d.x, cu - 14 + d.y], [x + 6 + d.x, cu - 14 + d.y]]) +
+    '" fill="#2B4C7E" stroke="#C9D6DE" stroke-width="0.4"/>' +
+    '<path d="M' + (x + 10.7) + "," + (cu - 14) + " l" + d.x.toFixed(1) + "," + d.y.toFixed(1) + " M" + (x + 15.3) + "," + (cu - 14) +
+    " l" + d.x.toFixed(1) + "," + d.y.toFixed(1) + '" stroke="#C9D6DE" stroke-width="0.35"/>';
+  return s;
 }
 
 function seekarteSvg(z) {
@@ -4407,58 +4452,35 @@ function seekarteSvg(z) {
 
   // Fluss mit Mündung: wird zum Meer hin breiter und öffnet sich trichterförmig. Feuchtes Ufer,
   // tiefere Rinne in der Mitte, Lichtkante am linken (sonnigen) Ufer und Glanzstriche, die flussabwärts ziehen.
-  const fluss = flussAbschnitte();
-  const flussD = "M" + fluss[0][0].join(",") + " C" + fluss[0].slice(1).map(function (p) { return p.join(","); }).join(" ") +
-    " C" + fluss[1].slice(1).map(function (p) { return p[0] + "," + p[1].toFixed(1); }).join(" ");
+  // Mit „Flussaue renaturieren“ schlängelt er sich, mit grüner Aue und zwei Altwassern daneben.
+  const aue = istUmgesetzt(z, "aue");
+  const flussD = "M" + flussMitte(aue ? 30 : 14, aue).map(function (p) { return p.x.toFixed(1) + "," + p.y.toFixed(1); }).join(" L");
   // Der Fluss endet an der Schaumkante und geht dort ins Meer über (Ausschnitt nur über Land und Strand)
   s += '<clipPath id="kaFlussRaum"><polygon points="0,0 ' + linienPunkte(STRAND_BREITE + 1) + ' 800,0"/></clipPath>';
-  s += '<g clip-path="url(#kaFlussRaum)">' +
-    '<path d="' + glatterPfad(flussUmriss(1, 4)) + '" fill="#B9A97C" opacity="0.6" filter="url(#kaWeich)"/>' +
-    '<path d="' + glatterPfad(flussUmriss(1, 1.4)) + '" fill="#9E8D62" opacity="0.45"/>' +
-    '<path d="' + glatterPfad(flussUmriss(1, 0)) + '" fill="url(#kaFluss)"/>' +
-    '<path d="' + glatterPfad(flussUmriss(0.42, 0)) + '" fill="' + farben.tief + '" opacity="0.28" filter="url(#kaWeich)"/>' +
-    '<path d="' + flussUferLinie(1, -1.2) + '" fill="none" stroke="#FFFFFF" stroke-opacity="0.45" stroke-width="0.9" stroke-linecap="round"/>' +
+  s += '<g clip-path="url(#kaFlussRaum)">';
+  if (aue) {
+    s += '<path d="' + glatterPfad(flussUmriss(1, 17, aue)) + '" fill="#97BD72" opacity="0.55" filter="url(#kaWeich)"/>';
+    [[0.62, 1], [1.12, -1]].forEach(function (a) {
+      const p = flussPunkt(a[0], aue);
+      const abstand = (flussBreite(a[0]) / 2 + 11) * a[1];
+      s += '<ellipse cx="' + (p.x - p.ry * abstand).toFixed(1) + '" cy="' + (p.y + p.rx * abstand).toFixed(1) +
+        '" rx="6.5" ry="3" fill="url(#kaFluss)" stroke="#7E9A4E" stroke-opacity="0.6" stroke-width="0.8"/>';
+    });
+  }
+  s += '<path d="' + glatterPfad(flussUmriss(1, 4, aue)) + '" fill="#B9A97C" opacity="0.6" filter="url(#kaWeich)"/>' +
+    '<path d="' + glatterPfad(flussUmriss(1, 1.4, aue)) + '" fill="#9E8D62" opacity="0.45"/>' +
+    '<path d="' + glatterPfad(flussUmriss(1, 0, aue)) + '" fill="url(#kaFluss)"/>' +
+    '<path d="' + glatterPfad(flussUmriss(0.42, 0, aue)) + '" fill="' + farben.tief + '" opacity="0.28" filter="url(#kaWeich)"/>' +
+    '<path d="' + flussUferLinie(1, -1.2, aue) + '" fill="none" stroke="#FFFFFF" stroke-opacity="0.45" stroke-width="0.9" stroke-linecap="round"/>' +
     '<path class="ka-fluss-glanz" style="' + animStil(7) + '" d="' + flussD + '" fill="none" stroke="#FFFFFF" stroke-opacity="0.38" ' +
     'stroke-width="1.1" stroke-linecap="round" stroke-dasharray="7 16"/>' +
-    '<path class="ka-fluss-glanz" style="' + animStil(11, 3) + '" d="' + flussUferLinie(-1, -3.2) + '" fill="none" stroke="#FFFFFF" ' +
+    '<path class="ka-fluss-glanz" style="' + animStil(11, 3) + '" d="' + flussUferLinie(-1, -3.2, aue) + '" fill="none" stroke="#FFFFFF" ' +
     'stroke-opacity="0.25" stroke-width="0.8" stroke-linecap="round" stroke-dasharray="3 20"/>' +
     "</g>";
 
   // Müll im Fluss: der Fluss trägt Müll aus dem Hinterland ins Meer
   s += flussMuellSvg(z, wirksam("muellfaenger"));
-
-  // Müllfänger: schwimmende Barriere schräg quer durch den Fluss. Sie lenkt den Müll
-  // zum Ufer, wo ein Sammelkorb ihn auffängt.
-  if (istUmgesetzt(z, "muellfaenger")) {
-    const p = bezierPunkt(fluss[1], 0.3);
-    const qx = -p.ry;                     // quer zur Flussrichtung
-    const qy = p.rx;
-    const halb = flussBreite(1.3) / 2 + 3;  // reicht über beide Ufer
-    const schraeg = 3;                    // Versatz in Flussrichtung: Barriere liegt schräg
-    const ax = p.x - qx * halb - p.rx * schraeg;
-    const ay = p.y - qy * halb - p.ry * schraeg;
-    const bx = p.x + qx * halb + p.rx * schraeg;
-    const by = p.y + qy * halb + p.ry * schraeg;
-    s += '<line x1="' + ax.toFixed(1) + '" y1="' + ay.toFixed(1) + '" x2="' + bx.toFixed(1) + '" y2="' + by.toFixed(1) +
-      '" stroke="#E8662A" stroke-width="2.4" stroke-linecap="round"/>';
-    [0.36, 0.5, 0.64].forEach(function (t) {
-      s += '<circle cx="' + (ax + (bx - ax) * t).toFixed(1) + '" cy="' + (ay + (by - ay) * t).toFixed(1) +
-        '" r="2.2" fill="#E8662A" stroke="' + tinte + '" stroke-width="0.7"/>';
-    });
-    // Pfosten an beiden Ufern
-    [[ax, ay], [bx, by]].forEach(function (e) {
-      s += '<rect x="' + (e[0] - 1.6).toFixed(1) + '" y="' + (e[1] - 1.6).toFixed(1) + '" width="3.2" height="3.2" fill="' + tinte + '"/>';
-    });
-    // Sammelkorb am unteren Ende der Barriere, davor aufgestauter Müll
-    const kx = bx + qx * 3.5;
-    const ky = by + qy * 3.5;
-    s += '<rect x="' + (kx - 4).toFixed(1) + '" y="' + (ky - 3.5).toFixed(1) + '" width="8" height="7" fill="#ffffff" stroke="' + tinte + '" stroke-width="1"/>' +
-      '<path d="M' + (kx - 1.3).toFixed(1) + "," + (ky - 3.5).toFixed(1) + " v7 M" + (kx + 1.3).toFixed(1) + "," + (ky - 3.5).toFixed(1) + " v7 M" +
-      (kx - 4).toFixed(1) + "," + ky.toFixed(1) + ' h8" stroke="' + tinte + '" stroke-width="0.6"/>';
-    [[0.43, "flasche"], [0.57, "tuete"], [0.66, "verpackung"]].forEach(function (t) {
-      s += muellSymbolSvg(t[1], ax + (bx - ax) * t[0] - p.rx * 3.2, ay + (by - ay) * t[0] - p.ry * 3.2, 30, 0.42, true);
-    });
-  }
+  if (istUmgesetzt(z, "muellfaenger")) s += muellfaengerSvg(aue);
 
   // Ort: zu Beginn ein Hotel und ein Gästehaus. Mit „Gewerbegebiet erweitern“
   // wächst der Ort um ein zweites Hotel und zwei Gästehäuser.
@@ -4466,11 +4488,11 @@ function seekarteSvg(z) {
   // Hotel und Kiosk stehen nah am Strand: das Hotel an der Dünenkante, der Kiosk direkt am Sand.
   // unten = Unterkante (Boden) des Gebäudes
   const haeuser = [
-    { art: "hotel", x: 470, unten: 86 },
-    { art: "kiosk", x: 524, unten: 101 }
+    { art: "hotel", x: 440, unten: 88 },
+    { art: "kiosk", x: 512, unten: 103 }
   ];
   if (gewerbe) {
-    haeuser.push({ art: "hotel", x: 416, unten: 80 }, { art: "gast", x: 520, unten: 70 }, { art: "gast", x: 500, unten: 44 });
+    haeuser.push({ art: "hotel", x: 380, unten: 84 }, { art: "gast", x: 520, unten: 70 }, { art: "gast", x: 552, unten: 52 });
   }
   // Abwasserrohr zum Meer (unter den Gebäuden, damit es aus der Fabrik kommt)
   const yRohrEnde = (kuestenlinie(652) + STRAND_BREITE + 6).toFixed(1);
@@ -4490,7 +4512,8 @@ function seekarteSvg(z) {
     const svg = h.art === "hotel" ? hotelGrossSvg(h.x, h.unten)
       : h.art === "kiosk" ? kioskSvg(h.x, h.unten)
       : hotelKleinSvg(h.x, h.unten - 13);
-    return { unten: h.unten, svg: svg };
+    return { unten: h.unten, svg: '<g transform="translate(' + h.x + "," + h.unten + ") scale(" + ORT_GROESSE + ") translate(" +
+      (-h.x) + "," + (-h.unten) + ')">' + svg + "</g>" };
   });
   // Fabrik mit Schornstein; mit „Gewerbegebiet erweitern“ eine zweite, kleinere Fabrik rechts daneben
   gebaeude.push({ unten: 76, svg: fabrikSvg(616, 46, 62, 30, 4, 7.6) });
@@ -4511,21 +4534,22 @@ function seekarteSvg(z) {
     s += '<rect x="736" y="' + (yHafen + 6).toFixed(1) + '" width="10" height="8" rx="1.2" fill="#2E8B57" stroke="' + kante + '" stroke-width="0.6"/>';
   }
   // Fischkutter am Steg
-  s += kutterSvg(772, yHafen + 56, 1, false, kante);
+  s += kutterSvg(776, yHafen + 56, 1.3, false, kante);
   // Zwei Kreuzfahrtschiffe am T-Stück: eines in der linken Ecke zwischen Steg und Querstück,
   // eines rechts unter dem Querstück
   if (kreuzfahrt) {
-    s += kreuzfahrtschiffSvg(703, steg.yEnde - 8, 0.9, kante) + kreuzfahrtschiffSvg(768, steg.tUnten + 25, 0.9, kante);
+    s += kreuzfahrtschiffSvg(690, steg.yEnde - 8, 1.25, kante) + kreuzfahrtschiffSvg(756, steg.tUnten + 30, 1.25, kante);
   }
   // Höhere Fangquoten: zwei weitere Kutter fischen auf See
   if (istUmgesetzt(z, "quoten")) {
-    s += kutterSvg(300, 205, 0.8, true, kante) + kutterSvg(765, 300, 0.8, false, kante);
+    s += kutterSvg(290, 200, 1.15, true, kante) + kutterSvg(765, 300, 1.15, false, kante);
   }
   s += "</g>";
 
-  // Mülleimer: verteilt am Strand, je einer am Hotel und an der Fabrik
+  // Mülleimer (am Strand, am Hotel, an der Fabrik) und Hinweisschilder am Strand
   if (istUmgesetzt(z, "schilder")) {
     muelleimerOrte().forEach(function (o) { s += muelleimerSvg(o.x, o.y, tinte); });
+    hinweisSchildOrte().forEach(function (o) { s += hinweisSchildSvg(o.x, o.y); });
   }
 
   // Forschungsboje
@@ -4571,6 +4595,7 @@ function seekarteAnzeigen() {
     [legendenSymbol("apfel", 0, 1.1), "Essensreste", arten.essen],
     [legendenSymbol("tuete", 10, 0.8), "Plastiktüte", treibgutAnzahl(z) > 0],
     [legendenSvg(muelleimerSvg(0, 0, "#12304A"), "-7 -12.5 14 13.5"), "Mülleimer", istUmgesetzt(z, "schilder")],
+    [legendenSvg(hinweisSchildSvg(0, 0), "-9 -26 18 26"), "Hinweisschild", istUmgesetzt(z, "schilder")],
     [legendenSvg('<rect x="-10.5" y="-7" width="25" height="14" rx="3.5" fill="#3F84B5"/>' + FISCH_FORMEN.hering(),
       "-10.5 -7 25 14"), fischLegende(z.kennzahlen.artenvielfalt), true],
     ["lg-wasser", "Wasserfarbe, Meeresgesundheit", true],
@@ -4768,7 +4793,6 @@ function quizAntwortWaehlen(index) {
   const weiter = el("quizWeiter");
   weiter.disabled = false;
   weiter.focus();
-  zieleAnzeigen();
 }
 
 function quizWeiter() {
@@ -5253,11 +5277,6 @@ function bewertungHtml() {
   return html;
 }
 
-function bewertungZeigen() {
-  el("bewertungInhalt").innerHTML = bewertungHtml();
-  popupOeffnen("popupBewertung");
-}
-
 // Startbildschirm: Spielinfo mit der Bewertung darunter
 function spielinfoZeigen() {
   el("ueberBewertung").innerHTML = bewertungHtml();
@@ -5285,7 +5304,7 @@ const REIHEN = [
 
 // Liniendiagramm als SVG; Beschriftungen stehen außerhalb der Zeichenfläche
 function diagrammSvg(verlauf, reihen, yMax, schwelle, schwelleFarbe) {
-  const B = 960, H = 250, li = 44, re = 12, ob = 10, un = 30;
+  const B = 520, H = 190, li = 36, re = 8, ob = 8, un = 24;
   const breite = B - li - re;
   const hoehe = H - ob - un;
   const xPos = function (r) { return li + r / RUNDEN * breite; };
@@ -5298,7 +5317,7 @@ function diagrammSvg(verlauf, reihen, yMax, schwelle, schwelleFarbe) {
     s += '<text x="' + (li - 8) + '" y="' + (y + 4) + '" text-anchor="end" class="achse">' + zahl(w) + "</text>";
   }
   for (let r = 0; r <= RUNDEN; r += 2) {
-    s += '<text x="' + xPos(r) + '" y="' + (H - 8) + '" text-anchor="middle" class="achse">' + r + "</text>";
+    s += '<text x="' + xPos(r) + '" y="' + (H - 6) + '" text-anchor="middle" class="achse">' + r + "</text>";
   }
   if (schwelle !== null) {
     s += '<line x1="' + li + '" y1="' + yPos(schwelle) + '" x2="' + (B - re) + '" y2="' + yPos(schwelle) +
@@ -5329,12 +5348,16 @@ function auswertungZeigen() {
     "</strong> × " + Math.round(WISSEN_ANTEIL * 100) + " %</p>" +
     "</div></div>";
 
-  html += '<section class="bericht-block"><h3>Verlauf der Kennzahlen</h3>' +
+  // Verlauf: Kennzahlen und Strandmüll nebeneinander (auf schmalen Bildschirmen untereinander)
+  html += '<section class="bericht-block diagramm-paar"><div><h3>Verlauf der Kennzahlen</h3>' +
     '<div class="diagramm">' + diagrammSvg(z.verlauf, REIHEN, 100, GUTER_ZUSTAND.meeresgesundheit, "#12304A") + "</div>" +
     '<ul class="diagramm-legende">' + REIHEN.map(function (r) {
       return '<li><span class="linie" style="background:' + r.farbe + '"></span>' + r.name + "</li>";
-    }).join("") + '<li><span class="linie gestrichelt"></span>Mindestwert Meeresgesundheit und Artenvielfalt ' +
-    GUTER_ZUSTAND.meeresgesundheit + " %</li></ul></section>";
+    }).join("") + '<li><span class="linie gestrichelt"></span>Mindestwert ' + GUTER_ZUSTAND.meeresgesundheit + " %</li></ul></div>" +
+    '<div><h3>Strandmüll in Teilen pro 100 m</h3>' +
+    '<div class="diagramm">' + diagrammSvg(z.verlauf, [{ id: "strandmuell", farbe: "#C8382E" }], 300, MUELL_SCHWELLE, "#2E8B57") + "</div>" +
+    '<ul class="diagramm-legende"><li><span class="linie" style="background:#C8382E"></span>Strandmüll</li>' +
+    '<li><span class="linie gestrichelt gruen"></span>EU-Schwellenwert ' + MUELL_SCHWELLE + "</li></ul></div></section>";
 
   // Kompetenzprofil und Zielkonflikte
   html += '<section class="bericht-block"><h3>Dein Kompetenzprofil</h3>' +
@@ -5356,11 +5379,6 @@ function auswertungZeigen() {
       }).join("") + "</ul>"
     : "<p>Keine Säule ist in einer Runde deutlich eingebrochen. Du hast die Zielkonflikte früh abgefedert.</p>") +
     "</section>";
-
-  html += '<section class="bericht-block"><h3>Strandmüll in Teilen pro 100 m</h3>' +
-    '<div class="diagramm">' + diagrammSvg(z.verlauf, [{ id: "strandmuell", farbe: "#C8382E" }], 300, MUELL_SCHWELLE, "#2E8B57") + "</div>" +
-    '<ul class="diagramm-legende"><li><span class="linie" style="background:#C8382E"></span>Strandmüll</li>' +
-    '<li><span class="linie gestrichelt gruen"></span>EU-Schwellenwert 20</li></ul></section>';
 
   // Wissen
   const freiwillige = INFOPUNKTE.filter(function (p) { return p.runde !== INFOPUNKT_PFLICHT_RUNDE; });
@@ -5384,9 +5402,11 @@ function auswertungZeigen() {
       anzahlMassnahmen += 1;
     });
   });
-  html += '<section class="bericht-block"><h3>Deine Entscheidungen</h3>' +
+  html += '<details class="bericht-block aufklapp-block"><summary><h3>Deine Entscheidungen</h3>' +
+    '<span class="klein">' + anzahlMassnahmen + " Maßnahmen</span>" +
+    '<span class="bericht-pfeil" aria-hidden="true">▼</span></summary>' +
     (anzahlMassnahmen
-      ? '<p class="klein">' + anzahlMassnahmen + " Maßnahmen in " + RUNDEN + " Runden. „–“ heißt: in dieser Säule zurückgestellt.</p>" +
+      ? '<p class="klein">„–“ heißt: in dieser Säule zurückgestellt.</p>' +
         '<div class="entscheidungen-rahmen"><table class="entscheidungen-tabelle"><thead><tr><th scope="col">Runde</th>' +
         SAEULEN.map(function (sl) { return '<th scope="col">' + sl.name + "</th>"; }).join("") + "</tr></thead><tbody>" +
         proRunde.map(function (zeile, i) {
@@ -5395,7 +5415,7 @@ function auswertungZeigen() {
             return '<td data-saeule="' + sl.name + '">' + (namen.length ? namen.join("<br>") : '<span class="gedaempft">–</span>') + "</td>";
           }).join("") + "</tr>";
         }).join("") + "</tbody></table></div>"
-      : "<p>Du hast keine Maßnahme umgesetzt.</p>") + "</section>";
+      : "<p>Du hast keine Maßnahme umgesetzt.</p>") + "</details>";
 
   html += '<section class="bericht-block reflexion"><h3>Zum Nachdenken</h3><ul class="liste-kompakt">' +
     "<li>Welche Maßnahme hat den Müll-Eintrag am stärksten gesenkt? Warum hätte Aufräumen allein nicht gereicht?</li>" +
@@ -6616,7 +6636,6 @@ function oberflaecheVerbinden() {
     quizWeiter: quizWeiter,
     infoKnopf: budgetZeigen,
     muellInfoKnopf: muellPopupZeigen,
-    bewertungKnopf: bewertungZeigen,
     anliegenOk: anliegenSchliessen,
     otterOk: otterSchliessen,
     beendenKnopf: function () { popupOeffnen("popupBeenden"); },   // unvollständige Spiele kommen nicht ins Leaderboard
@@ -6631,7 +6650,7 @@ function oberflaecheVerbinden() {
   // Knopf → Pop-up, das er nur schließt
   const schliessen = {
     nameAbbrechen: "popupName", ereignisOk: "popupEreignis", muellSchliessen: "popupMuell",
-    budgetSchliessen: "popupBudget", bewertungSchliessen: "popupBewertung",
+    budgetSchliessen: "popupBudget",
     beendenAbbrechen: "popupBeenden", leaderboardSchliessen: "popupLeaderboard",
     ueberSchliessen: "popupUeber", quellenSchliessen: "popupQuellen"
   };
@@ -6654,11 +6673,11 @@ function oberflaecheVerbinden() {
 
 // Prüft, ob index.html und style.css zur Version dieses Skripts passen.
 // Passt etwas nicht (z. B. alte Datei oder Browser-Cache), erscheint ein Hinweis statt einer kaputten Seite.
-const BENOETIGTE_ELEMENTE = ["anzeigeWissen", "auswahlUebersicht", "popupInfo", "infoOk", "popupQuiz",
+const BENOETIGTE_ELEMENTE = ["auswahlUebersicht", "popupInfo", "infoOk", "popupQuiz",
   "quizWeiter", "massnahmenListe", "personen", "muellInfoKnopf",
   "popupMuell", "muellInhalt", "muellSchliessen", "entscheidungen", "startSzene", "startBilder", "ladebildschirm",
   "ladeKarte", "ladeFuellung", "ladeBalken", "ladeMarken", "ladeWeiter", "startVollbild", "popupQuellen", "popupUeber", "bildNachweis", "ueberBewertung", "startSonne", "startWolken", "startMeer", "startWindsack", "startHalme",
-  "popupOtter", "otterOk", "otterInhalt", "zielZusatz"];
+  "popupOtter", "otterOk", "otterInhalt"];
 
 function versionPruefen() {
   const fehlend = BENOETIGTE_ELEMENTE.filter(function (id) { return !document.getElementById(id); });

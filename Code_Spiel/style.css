@@ -123,17 +123,6 @@ button {
   font-size: 1.08rem;
 }
 
-.text-knopf {
-  padding: 0;
-  font-weight: 600;
-  color: var(--blau);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-
 /* ===== Kopfleiste ===== */
 #kopfleiste {
   position: fixed;
@@ -925,48 +914,6 @@ button {
   padding-top: 8px;
   font-size: 0.92rem;
   border-top: 1px solid var(--linie);
-}
-
-/* ===== Ziel-Tafel ===== */
-.ziel-tafel { padding: 16px 18px; }
-
-.ziel-liste {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 28px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.ziel-liste li {
-  display: grid;
-  grid-template-columns: 12px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 0;
-  font-size: 0.94rem;
-  border-bottom: 1px solid var(--linie);
-}
-
-.ziel-punkt {
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-}
-
-.ziel-ok .ziel-punkt { background: var(--gruen); }
-.ziel-offen .ziel-punkt { border: 2px solid var(--rot); }
-.ziel-wert { font-weight: 600; }
-.ziel-offen .ziel-wert { color: var(--rot); }
-
-.score-zeile {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px 16px;
-  margin-top: 14px;
 }
 
 /* ===== Seitenleiste ===== */
@@ -2449,8 +2396,8 @@ p + .info-tabelle { margin-top: 10px; }
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 24px;
-  padding: 16px 18px;
+  gap: 18px;
+  padding: 10px 16px;
   background: var(--papier);
   border-left: 6px solid var(--rot);
   border-radius: 4px;
@@ -2465,7 +2412,7 @@ p + .info-tabelle { margin-top: 10px; }
 
 .ergebnis-zahl {
   font-family: var(--schrift-schmal);
-  font-size: 3.2rem;
+  font-size: 2.5rem;
   font-weight: 700;
   line-height: 1;
 }
@@ -2482,7 +2429,39 @@ p + .info-tabelle { margin-top: 10px; }
   font-weight: 600;
 }
 
-.ergebnis + .bericht-block { margin-top: 20px; }
+.ergebnis + .bericht-block { margin-top: 14px; }
+
+/* Endauswertung kompakt: engere Abstände, Diagramme nebeneinander, Profil zweispaltig */
+#auswertungInhalt .bericht-block + .bericht-block {
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.diagramm-paar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 24px;
+}
+
+#auswertungInhalt .profil-liste {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 24px;
+}
+
+/* Aufklappbarer Block (Endauswertung: Entscheidungen) */
+.aufklapp-block > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.aufklapp-block > summary::-webkit-details-marker { display: none; }
+.aufklapp-block > summary h3 { margin: 0; }
+.aufklapp-block > summary .bericht-pfeil { margin-left: auto; }
+.aufklapp-block > summary:hover h3 { text-decoration: underline; }
+.aufklapp-block[open] > summary { margin-bottom: 8px; }
 
 .diagramm svg {
   display: block;
@@ -2492,17 +2471,17 @@ p + .info-tabelle { margin-top: 10px; }
 
 .diagramm .achse {
   font-family: var(--schrift);
-  font-size: 12px;
+  font-size: 14px;
   fill: var(--tinte-3);
 }
 
 .diagramm-legende {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 18px;
-  margin: 6px 0 0;
+  gap: 2px 12px;
+  margin: 4px 0 0;
   padding: 0;
-  font-size: 0.86rem;
+  font-size: 0.78rem;
   list-style: none;
 }
 
@@ -2609,14 +2588,7 @@ p + .info-tabelle { margin-top: 10px; }
   padding-left: 12px;
 }
 
-/* ===== Ergänzungen: Score, Säulen, Quiz ===== */
-/* Score-Zeile mit zwei Werten */
-.score-werte {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
+/* ===== Ergänzungen: Säulen, Quiz ===== */
 /* ===== Übersicht über die Entscheidungen der Runde ===== */
 .auswahl-uebersicht {
   display: flex;
@@ -2880,7 +2852,8 @@ div.bericht-entscheidung {
 .bericht-entscheidung > summary::-webkit-details-marker { display: none; }
 .bericht-entscheidung > summary:hover .bericht-massnahme { text-decoration: underline; }
 
-.bericht-entscheidung > summary:focus-visible {
+.bericht-entscheidung > summary:focus-visible,
+.aufklapp-block > summary:focus-visible {
   outline: 3px solid var(--orange);
   outline-offset: 2px;
   border-radius: 4px;
@@ -2892,7 +2865,7 @@ div.bericht-entscheidung {
   transition: transform 0.2s ease;
 }
 
-.bericht-entscheidung[open] .bericht-pfeil { transform: rotate(180deg); }
+details[open] > summary .bericht-pfeil { transform: rotate(180deg); }
 
 .bericht-erklaerung {
   margin: 0 0 10px 6.2rem;
@@ -2964,15 +2937,18 @@ div.bericht-entscheidung {
   #kennzahlen          { order: 2; }
   .entscheidungs-tafel { order: 3; }
   .runden-abschluss    { order: 4; }
-  .ziel-tafel          { order: 5; }
   .marke-name { display: inline; }
-  .ziel-liste { grid-template-columns: minmax(0, 1fr); }
   .bilanz { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .vb-zeile { grid-template-columns: minmax(0, 1fr) auto; }
   .vb-zeile .vb-werte { grid-column: 2; }
   .vb-zeile .vb-balken { grid-column: 1 / -1; grid-row: 2; margin-top: 6px; }
   .vb-zeile .vb-fuss { grid-column: 1 / -1; grid-row: 3; }
   .bericht-erklaerung { margin-left: 0; }
+  .diagramm-paar,
+  #auswertungInhalt .profil-liste { grid-template-columns: minmax(0, 1fr); }
+  .entscheidungen-tabelle { font-size: 0.8rem; }
+  .entscheidungen-tabelle th,
+  .entscheidungen-tabelle td { padding-right: 6px; }
   .vb-posten { padding: 6px 8px; }
   .ergebnis {
     grid-template-columns: minmax(0, 1fr);
