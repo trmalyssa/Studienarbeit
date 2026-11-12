@@ -141,9 +141,6 @@ const BEREICH_STIL = {
 const OTTER_RUNDEN = [3, 6, 9];
 const OTTER_ORT = { x: 6.5, y: 94 };   // Fußpunkt der Figur in Prozent der Kartenbreite/-höhe
 
-// Zwischenbilanz nach diesen Runden (3, 6, 9)
-const ZWISCHENBILANZ_ALLE = 3;
-const ZB_TOLERANZ = 3;            // so viele Punkte unter dem Soll gelten noch als „auf Kurs“
 
 // Wissen: Anteil am Endergebnis
 const WISSEN_ANTEIL = 0.2;        // Endergebnis = 80 % Nachhaltigkeit + 20 % Wissen
@@ -2232,116 +2229,9 @@ function ereignisAusloesen(z) {
   return z.ereignis;
 }
 
-// ---------- Zwischenbilanz nach Runde 3, 6 und 9 ----------
-// Der Sollkurs (KURS) ist der Maßstab: Weil alle Maßnahmen verzögert wirken und die
-// Artenvielfalt der Meeresgesundheit hinterherläuft, steigt er anfangs flach und später steiler.
-// „Auf Kurs“ heißt: höchstens ZB_TOLERANZ Punkte unter dem Sollwert dieser Runde.
-function kursGrenze(id, runde) {
-  const soll = kursSoll(id, runde);
-  if (id !== "strandmuell") return soll - ZB_TOLERANZ;
-  // Müll: Wert, dessen Müllpunkte ZB_TOLERANZ unter denen des Sollwerts liegen
-  const mp = Math.max(0, muellPunkte(soll) - ZB_TOLERANZ) / 100;
-  return Math.round(Math.exp(Math.log(MUELL_START) - mp * (Math.log(MUELL_START) - Math.log(MUELL_SCHWELLE))));
-}
-
-const ZB_HINWEISE = {
-  belastung: {
-    muell: "Die größte Belastung für das Meer ist der Müll, der jede Runde neu dazukommt. Das i neben " +
-      "dem Strandmüll in der Kopfleiste zeigt, welche Quelle am meisten beiträgt.",
-    wasser: "Die größte Belastung für das Meer kommt gerade nicht vom Strand. Was fließt außer Müll " +
-      "noch aus Fabriken und Orten ins Wasser?",
-    fischerei: "Die Fischerei setzt dem Meer gerade am stärksten zu. Was passiert mit Netzen, die niemand " +
-      "mehr einholt, und wo könnten sich Bestände erholen?",
-    klima: "Die Erwärmung belastet das Meer stärker als alles andere. Dagegen hilft nichts sofort. Lohnt " +
-      "es sich, früh damit anzufangen?"
-  },
-  artenvielfalt: "Die Artenvielfalt folgt der Meeresgesundheit mit Verzögerung. Tiere brauchen außerdem " +
-    "Rückzugsorte, an denen sie nicht gestört werden. Prüfe auch, ob eine Maßnahme ihnen dauerhaft " +
-    "Nahrung oder Lebensraum nimmt.",
-  muellEintrag: "Der Strand füllt sich schneller wieder, als er sauber wird. Aufräumen bekämpft das " +
-    "Symptom. Wo entsteht der Müll?",
-  muellBestand: "Der neue Müll ist schon deutlich gesunken. Der alte Bestand am Strand baut sich aber nur " +
-    "langsam von selbst ab.",
-  wirtschaft: "Die Betriebe kommen unter Druck. Ohne Wirtschaft sinken auch deine Einnahmen und die " +
-    "Akzeptanz. Gibt es Projekte, die Arbeit schaffen, ohne dem Meer zu schaden?",
-  tourismus: "Gäste bleiben weg. Sie achten auf saubere Strände und klares Wasser, aber auch darauf, " +
-    "was die Region ihnen bietet.",
-  akzeptanz: "Die Menschen tragen deine Entscheidungen immer weniger mit. Erklärst du genug, und hörst " +
-    "du ihnen zu? Auch zu viele Gäste können die Stimmung kippen lassen.",
-  budget: "Dein Budget ist im Minus. Laufende Kosten und teure Projekte zehren an den Rücklagen."
-};
-
-function zwischenbilanzBerechnen(z, runde, belastungen) {
-  const s = z.verlauf[z.verlauf.length - 1];
-  const start = z.verlauf[0];
-  const punkte = [
-    ["meeresgesundheit", "Meeresgesundheit"], ["artenvielfalt", "Artenvielfalt"], ["strandmuell", "Strandmüll"],
-    ["wirtschaft", "Wirtschaft"], ["tourismus", "Tourismus"], ["akzeptanz", "Akzeptanz"]
-  ].map(function (e) {
-    const muell = e[0] === "strandmuell";
-    return { id: e[0], name: e[1], wert: s[e[0]], start: start[e[0]], soll: Math.round(kursSoll(e[0], runde)),
-      grenze: Math.round(kursGrenze(e[0], runde)), einheit: muell ? " Teile" : " %", hoeher: !muell };
-  });
-  punkte.forEach(function (p) {
-    // Abstand zum Sollkurs auf der Skala 0 bis 100 (für die Rangfolge der Hinweise)
-    p.abstand = Math.max(0, kennzahlPunkte(p.id, p.soll) - kennzahlPunkte(p.id, p.wert));
-    p.ok = p.abstand <= ZB_TOLERANZ;
-  });
-  const budgetOk = s.budget >= 0;
-  const daneben = punkte.filter(function (p) { return !p.ok; }).length + (budgetOk ? 0 : 1);
-
-  let status;
-  if (daneben === 0) {
-    status = { id: "gut", titel: "Du bist auf einem guten Weg",
-      text: "Alle Kennzahlen liegen auf Kurs zum guten Umweltzustand. Halte die Richtung: In den Runden " +
-        zielFenster().von + " bis " + zielFenster().bis + " müssen alle Bedingungen gleichzeitig erfüllt sein." };
-  } else if (daneben <= 2) {
-    status = { id: "teilweise", titel: "Teilweise auf Kurs",
-      text: "Vieles entwickelt sich in die richtige Richtung, aber " + daneben +
-        (daneben === 1 ? " Kennzahl liegt" : " Kennzahlen liegen") + " hinter dem Weg zum Ziel zurück." };
-  } else {
-    status = { id: "kritisch", titel: "Kurskorrektur nötig",
-      text: daneben + " Kennzahlen liegen deutlich hinter dem Weg zum Ziel zurück. In diesem Tempo " +
-        "erreichst du den guten Umweltzustand nicht rechtzeitig." };
-  }
-
-  // Hinweise zu den zwei schwächsten Kennzahlen, ohne die Lösung zu verraten
-  const hinweise = [];
-  if (!budgetOk) hinweise.push(ZB_HINWEISE.budget);
-  punkte.filter(function (p) { return !p.ok; })
-    .sort(function (a, b) { return b.abstand - a.abstand; })
-    .slice(0, budgetOk ? 2 : 1)
-    .forEach(function (p) {
-      if (p.id === "meeresgesundheit") {
-        const groesste = Object.keys(belastungen).sort(function (a, b) { return belastungen[b] - belastungen[a]; })[0];
-        hinweise.push(ZB_HINWEISE.belastung[groesste]);
-      } else if (p.id === "strandmuell") {
-        hinweise.push(z.eintrag.gesamt > 30 ? ZB_HINWEISE.muellEintrag : ZB_HINWEISE.muellBestand);
-      } else {
-        hinweise.push(ZB_HINWEISE[p.id]);
-      }
-    });
-  if (!hinweise.length) {
-    const knappste = punkte.slice().sort(function (a, b) {
-      return (kennzahlPunkte(a.id, a.wert) - kennzahlPunkte(a.id, a.soll)) -
-             (kennzahlPunkte(b.id, b.wert) - kennzahlPunkte(b.id, b.soll));
-    })[0];
-    hinweise.push("Am knappsten ist gerade: " + knappste.name + ". Behalte diese Kennzahl im Auge.");
-  }
-
-  // Maßnahmen, deren Wirkung noch aussteht
-  const ausstehend = [];
-  z.effekte.forEach(function (e) {
-    if (e.massnahme && e.start > runde && ausstehend.indexOf(e.massnahme) < 0) ausstehend.push(e.massnahme);
-  });
-
-  return { runde: runde, status: status, punkte: punkte, budget: s.budget, budgetOk: budgetOk,
-    hinweise: hinweise, ausstehend: ausstehend.length };
-}
-
 // Rechnet eine komplette Runde durch und liefert einen Bericht.
 // Ablauf: Anhörung → Maßnahmen der drei Säulen verbuchen → aktive Wirkungen →
-//         Müllbilanz → Kennzahlen → Einnahmen → Verlauf → Zwischenbilanz →
+//         Müllbilanz → Kennzahlen → Einnahmen → Verlauf →
 //         nächste Runde vorbereiten
 function rundeAbschliessen(z, auswahl) {
   auswahl = auswahl || {};
@@ -2351,7 +2241,7 @@ function rundeAbschliessen(z, auswahl) {
   const bericht = {
     runde: r, entscheidungen: [],
     neuWirksam: [], ausgelaufen: [], foerderungen: [],
-    ereignis: null, anhoerung: [], zwischenbilanz: null
+    ereignis: null, anhoerung: []
   };
 
   // 0. Anhörung: Wer Anliegen überflogen hat, verliert Akzeptanz
@@ -2446,11 +2336,6 @@ function rundeAbschliessen(z, auswahl) {
     .forEach(function (id) { z.trend[id] = nachher[id] - vorher[id]; });
   bericht.vorher = vorher;
   bericht.nachher = nachher;
-
-  // 6b. Zwischenbilanz nach Runde 3, 6, 9
-  if (r % ZWISCHENBILANZ_ALLE === 0 && r < RUNDEN) {
-    bericht.zwischenbilanz = zwischenbilanzBerechnen(z, r, ziel.belastungen);
-  }
 
   // 7. Nächste Runde vorbereiten
   z.runde = r + 1;
@@ -4706,7 +4591,7 @@ function seekarteAnzeigen() {
 // 9. POP-UPS
 // ==========================================================
 // nachher (optional) läuft genau einmal, wenn das Pop-up mit popupFertig geschlossen wird.
-// So folgen Quiz → Bericht → Zwischenbilanz → Ereignis aufeinander.
+// So folgen Quiz → Bericht → Ereignis aufeinander.
 const nachSchliessen = {};
 
 function popupOeffnen(id, nachher) {
@@ -4956,7 +4841,7 @@ function berichtZeigen(bericht) {
   el("berichtInhalt").scrollTop = 0;
   el("berichtWeiter").textContent = zustand.beendet
     ? "Zum Abschlussquiz"
-    : bericht.zwischenbilanz ? "Zur Zwischenbilanz" : "Weiter zu Runde " + zustand.runde;
+    : "Weiter zu Runde " + zustand.runde;
   popupOeffnen("popupBericht");
   berichtAnimieren(el("berichtInhalt"));
 }
@@ -5141,50 +5026,7 @@ function berichtWeiter() {
     abschlussQuizStarten();
     return;
   }
-  const danach = function () {
-    if (b && b.ereignis) ereignisZeigen(b.ereignis);
-  };
-  if (b && b.zwischenbilanz) {
-    zwischenbilanzZeigen(b.zwischenbilanz, danach);
-  } else {
-    danach();
-  }
-}
-
-// ---------- Zwischenbilanz ----------
-function zwischenbilanzZeigen(zb, nachher) {
-  let html = '<div class="zb-status zb-' + zb.status.id + '">' +
-    '<p class="zb-titel">' + zb.status.titel + "</p><p>" + zb.status.text + "</p></div>";
-
-  html += '<section class="bericht-block"><h3>Stand nach Runde ' + zb.runde + "</h3>" +
-    '<table class="bericht-tabelle zb-tabelle"><thead><tr><th>Kennzahl</th><th>Start</th><th>jetzt</th>' +
-    "<th>Soll nach Runde " + zb.runde + '</th><th>Kurs</th></tr></thead><tbody>';
-  zb.punkte.forEach(function (p) {
-    html += '<tr><th scope="row">' + p.name + "</th><td>" + zahl(p.start) + p.einheit + "</td><td><strong>" +
-      zahl(p.wert) + p.einheit + "</strong></td><td>" + (p.hoeher ? "mind. " : "höchstens ") +
-      zahl(p.grenze) + p.einheit + "</td>" +
-      '<td class="' + (p.ok ? "trend-gut" : "trend-schlecht") + '">' + (p.ok ? "auf Kurs" : "zurück") + "</td></tr>";
-  });
-  html += '<tr><th scope="row">Budget</th><td>' + euro(STARTBUDGET) + "</td><td><strong>" + euro(zb.budget) +
-    "</strong></td><td>nicht im Minus</td>" +
-    '<td class="' + (zb.budgetOk ? "trend-gut" : "trend-schlecht") + '">' + (zb.budgetOk ? "auf Kurs" : "zurück") + "</td></tr>";
-  html += "</tbody></table>" +
-    '<p class="klein">Das Soll ist der Sollkurs, der auch in die Wertung eingeht: Wer ihm folgt, erreicht den guten ' +
-    "Umweltzustand ab Runde " + zielFenster().von + ". Weil Maßnahmen verzögert wirken, steigt er anfangs flach. " +
-    "Die Spalte „Soll“ zeigt die Grenze, bis zu der du noch als auf Kurs giltst.</p></section>";
-
-  html += '<section class="bericht-block"><h3>Was du verbessern kannst</h3><ul class="liste-kompakt">' +
-    zb.hinweise.map(function (h) { return "<li>" + h + "</li>"; }).join("") + "</ul>" +
-    (zb.ausstehend
-      ? '<p class="klein">' + zb.ausstehend + (zb.ausstehend === 1 ? " deiner Maßnahmen entfaltet ihre" :
-        " deiner Maßnahmen entfalten ihre") + " Wirkung erst in den nächsten Runden.</p>"
-      : "") +
-    "</section>";
-
-  el("zbTitel").textContent = "Zwischenbilanz nach Runde " + zb.runde;
-  el("zbInhalt").innerHTML = html;
-  el("zbInhalt").scrollTop = 0;
-  popupOeffnen("popupZwischenbilanz", nachher);
+  if (b && b.ereignis) ereignisZeigen(b.ereignis);
 }
 
 // ---------- Ereignis ----------
@@ -5376,7 +5218,7 @@ function bewertungHtml() {
 
   html += "<h3>Nachhaltigkeitsscore: den Kurs halten</h3>" +
     "<p>Jede Kennzahl hat in jeder Runde einen <strong>Sollwert</strong>. Wie weit du davon entfernt bist, zeigen " +
-    "der Rundenbericht, die Zwischenbilanz und der Otter in den Runden " + namenListe(OTTER_RUNDEN.map(String)) + ". " +
+    "der Rundenbericht und der Otter in den Runden " + namenListe(OTTER_RUNDEN.map(String)) + ". " +
     "Der Sollkurs steigt anfangs flach, weil Maßnahmen verzögert wirken, und endet bei den Mindestwerten des guten " +
     "Umweltzustands. Wer auf oder über dem Sollwert liegt, bekommt die volle Punktzahl. Liegt eine Kennzahl darunter, " +
     "sinkt ihre Punktzahl bis auf null, sobald sie " + KURS_TOLERANZ + " Punkte (beim Strandmüll: Müllpunkte) hinter dem " +
@@ -6771,7 +6613,6 @@ function oberflaecheVerbinden() {
     naechsteRunde: rundeBeenden,
     berichtWeiter: berichtWeiter,
     infoOk: function () { popupFertig("popupInfo"); },
-    zbWeiter: function () { popupFertig("popupZwischenbilanz"); },
     quizWeiter: quizWeiter,
     infoKnopf: budgetZeigen,
     muellInfoKnopf: muellPopupZeigen,
@@ -6814,7 +6655,7 @@ function oberflaecheVerbinden() {
 // Prüft, ob index.html und style.css zur Version dieses Skripts passen.
 // Passt etwas nicht (z. B. alte Datei oder Browser-Cache), erscheint ein Hinweis statt einer kaputten Seite.
 const BENOETIGTE_ELEMENTE = ["anzeigeWissen", "auswahlUebersicht", "popupInfo", "infoOk", "popupQuiz",
-  "quizWeiter", "popupZwischenbilanz", "zbWeiter", "massnahmenListe", "personen", "muellInfoKnopf",
+  "quizWeiter", "massnahmenListe", "personen", "muellInfoKnopf",
   "popupMuell", "muellInhalt", "muellSchliessen", "entscheidungen", "startSzene", "startBilder", "ladebildschirm",
   "ladeKarte", "ladeFuellung", "ladeBalken", "ladeMarken", "ladeWeiter", "startVollbild", "popupQuellen", "popupUeber", "bildNachweis", "ueberBewertung", "startSonne", "startWolken", "startMeer", "startWindsack", "startHalme",
   "popupOtter", "otterOk", "otterInhalt", "zielZusatz"];
