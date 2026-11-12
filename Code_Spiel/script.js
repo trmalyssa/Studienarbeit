@@ -1377,11 +1377,12 @@ const START_VERSION = "Version 10";
 
 // Ladebildschirm nach Namenseingabe und Spielstart (siehe Abschnitt „Ladebildschirm“ unten).
 // Feste Gesamtdauer: Der Ladebildschirm steht immer genau gesamtDauer ms, egal wie oft übersprungen wird.
-// Ohne Eingriff wechselt der Fakt alle faktDauer ms (bei 12 s / 4 s also 3 Fakten).
+// Ohne Eingriff wechselt der Fakt alle faktDauer ms (bei 8 s / 4 s also 2 Fakten, jeder volle 4 s).
+// gesamtDauer sollte ein Vielfaches von faktDauer sein, sonst wird der letzte Fakt abgeschnitten.
 // Überspringen (Enter, Leertaste, Maustaste) zeigt sofort den nächsten Fakt und startet nur die
 // Faktuhr neu, die Gesamtuhr läuft unverändert weiter.
 const LADEBILDSCHIRM = {
-  gesamtDauer: 9000,      // ms, feste Gesamtlaufzeit des Ladebildschirms
+  gesamtDauer: 8000,      // ms, feste Gesamtlaufzeit des Ladebildschirms (2 × faktDauer)
   faktDauer: 4000          // ms, so lange steht ein Fakt, wenn niemand überspringt
 };
 
@@ -1415,200 +1416,180 @@ const FAKT_KATEGORIEN = {
 
 // Fakten für den Ladebildschirm. Jeder Fakt hat eine überprüfbare Quelle (Name + Link), die im
 // Ladebildschirm unter dem Text und im Pop-up „Quellen“ erscheint.
-// Pro Ladung werden ohne Eingriff 3 Fakten gezeigt; der Rest ist Puffer fürs Überspringen.
+// Aufbau: titel = die Kernaussage (kurz, mit der wichtigsten Zahl), text = ein bis zwei kurze
+// Sätze Zusatzinfo. In 4 s muss beides lesbar sein, also knapp halten.
+// Pro Ladung werden ohne Eingriff 2 Fakten gezeigt; der Rest ist Puffer fürs Überspringen.
 // Erst wenn alle Fakten einmal dran waren, wird neu gemischt (siehe naechsterFakt).
 const MEERESFAKTEN = [
   {
-    id: "schweinswal-ostsee", kategorie: "bedroht", titel: "Der letzte Wal vor der Haustür",
-    text: "Der Schweinswal ist der einzige Wal, der in deutschen Meeren heimisch ist. In der zentralen " +
-      "Ostsee leben nur noch rund 500 Tiere, die Population gilt als akut vom Aussterben bedroht. " +
-      "Viele verenden als Beifang in Stellnetzen.",
+    id: "schweinswal-ostsee", kategorie: "bedroht",
+    titel: "Nur noch rund 500 Schweinswale in der Ostsee",
+    text: "Deutschlands einziger heimischer Wal ist dort akut vom Aussterben bedroht. Viele sterben als Beifang in Stellnetzen.",
     quelle: { name: "Deutsche Umwelthilfe, 2021",
       url: "https://www.duh.de/presse/pressemitteilungen/pressemitteilung/ostsee-schweinswal-vom-aussterben-bedroht-umweltschuetzer-starten-petition-gegen-stellnetze-in-meere/" }
   },
   {
-    id: "schweinswal-nordsee", kategorie: "nordsee", titel: "Schweinswale zählen aus der Luft",
-    text: "Bei Zählflügen im Sommer 2019 schätzten Fachleute knapp 28.000 Schweinswale in der deutschen " +
-      "Nordsee. Im Schutzgebiet Sylter Außenriff stellte das Monitoring in den Jahren davor einen starken " +
-      "Rückgang fest.",
+    id: "schweinswal-nordsee", kategorie: "nordsee",
+    titel: "Knapp 28.000 Schweinswale in der Nordsee",
+    text: "So viele schätzten Fachleute 2019 nach Zählflügen. Am Sylter Außenriff ging der Bestand zuvor stark zurück.",
     quelle: { name: "Bundesamt für Naturschutz, Monitoringbericht 2019",
       url: "https://www.bfn.de/sites/default/files/2022-05/2019-monitoringbericht-schweinswale.pdf" }
   },
   {
-    id: "seehund", kategorie: "wattenmeer", titel: "Weniger Seehunde im Watt",
-    text: "Im August 2023 zählten Fachleute im Wattenmeer von Dänemark, Deutschland und den Niederlanden " +
-      "22.621 Seehunde: der niedrigste Stand seit 2010 und der dritte Rückgang in Folge. Die Ursache ist " +
-      "noch unklar. Diskutiert werden Nahrungsmangel, Störungen, Beifang und die Konkurrenz durch Kegelrobben.",
+    id: "seehund", kategorie: "wattenmeer",
+    titel: "Seehunde: tiefster Stand seit 2010",
+    text: "2023 zählten Fachleute im Wattenmeer 22.621 Tiere, der dritte Rückgang in Folge. Die Ursache ist noch unklar.",
     quelle: { name: "ORF nach Gemeinsamem Wattenmeersekretariat, 2023", url: "https://orf.at/stories/3338410/" }
   },
   {
-    id: "auster", kategorie: "rueckkehr", titel: "Die verschwundene Auster",
-    text: "Die Europäische Auster galt in der deutschen Nordsee im 20. Jahrhundert als fast ausgestorben, " +
-      "vor allem durch Überfischung. Inzwischen wird sie wieder angesiedelt, etwa auf einem Pilotriff im " +
-      "Borkum Riffgrund. Eine einzige Auster kann am Tag bis zu 240 Liter Meerwasser filtern.",
+    id: "auster", kategorie: "rueckkehr",
+    titel: "Eine Auster filtert bis zu 240 Liter am Tag",
+    text: "In der Nordsee war sie durch Überfischung fast ausgestorben. Heute wird sie wieder angesiedelt, etwa im Borkum Riffgrund.",
     quelle: { name: "Bundesamt für Naturschutz, Faltblatt 2022",
       url: "https://www.bfn.de/sites/default/files/2022-08/2022-faltblatt-die-wiederansiedlung-der-europaeischen-auster-bfn.pdf" }
   },
   {
-    id: "rochen", kategorie: "bedroht", titel: "Haie und Rochen in Not",
-    text: "In deutschen Meeren leben zehn Arten von Haien und Rochen dauerhaft. Bis auf den Kleingefleckten " +
-      "Katzenhai gelten alle als bedroht. Der Glattrochen ist hier bereits verschollen, Nagelrochen und " +
-      "Dornhai sind vom Aussterben bedroht. Hauptursache ist der Beifang in Schleppnetzen.",
+    id: "rochen", kategorie: "bedroht",
+    titel: "Fast alle Haie und Rochen sind bedroht",
+    text: "Von zehn heimischen Arten ist nur der Kleingefleckte Katzenhai nicht gefährdet. Hauptursache ist Beifang.",
     quelle: { name: "Umwelt im Unterricht (Bundesumweltministerium)",
       url: "https://www.umwelt-im-unterricht.de/hintergrund/gefaehrdete-arten-rochen-und-haie-in-deutschen-meeren/" }
   },
   {
-    id: "eissturmvogel", kategorie: "nordsee", titel: "Plastik im Vogelmagen",
-    text: "89 % der Eissturmvögel, die zwischen 2019 und 2023 tot an der deutschen Nordseeküste gefunden " +
-      "wurden, hatten Plastik im Magen. Bei rund 48 % waren es mehr als 0,1 Gramm. Das Ziel der " +
-      "Nordsee-Anrainerstaaten liegt bei höchstens 10 %.",
+    id: "eissturmvogel", kategorie: "nordsee",
+    titel: "89 % der Eissturmvögel haben Plastik im Magen",
+    text: "Untersucht wurden tote Vögel von der Nordseeküste (2019–2023). Bei 48 % war es über 0,1 g, Ziel sind höchstens 10 %.",
     quelle: { name: "Umweltbundesamt, Indikator Kunststoffmüll in der Nordsee",
       url: "https://www.umweltbundesamt.de/daten/umweltindikatoren/indikator-kunststoffmuell-in-der-nordsee" }
   },
   {
-    id: "zugvoegel", kategorie: "wattenmeer", titel: "Drehkreuz für Zugvögel",
-    text: "Das Wattenmeer ist seit 2009 UNESCO-Weltnaturerbe. Jedes Jahr rasten hier 10 bis 12 Millionen " +
-      "Zugvögel, und rund 10.000 Tier- und Pflanzenarten leben in diesem Lebensraum.",
+    id: "zugvoegel", kategorie: "wattenmeer",
+    titel: "Bis zu 12 Millionen Zugvögel rasten im Watt",
+    text: "Und das jedes Jahr. Das Wattenmeer ist seit 2009 UNESCO-Weltnaturerbe und Heimat von rund 10.000 Arten.",
     quelle: { name: "Landesportal Schleswig-Holstein",
       url: "https://www.schleswig-holstein.de/DE/landesportal/land-und-leute/landschaft-natur/wattenmeer" }
   },
   {
-    id: "stoer", kategorie: "bedroht", titel: "Der größte Fisch, den es hier nicht mehr gibt",
-    text: "Der Europäische Stör wurde bis zu 5,4 m lang und 800 kg schwer. In Deutschland gilt er seit den " +
-      "1970er-Jahren als ausgestorben. Seit 2008 setzen Forschende Jungstöre in Elbe und Havel aus, " +
-      "bis 2015 rund 19.000 Tiere.",
+    id: "stoer", kategorie: "bedroht",
+    titel: "Der Stör wurde bis zu 5,4 Meter lang",
+    text: "In Deutschland gilt er seit den 1970er-Jahren als ausgestorben. Seit 2008 werden Jungstöre in Elbe und Havel ausgesetzt.",
     quelle: { name: "Leibniz-Institut für Gewässerökologie (IGB), 2015", url: "https://idw-online.de/de/news630239" }
   },
   {
-    id: "ocean-census", kategorie: "entdeckt", titel: "866 neue Meeresarten",
-    text: "Das Forschungsprogramm Ocean Census meldete im April 2025 866 neu entdeckte Meeresarten, darunter " +
-      "einen Hai. Bis eine neue Art offiziell beschrieben ist, können über 13 Jahre vergehen. Fachleute " +
-      "schätzen, dass erst rund 10 % des Lebens im Meer bekannt sind.",
+    id: "ocean-census", kategorie: "entdeckt",
+    titel: "866 neue Meeresarten entdeckt",
+    text: "Das meldete Ocean Census 2025, darunter ein Hai. Bekannt sind erst rund 10 % des Lebens im Meer.",
     quelle: { name: "University of Essex, 2025",
       url: "https://www.essex.ac.uk/news/2025/04/14/ocean-census-and-university-of-essex-discover-866-new-species" }
   },
   {
-    id: "korallen", kategorie: "weltmeer", titel: "Die größte Korallenbleiche",
-    text: "Seit 2023 läuft die vierte weltweite Korallenbleiche. Bis zum Frühjahr 2025 waren 84 % der " +
-      "Korallenriffe der Welt in 82 Ländern und Gebieten von Hitzestress betroffen. Ursache ist ungewöhnlich " +
-      "warmes Meerwasser.",
+    id: "korallen", kategorie: "weltmeer",
+    titel: "84 % der Korallenriffe leiden unter Hitze",
+    text: "Die vierte weltweite Korallenbleiche läuft seit 2023 und hat Riffe in 82 Ländern und Gebieten erfasst.",
     quelle: { name: "NOAA und International Coral Reef Initiative, 2025",
       url: "https://maritime-executive.com/article/unprecedented-bleaching-event-affects-84-percent-of-world-s-corals" }
   },
   {
-    id: "hochsee", kategorie: "weltmeer", titel: "Schutz für die Hohe See",
-    text: "Seit dem 17. Januar 2026 gilt das UN-Hochseeabkommen. Damit lassen sich erstmals auch Schutzgebiete " +
-      "in Meeren ausweisen, die keinem Staat gehören. Es ist ein wichtiger Schritt zum Ziel, 30 % der " +
-      "Meere unter Schutz zu stellen.",
+    id: "hochsee", kategorie: "weltmeer",
+    titel: "Erstmals Schutz für die Hohe See",
+    text: "Seit Januar 2026 gilt das UN-Hochseeabkommen. Es erlaubt Schutzgebiete in Meeren, die keinem Staat gehören.",
     quelle: { name: "SeafoodSource, 2025",
       url: "https://www.seafoodsource.com/news/environment-sustainability/high-seas-treaty-crosses-ratification-threshold-enters-force-in-january-2026" }
   },
   {
-    id: "thunfisch", kategorie: "rueckkehr", titel: "Der Thunfisch ist zurück",
-    text: "Große Blauflossenthunfische waren in den nordischen Meeren über ein halbes Jahrhundert lang sehr " +
-      "selten. Inzwischen tauchen sie im Spätsommer und Herbst wieder auf. Forschende haben 18 Tiere mit " +
-      "Satellitensendern markiert, um ihre Wanderungen zu verfolgen.",
+    id: "thunfisch", kategorie: "rueckkehr",
+    titel: "Der Blauflossenthunfisch ist zurück",
+    text: "Über 50 Jahre war er in den nordischen Meeren selten. Heute taucht er wieder auf, Satellitensender verfolgen seine Wege.",
     quelle: { name: "Aarestrup et al., Scientific Reports 2022", url: "https://doi.org/10.1038/s41598-022-15819-x" }
   },
   // ----- Erweiterung: Meeresmüll, Klima, Wattenmeer -----
   {
-    id: "plastik-eintrag", kategorie: "muell", titel: "Millionen Tonnen Plastik pro Jahr",
-    text: "Aus 192 Küstenländern gelangten im Jahr 2010 schätzungsweise 4,8 bis 12,7 Millionen Tonnen " +
-      "Plastikmüll ins Meer. Grundlage der Schätzung sind Daten zu Abfallmengen, Bevölkerungsdichte und " +
-      "Abfallentsorgung der einzelnen Länder.",
+    id: "plastik-eintrag", kategorie: "muell",
+    titel: "Bis zu 12,7 Millionen Tonnen Plastik ins Meer",
+    text: "So viel Plastikmüll gelangte 2010 schätzungsweise aus 192 Küstenländern ins Meer, in nur einem Jahr.",
     quelle: { name: "Jambeck et al., Science 2015", url: "https://doi.org/10.1126/science.1260352" }
   },
   {
-    id: "geisternetze", kategorie: "muell", titel: "Geisternetze im Müllstrudel",
-    text: "Im Großen Pazifischen Müllteppich treiben auf 1,6 Millionen Quadratkilometern mindestens 79.000 " +
-      "Tonnen Plastik. Mindestens 46 % dieser Masse sind verlorene oder zurückgelassene Fischernetze, " +
-      "sogenannte Geisternetze.",
+    id: "geisternetze", kategorie: "muell",
+    titel: "Fast die Hälfte ist altes Fischernetz",
+    text: "Mindestens 46 % des Großen Pazifischen Müllteppichs sind verlorene Netze, sogenannte Geisternetze.",
     quelle: { name: "Lebreton et al., Scientific Reports 2018", url: "https://doi.org/10.1038/s41598-018-22939-w" }
   },
   {
-    id: "tiefsee-tuete", kategorie: "muell", titel: "Plastik am tiefsten Punkt",
-    text: "Im Marianengraben filmte ein Tauchroboter eine Plastiktüte in 10.898 Metern Tiefe. Eine " +
-      "Auswertung von 30 Jahren Tiefseeaufnahmen zeigte außerdem: 89 % der gefundenen Plastikteile " +
-      "waren Einwegprodukte.",
+    id: "tiefsee-tuete", kategorie: "muell",
+    titel: "Eine Plastiktüte in 10.898 Metern Tiefe",
+    text: "Ein Tauchroboter filmte sie im Marianengraben. 89 % des gefundenen Tiefseeplastiks waren Einwegprodukte.",
     quelle: { name: "Chiba et al., Marine Policy 2018", url: "https://doi.org/10.1016/j.marpol.2018.03.022" }
   },
   {
-    id: "spuelsaum", kategorie: "muell", titel: "Müll im Spülsaum",
-    text: "Auf 100 Metern Nordseestrand finden sich im Mittel knapp 400 Müllteile, an der Ostsee sind es " +
-      "rund 70. Mindestens 70 % davon sind Kunststoffe.",
+    id: "spuelsaum", kategorie: "muell",
+    titel: "Rund 400 Müllteile auf 100 m Strand",
+    text: "So viel liegt im Mittel an der Nordsee, an der Ostsee rund 70. Mindestens 70 % davon sind Kunststoff.",
     quelle: { name: "Umweltbundesamt, Runder Tisch Meeresmüll",
       url: "https://www.umweltbundesamt.de/presse/pressemitteilungen/runder-tisch-gegen-meeresmuell-geht-in-die-zweite" }
   },
   {
-    id: "reifenabrieb", kategorie: "muell", titel: "Mikroplastik von der Straße",
-    text: "Reifenabrieb ist die größte Quelle für Mikroplastik in Deutschland. Fachleute schätzen die Menge " +
-      "auf 60.000 bis 100.000 Tonnen im Jahr, rechnerisch rund 1 Kilogramm pro Kopf. Über Luft und " +
-      "Regenwasser gelangt er in Flüsse und schließlich ins Meer.",
+    id: "reifenabrieb", kategorie: "muell",
+    titel: "Reifenabrieb: Mikroplastik-Quelle Nr. 1",
+    text: "In Deutschland bis zu 100.000 Tonnen im Jahr. Über Regenwasser und Flüsse gelangt er bis ins Meer.",
     quelle: { name: "Fraunhofer UMSICHT, 2024", url: "https://idw-online.de/de/news826927" }
   },
   {
-    id: "sauerstoff", kategorie: "weltmeer", titel: "Jeder zweite Atemzug",
-    text: "Etwa die Hälfte des Sauerstoffs, der auf der Erde entsteht, stammt aus dem Meer. Den größten " +
-      "Teil produziert Plankton, also winzige Algen, Pflanzen und Bakterien, die im Wasser treiben und " +
-      "Photosynthese betreiben.",
+    id: "sauerstoff", kategorie: "weltmeer",
+    titel: "Jeder zweite Atemzug kommt aus dem Meer",
+    text: "Etwa die Hälfte des Sauerstoffs der Erde stammt aus dem Meer, vor allem von winzigem Plankton.",
     quelle: { name: "NOAA Ocean Service", url: "https://oceanservice.noaa.gov/facts/ocean-oxygen.html" }
   },
   {
-    id: "versauerung", kategorie: "klima", titel: "Das Meer wird saurer",
-    text: "Das Meer nimmt rund 30 % des Kohlendioxids auf, das in die Atmosphäre gelangt. Dadurch ist der " +
-      "pH-Wert an der Meeresoberfläche seit Beginn der Industrialisierung um etwa 0,1 gesunken. Das " +
-      "entspricht rund 30 % mehr Säure und erschwert Muscheln und Korallen den Bau ihrer Kalkschalen.",
+    id: "versauerung", kategorie: "klima",
+    titel: "Das Meer ist rund 30 % saurer geworden",
+    text: "Es schluckt etwa 30 % des CO₂ aus der Luft. Muscheln und Korallen fällt der Bau ihrer Kalkschalen dadurch schwerer.",
     quelle: { name: "NOAA, Ocean Acidification",
       url: "https://www.noaa.gov/education/resource-collections/ocean-coasts/ocean-acidification" }
   },
   {
-    id: "ozeanwaerme", kategorie: "klima", titel: "Der größte Wärmespeicher",
-    text: "Rund 90 % der zusätzlichen Wärme, die durch den menschengemachten Treibhauseffekt entsteht, hat " +
-      "das Meer aufgenommen. Das meiste davon steckt in den oberen 700 Metern.",
+    id: "ozeanwaerme", kategorie: "klima",
+    titel: "90 % der Extra-Wärme steckt im Meer",
+    text: "Das Meer hat fast die gesamte zusätzliche Wärme des Treibhauseffekts aufgenommen, vor allem in den oberen 700 m.",
     quelle: { name: "NASA, Vital Signs: Ocean Warming", url: "https://climate.nasa.gov/vital-signs/ocean-warming/" }
   },
   {
-    id: "seegras", kategorie: "klima", titel: "Klimaschützer am Meeresgrund",
-    text: "Seegraswiesen bedecken nur etwa 0,2 % des Meeresbodens, speichern aber rund 10 % des im Meer " +
-      "gebundenen Kohlenstoffs. Pro Fläche können sie Kohlenstoff bis zu 35-mal schneller binden als " +
-      "tropischer Regenwald. Auch im Wattenmeer wachsen Seegraswiesen.",
+    id: "seegras", kategorie: "klima",
+    titel: "Seegras bindet CO₂ bis zu 35-mal schneller",
+    text: "Schneller als tropischer Regenwald, pro Fläche. Auf 0,2 % des Meeresbodens speichert es 10 % des Kohlenstoffs im Meer.",
     quelle: { name: "UN-Umweltprogramm (UNEP)",
       url: "https://www.unep.org/news-and-stories/story/seagrass-secret-weapon-fight-against-global-heating" }
   },
   {
-    id: "watt-weltrekord", kategorie: "wattenmeer", titel: "Das größte Watt der Welt",
-    text: "Das Wattenmeer von Dänemark, Deutschland und den Niederlanden ist das größte zusammenhängende " +
-      "System aus Sand- und Schlickwatt der Erde. Es gehört zu den letzten großen Gezeitenlandschaften, " +
-      "in denen natürliche Prozesse weitgehend ungestört ablaufen.",
+    id: "watt-weltrekord", kategorie: "wattenmeer",
+    titel: "Das größte Watt der Welt liegt vor unserer Küste",
+    text: "Nirgends gibt es mehr zusammenhängendes Sand- und Schlickwatt. Die Natur läuft hier weitgehend ungestört ab.",
     quelle: { name: "UNESCO-Welterbezentrum", url: "https://whc.unesco.org/en/list/1314" }
   },
   {
-    id: "kegelrobbe", kategorie: "rueckkehr", titel: "Rekord bei den Kegelrobben",
-    text: "Die Kegelrobbe ist das größte Raubtier Deutschlands. Im Frühjahr 2024 zählten Fachleute im " +
-      "Wattenmeer und auf Helgoland 11.515 Tiere, 9 % mehr als im Vorjahr. Im Winter davor kamen 2.547 " +
-      "Jungtiere zur Welt.",
+    id: "kegelrobbe", kategorie: "rueckkehr",
+    titel: "Rekord: 11.515 Kegelrobben gezählt",
+    text: "So viele lebten 2024 im Wattenmeer und auf Helgoland, 9 % mehr als im Vorjahr. Sie ist Deutschlands größtes Raubtier.",
     quelle: { name: "Gemeinsames Wattenmeersekretariat, 2024", url: "https://waddensea-worldheritage.org/node/2239" }
   },
   {
-    id: "schutzgebiete", kategorie: "nordsee", titel: "Fast die Hälfte geschützt",
-    text: "Rund 45 % der deutschen Meeresgebiete in Nord- und Ostsee sind als Schutzgebiete ausgewiesen, " +
-      "in der Nordsee etwa 43 %, in der Ostsee etwa 51 % (Stand April 2024). Die küstenfernen Gebiete " +
-      "gehören zum europäischen Schutzgebietsnetz Natura 2000.",
+    id: "schutzgebiete", kategorie: "nordsee",
+    titel: "45 % unserer Meere sind Schutzgebiete",
+    text: "In der Nordsee sind es etwa 43 %, in der Ostsee etwa 51 % (Stand April 2024).",
     quelle: { name: "Bundesamt für Naturschutz, Hintergrundpapier 2026",
       url: "https://www.bfn.de/sites/default/files/2026-01/2026%2001%2016%20Hintergrund%20Meere_Schutzgebiete_aktualisiert_pac.pdf" }
   },
   {
-    id: "kabeljau", kategorie: "nordsee", titel: "Der Kabeljau zieht nach Norden",
-    text: "Mit dem wärmeren Wasser verändert sich die Nordsee: Kälteliebende Fische wie der Kabeljau weichen " +
-      "nach Norden aus, wärmeliebende Arten aus dem Süden wandern ein. Am Südrand seines Verbreitungsgebiets " +
-      "ist der Kabeljau inzwischen fast verschwunden.",
+    id: "kabeljau", kategorie: "nordsee",
+    titel: "Der Kabeljau flieht nach Norden",
+    text: "Das wärmere Wasser vertreibt ihn, wärmeliebende Arten wandern ein. Im Süden seines Gebiets ist er fast verschwunden.",
     quelle: { name: "Umweltbundesamt, Monitoringbericht Klimaanpassung",
       url: "https://www.umweltbundesamt.de/monitoring-zur-das/handlungsfelder/fischerei/fi-i-1/indikator" }
   },
   {
-    id: "tiefsee-gesehen", kategorie: "entdeckt", titel: "Kaum ein Blick in die Tiefe",
-    text: "Weniger als 0,001 % des Tiefseebodens haben Menschen bisher mit eigenen Augen oder Kameras " +
-      "gesehen. Das entspricht etwa der Fläche des kleinsten US-Bundesstaats Rhode Island.",
+    id: "tiefsee-gesehen", kategorie: "entdeckt",
+    titel: "Weniger als 0,001 % der Tiefsee gesehen",
+    text: "Mehr haben Menschen bisher nicht vom Tiefseeboden beobachtet: eine Fläche etwa so groß wie Rhode Island.",
     quelle: { name: "NPR nach Bell et al., Science Advances 2025",
       url: "https://www.npr.org/2025/05/07/nx-s1-5387502/deep-seafloor-ocean-mapped-rhode-island" }
   }
@@ -5022,18 +5003,18 @@ function startbildschirmVerbergen() {
 }
 
 // ---------- Ladebildschirm ----------
-// Ablauf: Name bestätigen → ladebildschirmStarten() → genau LADEBILDSCHIRM.gesamtDauer (12 s) lang
+// Ablauf: Name bestätigen → ladebildschirmStarten() → genau LADEBILDSCHIRM.gesamtDauer (8 s) lang
 // Meeresfakten → danach startet das Spiel (Einführung).
 //
 // Zwei voneinander unabhängige Uhren:
-//   1. Gesamtuhr  (gesamtDauer, 12 s): startet einmal und wird NIE verlängert oder verkürzt.
+//   1. Gesamtuhr  (gesamtDauer, 8 s): startet einmal und wird NIE verlängert oder verkürzt.
 //                 Sie steuert den großen Ladebalken und das Ende des Ladebildschirms.
 //   2. Faktuhr    (faktDauer, 4 s): läuft pro Fakt. Ist sie abgelaufen, erscheint der nächste Fakt.
 //                 Beim Überspringen startet sie sofort neu. Ohne Eingriff: Fakt 1 bei 0 s,
-//                 Fakt 2 bei 4 s, Fakt 3 bei 8 s, Ende bei 12 s.
+//                 Fakt 2 bei 4 s, Ende bei 8 s. Die Faktuhr ist unsichtbar (kein Balken über dem Fakt).
 //
 // Die Uhren laufen über setTimeout und Zeitstempel (performance.now), nicht über die Bildrate.
-// requestAnimationFrame zeichnet nur die Balken. So bleiben die 12 s auch bei ruckelnder
+// requestAnimationFrame zeichnet nur den Ladebalken. So bleiben die 8 s auch bei ruckelnder
 // Darstellung oder einem Tab im Hintergrund exakt (der Browser pausiert dort nur das Zeichnen).
 //
 // Alle Eingabe-Listener hängen an einem AbortController: Ein einziges abort() beim Beenden
@@ -5044,14 +5025,14 @@ function startbildschirmVerbergen() {
 //   startZeit    performance.now() beim Start; Ende = startZeit + gesamtDauer
 //   faktStart    performance.now(), seit der aktuelle Fakt steht
 //   fakt         der angezeigte Fakt
-//   anzahl       wie viele Fakten in dieser Ladung schon gezeigt wurden (für „Fakt 2“)
+//   anzahl       wie viele Fakten in dieser Ladung schon gezeigt wurden
 //   endeTimer    setTimeout-ID der Gesamtuhr
 //   faktTimer    setTimeout-ID der Faktuhr
 //   schleife     requestAnimationFrame-ID der Zeichenschleife
 //   abbruch      AbortController der Eingabe-Listener
 //   stapel       gemischte Fakten; gezogen wird von oben, leer → neu mischen.
 //                So wiederholt sich kein Fakt, bevor alle einmal dran waren.
-//   fertig       Rückruf, der genau einmal nach Ablauf der 12 s läuft
+//   fertig       Rückruf, der genau einmal nach Ablauf der 8 s läuft
 const lade = {
   aktiv: false,
   startZeit: 0, faktStart: 0,
@@ -5066,12 +5047,6 @@ const lade = {
 function ladeGesamtFortschritt(verstrichen, einstellung) {
   const e = einstellung || LADEBILDSCHIRM;
   return Math.min(1, Math.max(0, verstrichen / e.gesamtDauer));
-}
-
-// Anteil 0…1 der verstrichenen Zeit des aktuellen Fakts (für die Faktuhr in der Karte)
-function faktFortschritt(seitFaktStart, einstellung) {
-  const e = einstellung || LADEBILDSCHIRM;
-  return Math.min(1, Math.max(0, seitFaktStart / e.faktDauer));
 }
 
 // Phase 0, 1 oder 2 der Gesamtzeit (je ein Drittel); bestimmt die Statuszeile unter dem Balken.
@@ -5134,7 +5109,7 @@ function ladebildschirmStarten(fertig) {
   lade.schleife = requestAnimationFrame(ladeSchleife);
 }
 
-// Trennstriche im großen Balken: dort wechselt der Fakt, wenn niemand überspringt (4 s, 8 s)
+// Trennstriche im Ladebalken: dort wechselt der Fakt, wenn niemand überspringt (bei 4 s)
 function ladeMarkenSetzen() {
   const anzahl = Math.round(LADEBILDSCHIRM.gesamtDauer / LADEBILDSCHIRM.faktDauer);
   let html = "";
@@ -5152,11 +5127,11 @@ function ladeNaechsterFakt() {
   lade.fakt = naechsterFakt(lade.fakt);
   lade.anzahl += 1;
   lade.faktStart = performance.now();
-  ladeFaktZeigen(lade.fakt, lade.anzahl);
+  ladeFaktZeigen(lade.fakt);
   lade.faktTimer = setTimeout(ladeNaechsterFakt, LADEBILDSCHIRM.faktDauer);
 }
 
-function ladeFaktZeigen(f, nummer) {
+function ladeFaktZeigen(f) {
   const kat = FAKT_KATEGORIEN[f.kategorie];
   const karte = el("ladeKarte");
   karte.classList.remove("fakt-ein");
@@ -5170,7 +5145,6 @@ function ladeFaktZeigen(f, nummer) {
   quelle.textContent = f.quelle.name;
   quelle.href = f.quelle.url;
   quelle.title = f.quelle.url;                     // volle Adresse beim Überfahren
-  el("ladeNummer").textContent = "Fakt " + nummer;
   karte.classList.add("fakt-ein");
 }
 
@@ -5181,12 +5155,11 @@ function ladeSchleife(zeit) {
   lade.schleife = requestAnimationFrame(ladeSchleife);
 }
 
-// Zeichnet großen Balken, Prozentzahl, Statuszeile und Faktuhr für den Zeitpunkt "jetzt"
+// Zeichnet Ladebalken, Prozentzahl und Statuszeile für den Zeitpunkt "jetzt"
 function ladeZeichnen(jetzt) {
   const verstrichen = jetzt - lade.startZeit;
   const gesamt = ladeGesamtFortschritt(verstrichen);
   el("ladeFuellung").style.transform = "scaleX(" + gesamt.toFixed(4) + ")";
-  el("ladeFaktUhr").style.transform = "scaleX(" + (1 - faktFortschritt(jetzt - lade.faktStart)).toFixed(4) + ")";
 
   const prozent = Math.round(gesamt * 100);
   if (prozent !== lade.prozent) {                  // Text und ARIA nur bei Änderung anfassen
@@ -5202,7 +5175,7 @@ function ladeZeichnen(jetzt) {
 }
 
 // Aktuellen Fakt überspringen: sofort der nächste Fakt, Faktuhr startet neu.
-// Die Gesamtuhr bleibt unberührt, das Ende nach 12 s verschiebt sich also nicht.
+// Die Gesamtuhr bleibt unberührt, das Ende nach 8 s verschiebt sich also nicht.
 function ladeUeberspringen() {
   if (!lade.aktiv) return;
   ladeNaechsterFakt();
@@ -6134,7 +6107,7 @@ function oberflaecheVerbinden() {
   });
 
   // Ladebildschirm: Die Listener fürs Überspringen meldet ladebildschirmStarten() selbst an
-  // und ladeAufraeumen() nach Ablauf der 12 s wieder ab (siehe ladeListenerAnmelden).
+  // und ladeAufraeumen() nach Ablauf der 8 s wieder ab (siehe ladeListenerAnmelden).
 }
 
 // Prüft, ob index.html und style.css zur Version dieses Skripts passen.
@@ -6142,7 +6115,7 @@ function oberflaecheVerbinden() {
 const BENOETIGTE_ELEMENTE = ["anzeigeWissen", "auswahlUebersicht", "popupInfo", "infoOk", "popupQuiz",
   "quizWeiter", "popupZwischenbilanz", "zbWeiter", "massnahmenListe", "personen", "muellInfoKnopf",
   "popupMuell", "muellInhalt", "muellSchliessen", "entscheidungen", "startSzene", "startBilder", "ladebildschirm",
-  "ladeKarte", "ladeFuellung", "ladeBalken", "ladeMarken", "ladeFaktUhr", "ladeWeiter", "startVollbild", "popupQuellen", "popupUeber", "bildNachweis", "ueberBewertung", "startSonne", "startWolken", "startMeer", "startWindsack", "startHalme",
+  "ladeKarte", "ladeFuellung", "ladeBalken", "ladeMarken", "ladeWeiter", "startVollbild", "popupQuellen", "popupUeber", "bildNachweis", "ueberBewertung", "startSonne", "startWolken", "startMeer", "startWindsack", "startHalme",
   "popupOtter", "otterOk", "otterInhalt", "zielZusatz"];
 
 function versionPruefen() {
@@ -6182,7 +6155,7 @@ if (typeof module !== "undefined" && module.exports) {
     abschlussFragen: abschlussFragen, quizAntwortWerten: quizAntwortWerten, FRAGEN: FRAGEN, INFOPUNKTE: INFOPUNKTE,
     istUmgesetzt: istUmgesetzt, einnahmenBerechnen: einnahmenBerechnen,
     MEERESFAKTEN: MEERESFAKTEN, FAKT_KATEGORIEN: FAKT_KATEGORIEN, LADEBILDSCHIRM: LADEBILDSCHIRM,
-    ladeGesamtFortschritt: ladeGesamtFortschritt, faktFortschritt: faktFortschritt, ladePhase: ladePhase,
+    ladeGesamtFortschritt: ladeGesamtFortschritt, ladePhase: ladePhase,
     naechsterFakt: naechsterFakt, faktenZiehen: faktenZiehen
   };
 
