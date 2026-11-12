@@ -1,0 +1,11 @@
+{
+  // Name muss exakt dem Worker-Namen im Cloudflare-Dashboard entsprechen
+  "name": "studienarbeit",
+  "compatibility_date": "2026-11-01",
+  // Statische Dateien des Spiels (index.html, script.js, style.css)
+  "assets": {
+    "directory": "./Code_Spiel"
+  },
+  // Wird von `npx wrangler preview` (Builds auf Nicht-Produktions-Branches) verlangt
+  "previews": {}
+}
