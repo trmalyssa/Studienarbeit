@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="style.css?v=18">
+  <link rel="stylesheet" href="style.css?v=21">
 </head>
 <body>
 
@@ -63,35 +63,19 @@
     <button id="beendenKnopf" class="kopf-knopf" type="button">Spiel beenden</button>
   </header>
 
-  <!-- ===== Spielfläche ===== -->
-  <!-- Links: Karte, Entscheidungen, Ziel. Rechts (mitlaufend): Zustand der Region und Rundenabschluss. -->
+  <!-- ===== Spielfläche =====
+       Die Karte füllt den Bildschirm unter der Kopfleiste. Darüber liegen: oben ein Hinweis, was als Nächstes
+       zu tun ist; rechts Zustand der Region und Legende; unten links das Maßnahmen-Fenster (auf- und zuklappbar)
+       mit „Runde beenden“. Auf schmalen Bildschirmen steht alles untereinander. -->
   <main id="layout">
-    <div id="hauptspalte">
+    <section class="karten-rahmen" aria-label="Karte deiner Küstenregion">
+      <div id="seekarte" class="seekarte" role="img"
+           aria-label="Karte der Küstenregion mit Strand, Fluss, Ort, Hafen und Meer. Sie zeigt Müll, Fische und Wasserqualität."></div>
+      <!-- Infopunkte und Personen mit Sprechblasen liegen als Knöpfe über der Karte -->
+      <div id="personen" class="personen-ebene"></div>
+    </section>
 
-      <section class="tafel karten-tafel" aria-labelledby="kartenTitel">
-        <div class="tafel-kopf">
-          <h2 id="kartenTitel">Karte deiner Küstenregion</h2>
-        </div>
-        <div class="karten-rahmen">
-          <div id="seekarte" class="seekarte" role="img"
-               aria-label="Karte der Küstenregion mit Strand, Fluss, Ort, Hafen und Meer. Sie zeigt Müll, Fische und Wasserqualität."></div>
-          <!-- Infopunkte und Personen mit Sprechblasen liegen als Knöpfe über der Karte -->
-          <div id="personen" class="personen-ebene"></div>
-        </div>
-        <ul id="kartenLegende" class="legende"></ul>
-      </section>
-
-      <section id="entscheidungen" class="tafel entscheidungs-tafel" aria-labelledby="massnahmenTitel">
-        <div class="tafel-kopf">
-          <h2 id="massnahmenTitel">Entscheidungen der Runde</h2>
-          <div id="bereichAnzeige" class="bereich-anzeige"></div>
-          <p class="tafel-zusatz">Klicke auf eine Maßnahme, um sie aufzuklappen.</p>
-        </div>
-        <p id="foerderHinweis" class="foerder-hinweis versteckt"></p>
-        <div id="massnahmenListe" class="saeulen-raster"></div>
-      </section>
-
-    </div>
+    <p id="anhoerungHinweis" class="karten-hinweis" aria-live="polite"></p>
 
     <aside id="seitenleiste">
       <section id="kennzahlen" class="tafel" aria-labelledby="kennzahlenTitel">
@@ -102,12 +86,28 @@
         <p class="kennzahl-legende"><span class="ziel-strich" aria-hidden="true"></span>Mindestwert für den guten Umweltzustand</p>
       </section>
 
-      <section class="tafel runden-abschluss" aria-label="Runde abschließen">
-        <div id="auswahlUebersicht" class="auswahl-uebersicht" aria-live="polite"></div>
-        <button id="naechsteRunde" class="haupt-knopf" type="button" aria-describedby="anhoerungHinweis">Runde beenden</button>
-        <p id="anhoerungHinweis" class="anhoerung-hinweis" aria-live="polite"></p>
+      <section class="tafel legenden-tafel" aria-labelledby="legendeTitel">
+        <h2 id="legendeTitel">Legende</h2>
+        <ul id="kartenLegende" class="legende"></ul>
       </section>
     </aside>
+
+    <section id="entscheidungen" class="massnahmen-fenster" aria-label="Maßnahmen der Runde">
+      <button id="massnahmenKlappe" class="fenster-kopf" type="button" aria-expanded="true" aria-controls="massnahmenInhalt">
+        <span class="fenster-titel">Maßnahmen der Runde</span>
+        <span id="massnahmenStand" class="fenster-stand"></span>
+        <span class="fenster-pfeil" aria-hidden="true"></span>
+      </button>
+      <div id="massnahmenInhalt" class="fenster-inhalt">
+        <div id="saeulenReiter" class="saeulen-reiter" role="tablist" aria-label="Säulen der Nachhaltigkeit"></div>
+        <p id="foerderHinweis" class="foerder-hinweis versteckt"></p>
+        <div id="massnahmenListe" class="massnahmen-liste"></div>
+      </div>
+      <div class="fenster-fuss">
+        <div id="auswahlUebersicht" class="auswahl-uebersicht" aria-live="polite"></div>
+        <button id="naechsteRunde" class="haupt-knopf" type="button" aria-describedby="anhoerungHinweis">Runde beenden</button>
+      </div>
+    </section>
   </main>
 
   <!-- ===== Startbildschirm ===== -->
@@ -445,6 +445,6 @@
     </div>
   </div>
 
-  <script src="script.js?v=19"></script>
+  <script src="script.js?v=21"></script>
 </body>
 </html>
