@@ -4665,7 +4665,8 @@ function einfuehrungSeiten() {
     {
       titel: "Befreie die Küste von Müll",
       html: '<div class="seekarte minikarte" role="img" aria-label="Die Karte deiner Region: Erst liegt überall Müll, ' +
-        'dann wird sie sauber, bis nur noch drei Teile übrig sind.">' + seekarteSvg(zustand) + "</div>",
+        'dann wird sie sauber, bis nur noch drei Teile übrig sind.">' +
+        seekarteSvg(zustand).replace('viewBox="0 0 ' + KARTE_B + " " + KARTE_H + '"', 'viewBox="' + MINIKARTE.join(" ") + '"') + "</div>",
       breit: true,
       start: minikarteAufraeumen
     }
@@ -4749,17 +4750,31 @@ function zielBalkenAnimieren(inhalt) {
   requestAnimationFrame(bild);
 }
 
-// Minikarte: Der Müll verschwindet nach und nach von links nach rechts, drei verteilte Teile bleiben liegen
+// Minikarte: herangezoomter Ausschnitt der Karte (x, y, Breite, Höhe; Seitenverhältnis wie die Karte)
+// um die Flussmündung mit Strand, Fluss und Treibgut, wo zu Spielbeginn viel Müll liegt.
+// Der Müll im Ausschnitt verschwindet nach und nach von links nach rechts, drei verteilte Teile bleiben liegen.
+const MINIKARTE = [160, 70, 250, 100];
+
 function minikarteAufraeumen(inhalt) {
+  // auch angeschnittene Teile am Rand zählen als sichtbar
+  const sichtbar = function (b) {
+    return b.x + b.width > MINIKARTE[0] && b.x < MINIKARTE[0] + MINIKARTE[2] &&
+      b.y + b.height > MINIKARTE[1] && b.y < MINIKARTE[1] + MINIKARTE[3];
+  };
   const teile = Array.prototype.filter.call(inhalt.querySelectorAll(".ka-muell"), function (t) {
-    return !t.parentElement.closest(".ka-muell");
+    return !t.parentElement.closest(".ka-muell") && sichtbar(t.getBBox());
   }).map(function (t) { return { el: t, x: t.getBBox().x }; }).sort(function (a, b) { return a.x - b.x; });
-  const bleiben = [0.15, 0.5, 0.85].map(function (a) { return Math.round(a * (teile.length - 1)); });
+  const ganz = teile.filter(function (t) {
+    const b = t.el.getBBox();
+    return b.x > MINIKARTE[0] + 8 && b.x + b.width < MINIKARTE[0] + MINIKARTE[2] - 8 &&
+      b.y > MINIKARTE[1] + 8 && b.y + b.height < MINIKARTE[1] + MINIKARTE[3] - 8;
+  });
+  const bleiben = [0.15, 0.5, 0.85].map(function (a) { return teile.indexOf(ganz[Math.round(a * (ganz.length - 1))]); });
   const weg = teile.filter(function (_, i) { return bleiben.indexOf(i) < 0; });
   const ruhig = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   weg.forEach(function (t, i) {
-    t.el.style.transition = "opacity 0.7s ease, transform 0.7s ease";
-    t.el.style.transitionDelay = ruhig ? "0s" : (0.9 + i * 3 / weg.length).toFixed(2) + "s";
+    t.el.style.transition = "opacity 0.6s ease, transform 0.6s ease";
+    t.el.style.transitionDelay = ruhig ? "0s" : (1 + i * 4 / weg.length).toFixed(2) + "s";
   });
   // zwei Bilder warten, damit der volle Ist-Zustand erst gezeichnet ist
   requestAnimationFrame(function () {
