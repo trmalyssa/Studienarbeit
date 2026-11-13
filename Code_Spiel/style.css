@@ -4,7 +4,7 @@
 
 /* ===== Grundwerte (zentral änderbar) ===== */
 :root {
-  --layout-version: 12;       /* script.js prüft diesen Wert, damit HTML, CSS und JS zusammenpassen */
+  --layout-version: 13;       /* script.js prüft diesen Wert, damit HTML, CSS und JS zusammenpassen */
   --tinte: #12304A;          /* Linien und Text wie auf einer Seekarte */
   --tinte-2: #3E5A70;        /* zweitrangiger Text */
   --tinte-3: #687F91;        /* Hinweise */
@@ -21,7 +21,8 @@
   --magenta: #B0307A;        /* Sperrgebiet auf Seekarten */
   --blau: #1D4F8C;
   --kopfhoehe: 68px;
-  --seitenleiste: 392px;
+  --zustand-breite: 250px;   /* Zustand der Region, links oben über der Karte */
+  --fenster-breite: 400px;   /* Maßnahmen-Fenster, rechts unten über der Karte */
   --abstand: 16px;
   --radius: 8px;
   --schrift: "Barlow", "Segoe UI", system-ui, sans-serif;
@@ -365,14 +366,15 @@ button {
   border-radius: 10px;
 }
 
-/* Was als Nächstes zu tun ist: Hinweis oben mittig über der freien Kartenfläche */
+/* Was als Nächstes zu tun ist: Hinweis oben mittig zwischen Zustand (links) und Maßnahmen-Fenster (rechts) */
 .karten-hinweis {
   position: absolute;
   top: 12px;
-  left: calc((100% - var(--seitenleiste) - var(--abstand)) / 2);
+  left: calc(var(--zustand-breite) + 2 * var(--abstand) +
+    (100% - var(--zustand-breite) - var(--fenster-breite) - 4 * var(--abstand)) / 2);
   z-index: 4;
   width: max-content;
-  max-width: min(560px, calc(100% - var(--seitenleiste) - 5 * var(--abstand)));
+  max-width: min(560px, calc(100% - var(--zustand-breite) - var(--fenster-breite) - 6 * var(--abstand)));
   padding: 8px 18px;
   font-size: 0.9rem;
   line-height: 1.4;
@@ -935,24 +937,125 @@ button {
   border-top: 1px solid var(--linie);
 }
 
-/* ===== Seitenleiste: rechts über der Karte (Zustand der Region und Legende) ===== */
-#seitenleiste {
-  position: absolute;
-  top: var(--abstand);
-  right: var(--abstand);
-  z-index: 5;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: var(--seitenleiste);
-  max-height: calc(100% - 2 * var(--abstand));
-  overflow-y: auto;
+/* ===== Fenster über der Karte (HUD) ===== */
+.hud-fenster {
+  overflow: hidden;
+  background: var(--flaeche);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(11, 34, 56, 0.26);
 }
 
-#seitenleiste .tafel { box-shadow: 0 6px 20px rgba(11, 34, 56, 0.18); }
-.legenden-tafel { padding: 12px 18px 14px; }
+/* Zustand der Region: links oben, kompakt; eingeklappt nur Kurzwerte */
+.zustand-fenster {
+  position: absolute;
+  top: var(--abstand);
+  left: var(--abstand);
+  z-index: 5;
+  width: var(--zustand-breite);
+}
 
-#kennzahlen { padding: 16px 18px 16px; }
+.zustand-fenster .fenster-kopf { padding: 8px 12px; }
+.zustand-fenster .fenster-titel { font-size: 1rem; }
+.zustand-inhalt { padding: 10px 12px 10px; }
+.zustand-inhalt[hidden] { display: none; }
+#kennzahlen .kennzahlen-liste { gap: 8px; }
+
+#kennzahlen .kennzahl-kopf {
+  margin-bottom: 3px;
+  font-size: 0.85rem;
+}
+
+#kennzahlen .kennzahl-wert { gap: 5px; }
+#kennzahlen .trend { font-size: 0.7rem; }
+#kennzahlen .balken { height: 6px; }
+
+#kennzahlen .kennzahl-legende {
+  margin-top: 8px;
+  font-size: 0.7rem;
+}
+
+.kennzahlen-kurz {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 10px;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+}
+
+.kennzahlen-kurz[hidden] { display: none; }
+
+.kurzwert {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.kurzwert strong { margin-left: auto; }
+
+.ampel-punkt {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* Legende: kleiner Knopf links unten, öffnet die Legende darüber */
+.legenden-ecke {
+  position: absolute;
+  left: var(--abstand);
+  bottom: var(--abstand);
+  z-index: 6;
+}
+
+.legende-knopf {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  font-family: Georgia, serif;
+  font-size: 1.25rem;
+  font-style: italic;
+  font-weight: 700;
+  color: #111;
+  background: #fff;
+  border: 1px solid var(--linie);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(11, 34, 56, 0.25);
+  cursor: pointer;
+}
+
+.legende-knopf:hover { background: var(--papier); }
+
+.legende-knopf:focus-visible {
+  outline: 3px solid var(--orange);
+  outline-offset: 2px;
+}
+
+/* neues Symbol seit dem letzten Öffnen */
+.legende-knopf.neu::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 11px;
+  height: 11px;
+  background: var(--orange);
+  border: 2px solid #fff;
+  border-radius: 50%;
+}
+
+.legenden-tafel {
+  position: absolute;
+  left: 0;
+  bottom: 48px;
+  width: min(320px, calc(100vw - 2 * var(--abstand)));
+  padding: 12px 16px 14px;
+}
+
+.legenden-tafel[hidden] { display: none; }
 
 .kennzahlen-liste {
   display: grid;
@@ -1089,21 +1192,17 @@ button {
 .trend-schlecht { color: var(--rot); }
 .gedaempft { color: var(--tinte-3); }
 
-/* ===== Maßnahmen-Fenster unten links über der Karte ===== */
+/* ===== Maßnahmen-Fenster rechts unten über der Karte ===== */
 /* Kopf (Titel, Stand, Pfeil) klappt den Inhalt auf und zu; Fuß mit Kosten und „Runde beenden“ bleibt stehen. */
 .massnahmen-fenster {
   position: absolute;
-  left: var(--abstand);
+  right: var(--abstand);
   bottom: var(--abstand);
   z-index: 5;
   display: flex;
   flex-direction: column;
-  width: min(400px, calc(100% - var(--seitenleiste) - 3 * var(--abstand)));
-  max-height: calc(100% - var(--abstand) - 72px);   /* oben bleibt Platz für den Hinweis */
-  overflow: hidden;
-  background: var(--flaeche);
-  border-radius: 10px;
-  box-shadow: 0 8px 28px rgba(11, 34, 56, 0.26);
+  width: min(var(--fenster-breite), calc(100% - 2 * var(--abstand)));
+  max-height: calc(100% - 2 * var(--abstand));
 }
 
 .fenster-kopf {
@@ -1129,6 +1228,7 @@ button {
 
 .fenster-titel {
   flex: 1;
+  white-space: nowrap;
   font-family: var(--schrift-schmal);
   font-size: 1.12rem;
   font-weight: 600;
@@ -1145,7 +1245,7 @@ button {
 .fenster-stand:empty { display: none; }
 .fenster-stand.komplett { background: var(--gruen); }
 
-/* Pfeil: offen nach unten (zuklappen), zu nach oben (aufklappen) */
+/* Pfeil zeigt, wohin das Fenster klappt: Maßnahmen (unten) offen nach unten, Zustand (oben) offen nach oben */
 .fenster-pfeil {
   flex: none;
   width: 9px;
@@ -1156,7 +1256,8 @@ button {
   transition: transform 0.2s ease;
 }
 
-.massnahmen-fenster.zu .fenster-pfeil { transform: translateY(2px) rotate(-135deg); }
+.massnahmen-fenster.zu .fenster-pfeil,
+.zustand-fenster:not(.zu) .fenster-pfeil { transform: translateY(2px) rotate(-135deg); }
 
 .fenster-inhalt {
   display: flex;
@@ -3000,7 +3101,11 @@ details[open] > summary .bericht-pfeil { transform: rotate(180deg); }
   .kopf-level,
   .kopf-label-zusatz { display: none; }
   .runden-feld { width: 14px; }
-  :root { --seitenleiste: 300px; }
+  :root {
+    --zustand-breite: 230px;
+    --fenster-breite: 340px;
+  }
+  .stand-zusatz { display: none; }
 }
 
 /* Unter 1060 px: Markenname ausblenden */
@@ -3052,18 +3157,22 @@ details[open] > summary .bericht-pfeil { transform: rotate(180deg); }
     border-radius: 8px;
     transform: none;
   }
-  #seitenleiste {
+  .zustand-fenster,
+  .massnahmen-fenster,
+  .legenden-ecke,
+  .legenden-tafel {
     position: static;
-    display: contents;
-  }
-  #kennzahlen { order: 3; }
-  .massnahmen-fenster {
-    position: static;
-    order: 4;
     width: auto;
     max-height: none;
   }
-  .legenden-tafel { order: 5; }
+  .zustand-fenster { order: 3; }
+  .massnahmen-fenster { order: 4; }
+  .legenden-ecke {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 8px;
+    order: 5;
+  }
   .massnahmen-liste { overflow: visible; }
   .marke-name { display: inline; }
   .bilanz { grid-template-columns: repeat(2, minmax(0, 1fr)); }

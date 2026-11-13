@@ -169,12 +169,12 @@ const QUELLEN = [
 const GUTER_ZUSTAND = { meeresgesundheit: 75, artenvielfalt: 75, wirtschaft: 55, tourismus: 50, akzeptanz: 55 };
 const AKZEPTANZ_MINDEST = GUTER_ZUSTAND.akzeptanz;
 
-// Balken in der Seitenleiste (Akzeptanz steht im Kopfbalken)
+// Balken im Fenster „Zustand der Region“ (Akzeptanz steht im Kopfbalken)
 const KENNZAHLEN = [
-  { id: "meeresgesundheit", name: "Meeresgesundheit", mindest: GUTER_ZUSTAND.meeresgesundheit },
-  { id: "artenvielfalt",    name: "Artenvielfalt",    mindest: GUTER_ZUSTAND.artenvielfalt },
-  { id: "wirtschaft",       name: "Wirtschaft",       mindest: GUTER_ZUSTAND.wirtschaft },
-  { id: "tourismus",        name: "Tourismus",        mindest: GUTER_ZUSTAND.tourismus }
+  { id: "meeresgesundheit", name: "Meeresgesundheit", kurz: "Meer",       mindest: GUTER_ZUSTAND.meeresgesundheit },
+  { id: "artenvielfalt",    name: "Artenvielfalt",    kurz: "Arten",      mindest: GUTER_ZUSTAND.artenvielfalt },
+  { id: "wirtschaft",       name: "Wirtschaft",       kurz: "Wirtschaft", mindest: GUTER_ZUSTAND.wirtschaft },
+  { id: "tourismus",        name: "Tourismus",        kurz: "Tourismus",  mindest: GUTER_ZUSTAND.tourismus }
 ];
 
 // ---------- Bewertung: Kurs halten statt Rohwerte sammeln ----------
@@ -2516,6 +2516,34 @@ function kennzahlenAnzeigen() {
     balken.style.backgroundColor = ampelFarbe(wert, k.mindest);
     el("wert-" + k.id).innerHTML = trendHtml(z.trend[k.id], true) + "<strong>" + wert + " %</strong>";
   });
+  // eingeklappt: Kurzname, Ampelpunkt und Wert
+  el("kennzahlenKurz").innerHTML = KENNZAHLEN.map(function (k) {
+    const wert = z.kennzahlen[k.id];
+    return '<span class="kurzwert" title="' + k.name + '"><span class="ampel-punkt" style="background:' + ampelFarbe(wert, k.mindest) +
+      '"></span>' + k.kurz + " <strong>" + wert + " %</strong></span>";
+  }).join("");
+}
+
+// ---------- Fenster über der Karte: Zustand und Legende ----------
+// Zustand der Region (links oben) klappt auf die Kurzwerte zusammen; die Legende öffnet sich über ihrem Knopf
+// (links unten). Ein Punkt am Knopf zeigt, dass seit dem letzten Öffnen ein neues Symbol dazugekommen ist.
+function zustandFensterSetzen(offen) {
+  el("zustandInhalt").hidden = !offen;
+  el("kennzahlenKurz").hidden = offen;
+  el("zustandKlappe").setAttribute("aria-expanded", offen ? "true" : "false");
+  el("kennzahlen").classList.toggle("zu", !offen);
+}
+
+const legende = { spiel: null, gesehen: [] };
+
+function legendeSetzen(offen) {
+  el("legendeInhalt").hidden = !offen;
+  el("legendeKnopf").setAttribute("aria-expanded", offen ? "true" : "false");
+  el("legendeKnopf").setAttribute("aria-label", offen ? "Legende schließen" : "Legende anzeigen");
+  if (offen) {
+    legende.gesehen = Array.prototype.map.call(el("kartenLegende").children, function (li) { return li.textContent; });
+    el("legendeKnopf").classList.remove("neu");
+  }
 }
 
 // ---------- Entscheidungsfenster ----------
@@ -2854,7 +2882,7 @@ function uebersichtAnzeigen() {
   }
   const entschieden = SAEULEN.length - entscheidungenOffen(z).length;
   const kosten = geplanteKosten(z, null);
-  stand.textContent = entschieden + " von " + SAEULEN.length + " entschieden";
+  stand.innerHTML = entschieden + " von " + SAEULEN.length + '<span class="stand-zusatz"> entschieden</span>';
   stand.classList.toggle("komplett", entschieden === SAEULEN.length);
   feld.innerHTML =
     '<span class="uebersicht-kosten">Kosten <strong>' + euro(kosten) + "</strong> · danach <strong" +
@@ -3047,8 +3075,8 @@ function kuestenlinie(x) {
 
 // ---------- Sichtbereich ----------
 // Im Kern der Karte (0 bis 800 × 0 bis 320) liegen alle Spielinhalte. Die Karte füllt den ganzen Bildschirm
-// unter der Kopfleiste: Der Kern bleibt immer ganz sichtbar (links neben der Seitenleiste), der Rest des
-// Bildschirms wird mit Land (oben, 30 %) und Meer (unten, 70 %, dort liegt das Maßnahmen-Fenster) aufgefüllt.
+// unter der Kopfleiste: Der Kern bleibt immer ganz sichtbar (links neben dem Maßnahmen-Fenster), der Rest des
+// Bildschirms wird je zur Hälfte mit Land (oben, dort liegt der Zustand der Region) und Meer (unten) aufgefüllt.
 const KARTEN_KERN = { x: 0, y: 0, b: KARTE_B, h: KARTE_H };
 let kartenSicht = KARTEN_KERN;
 
@@ -3057,15 +3085,16 @@ function sichtBerechnen() {
   const breite = karte.clientWidth;
   const hoehe = karte.clientHeight;
   if (!breite || !hoehe) return KARTEN_KERN;
-  // Liegt die Seitenleiste über der Karte, bleibt der Kern links von ihr
-  const leiste = el("seitenleiste");
+  // Liegt das Maßnahmen-Fenster über der Karte, bleibt der Kern links von ihm (auch wenn es zugeklappt ist,
+  // damit die Karte beim Auf- und Zuklappen nicht springt)
+  const fenster = el("entscheidungen");
   let frei = breite;
-  if (getComputedStyle(leiste).position === "absolute") {
-    frei = Math.max(breite * 0.45, leiste.getBoundingClientRect().left - karte.getBoundingClientRect().left - 12);
+  if (getComputedStyle(fenster).position === "absolute") {
+    frei = Math.max(breite * 0.45, fenster.getBoundingClientRect().left - karte.getBoundingClientRect().left - 12);
   }
   const mass = Math.min(frei / KARTE_B, hoehe / KARTE_H);
   const h = hoehe / mass;
-  return { x: -Math.max(0, frei / mass - KARTE_B) / 2, y: -(h - KARTE_H) * 0.3, b: breite / mass, h: h };
+  return { x: -Math.max(0, frei / mass - KARTE_B) / 2, y: -(h - KARTE_H) * 0.5, b: breite / mass, h: h };
 }
 
 // Lage eines Orts (in Prozent des Kerns) auf dem Bildschirm, in Prozent der sichtbaren Karte
@@ -4768,10 +4797,21 @@ function seekarteAnzeigen() {
       '<path d="M0,6 V-2 M0,-2 l-5,-2.5 M0,-2 l5,-2.5 M0,-2 l0,5"/></g><circle cx="0" cy="-2" r="1.2" fill="#12304A"/>',
       "-8 -6 16 12"), "Windpark", istUmgesetzt(z, "windpark")]
   ];
-  el("kartenLegende").innerHTML = eintraege.filter(function (e) { return e[2]; }).map(function (e) {
+  const sichtbar = eintraege.filter(function (e) { return e[2]; });
+  el("kartenLegende").innerHTML = sichtbar.map(function (e) {
     const zeichen = e[0].charAt(0) === "<" ? e[0] : '<span class="lg ' + e[0] + '" aria-hidden="true"></span>';
     return "<li>" + zeichen + e[1] + "</li>";
   }).join("");
+  // Punkt am Knopf, sobald ein Eintrag dazukommt, den man noch nicht gesehen hat (neues Spiel: alles neu)
+  if (legende.spiel !== z) {
+    legende.spiel = z;
+    legende.gesehen = [];
+  }
+  if (!el("legendeInhalt").hidden) {
+    legendeSetzen(true);
+  } else if (sichtbar.some(function (e) { return legende.gesehen.indexOf(e[1]) < 0; })) {
+    el("legendeKnopf").classList.add("neu");
+  }
 }
 
 // ==========================================================
@@ -4858,7 +4898,7 @@ function einfuehrungWeiter() {
   }
 }
 
-// Status-Balken wie in der Seitenleiste, dazu Akzeptanz und Strandmüll.
+// Status-Balken wie im Fenster „Zustand der Region“, dazu Akzeptanz und Strandmüll.
 // ist = Startwert, soll = Mindestwert des guten Umweltzustands (Strandmüll: knapp unter dem Schwellenwert);
 // liegt ein Wert schon darüber, bleibt er stehen.
 function zielBalkenZeilen() {
@@ -5152,7 +5192,7 @@ function veraenderungHtml(bericht) {
   const mb = bericht.muell;
   let html = '<div class="vb-liste">';
 
-  // Kennzahlen und Akzeptanz: Ampelfarbe wie in der Seitenleiste und der Kopfleiste
+  // Kennzahlen und Akzeptanz: Ampelfarbe wie im Fenster „Zustand der Region“ und in der Kopfleiste
   const reihen = KENNZAHLEN.map(function (k) {
     return { id: k.id, name: k.name, marke: k.mindest, markeTitel: "Mindestwert " + k.mindest + " %",
       farbe: function (x) { return ampelFarbe(x, k.mindest); } };
@@ -6877,6 +6917,16 @@ function kartenGroesseAnpassen() {
 
 function oberflaecheVerbinden() {
   window.addEventListener("resize", kartenGroesseAnpassen);
+  // Legende schließt bei Klick daneben oder mit Esc
+  document.addEventListener("click", function (e) {
+    if (!el("legendeInhalt").hidden && !e.target.closest(".legenden-ecke")) legendeSetzen(false);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !el("legendeInhalt").hidden) {
+      legendeSetzen(false);
+      el("legendeKnopf").focus();
+    }
+  });
   // Knopf → Aktion
   const aktionen = {
     startNeuesSpiel: namePopupOeffnen,
@@ -6886,6 +6936,8 @@ function oberflaecheVerbinden() {
     einfuehrungZurueck: function () { einfuehrungZeigen(einfuehrungSchritt - 1); },
     naechsteRunde: rundeBeenden,
     massnahmenKlappe: function () { massnahmenFensterSetzen(!massnahmenFenster.offen); },
+    zustandKlappe: function () { zustandFensterSetzen(el("zustandInhalt").hidden); },
+    legendeKnopf: function () { legendeSetzen(el("legendeInhalt").hidden); },
     berichtWeiter: berichtWeiter,
     infoOk: function () { popupFertig("popupInfo"); },
     quizWeiter: quizWeiter,
@@ -6928,7 +6980,8 @@ function oberflaecheVerbinden() {
 
 // Prüft, ob index.html und style.css zur Version dieses Skripts passen.
 // Passt etwas nicht (z. B. alte Datei oder Browser-Cache), erscheint ein Hinweis statt einer kaputten Seite.
-const BENOETIGTE_ELEMENTE = ["auswahlUebersicht", "massnahmenKlappe", "massnahmenInhalt", "massnahmenStand", "saeulenReiter", "popupInfo", "infoOk", "popupQuiz",
+const BENOETIGTE_ELEMENTE = ["zustandKlappe", "zustandInhalt", "kennzahlenKurz", "legendeKnopf", "legendeInhalt",
+  "auswahlUebersicht", "massnahmenKlappe", "massnahmenInhalt", "massnahmenStand", "saeulenReiter", "popupInfo", "infoOk", "popupQuiz",
   "quizWeiter", "massnahmenListe", "personen", "muellInfoKnopf",
   "popupMuell", "muellInhalt", "muellSchliessen", "entscheidungen", "startSzene", "startBilder", "ladebildschirm",
   "ladeKarte", "ladeFuellung", "ladeBalken", "ladeMarken", "ladeWeiter", "startVollbild", "popupQuellen", "popupUeber", "bildNachweis", "ueberBewertung", "startSonne", "startWolken", "startMeer", "startWindsack", "startHalme",
@@ -6936,7 +6989,7 @@ const BENOETIGTE_ELEMENTE = ["auswahlUebersicht", "massnahmenKlappe", "massnahme
 
 function versionPruefen() {
   const fehlend = BENOETIGTE_ELEMENTE.filter(function (id) { return !document.getElementById(id); });
-  const cssNeu = getComputedStyle(document.documentElement).getPropertyValue("--layout-version").trim() === "12";
+  const cssNeu = getComputedStyle(document.documentElement).getPropertyValue("--layout-version").trim() === "13";
   if (!fehlend.length && cssNeu) return true;
   const hinweis = document.createElement("div");
   hinweis.setAttribute("role", "alert");
