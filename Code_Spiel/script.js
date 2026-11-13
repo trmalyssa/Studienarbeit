@@ -3845,7 +3845,8 @@ const MUELL_ARTEN = {
 };
 const MUELL_AUFRECHT = ["apfel", "banane", "tuete", "verpackung"];
 
-// schwimmt = true: im Wasser, ohne Schatten (Treibgut, Müll im Fluss)
+// schwimmt = true: im Wasser, ohne Schatten (Treibgut, Müll im Fluss).
+// Jedes Teil steckt in einer Gruppe .ka-muell, damit die Minikarte der Einführung es ausblenden kann.
 function muellSymbolSvg(form, x, y, winkel, groesse, schwimmt) {
   let s = "";
   if (!schwimmt) {
@@ -3853,8 +3854,8 @@ function muellSymbolSvg(form, x, y, winkel, groesse, schwimmt) {
     s += '<ellipse cx="' + (x + 1.4 * groesse).toFixed(1) + '" cy="' + (y + tief * groesse).toFixed(1) + '" rx="' + (5.4 * groesse).toFixed(1) +
       '" ry="' + (1.5 * groesse).toFixed(1) + '" fill="#3B2F1E" opacity="0.16"/>';
   }
-  return s + '<g transform="translate(' + x.toFixed(1) + "," + y.toFixed(1) + ") rotate(" + Math.round(winkel) + ") scale(" +
-    groesse.toFixed(2) + ')">' + MUELL_FORMEN[form] + "</g>";
+  return '<g class="ka-muell">' + s + '<g transform="translate(' + x.toFixed(1) + "," + y.toFixed(1) + ") rotate(" + Math.round(winkel) +
+    ") scale(" + groesse.toFixed(2) + ')">' + MUELL_FORMEN[form] + "</g></g>";
 }
 
 // ---------- Wo Müll liegen darf ----------
@@ -4639,6 +4640,9 @@ function popupFertig(id) {
 }
 
 // ---------- Einführung ----------
+// Drei Seiten: Willkommen, Ziel (Status-Balken wandern vom Ist- zum Soll-Zustand) und
+// „Befreie die Küste von Müll“ (Minikarte räumt sich bis auf drei Müllteile auf).
+// start(inhalt) läuft, sobald die Seite sichtbar ist, und startet ihre Animation.
 let einfuehrungSchritt = 0;
 
 function einfuehrungSeiten() {
@@ -4647,35 +4651,23 @@ function einfuehrungSeiten() {
       titel: "Willkommen, " + escapeHtml(spielerName) + "!",
       html:
         "<p>Du bist <strong>Küstenmanager:in</strong> einer Region an der Nordsee, direkt am Wattenmeer.</p>" +
-        "<p>Der Strand und das Meer sind hier stark mit Müll belastet. Außerdem setzen Abwasser und Fischerei den Tieren zu.</p>" 
+        "<p>Der Strand und das Meer sind hier stark mit Müll belastet. Außerdem setzen Abwasser und Fischerei den Tieren zu.</p>"
     },
     {
       titel: "Dein Ziel: ein guter Umweltzustand!",
       html:
-        "<p>Bringe die Region in einen guten Umweltzustand und <strong>halte diesen in den Runden " + zielFenster().von + " bis " + zielFenster().bis + " stabil</strong>. Dazu gehört mehr als saubere Strände: Auch Wirtschaft und Rückhalt der Bevölkerung müssen tragfähig bleiben.</p>" +
-        "<p>Um das zu erreichen, setzt du jede Runde gezielte Maßnahmen um. Aber Vorsicht: Jede Entscheidung verändert das Gefüge vor Ort, und nicht jede Maßnahme wird bei allen gut ankommen.</p>" +
-        "<p><strong>Die Endwertung:</strong><br>" +
-        "• " + Math.round((1 - WISSEN_ANTEIL) * 100) + " % Nachhaltigkeitsscore: Wie genau folgst du dem Sollkurs, in allen drei Säulen?<br>" +
-        "• " + Math.round(WISSEN_ANTEIL * 100) + " % Wissensscore aus den Quizfragen</p>"
+        "<p>Bringe die Region in einen guten Umweltzustand und halte diesen in den Runden " + zielFenster().von + " bis " +
+        zielFenster().bis + " stabil.</p>" + zielBalkenHtml() +
+        "<p>Um das zu erreichen, setzt du jede Runde gezielte Maßnahmen um. Aber Vorsicht: Jede Entscheidung verändert " +
+        "das Gefüge vor Ort, und nicht jede Maßnahme wird bei allen gut ankommen.</p>",
+      start: zielBalkenAnimieren
     },
     {
-      titel: "Drei Entscheidungen pro Runde",
-      html:
-        "<p>Nachhaltigkeit ruht auf drei Säulen. Pro Runde entscheidest du in jeder Säule einmal:</p>" +
-        "<ul>" +
-        "<li><strong>Ökologie:</strong> Schutz für Meer und Artenvielfalt. Der Bereich wechselt jede Runde: Strand, Meer, Land.</li>" +
-        "<li><strong>Ökonomie:</strong> Tourismus und Wirtschaft füllen dein Budget, belasten aber oft das Meer.</li>" +
-        "<li><strong>Soziales:</strong> Die Akzeptanz und Zufriedenheit der Bevölkerung.</li>" +
-        "</ul>" +
-        "<p><strong>Wichtige Regeln:</strong></p>" +
-        "<ul>" +
-        "<li>Du kannst in jedem Bereich auch diese Runde nichts machen und Budget sparen.</li>" +
-        "<li>Strandmüll ist ein Bestand - jede Runde kommt neuer Müll aus drei Quellen hinzu.</li>" +
-        "<li>Viele Maßnahmen wirken verzögert und auf mehrere Säulen zugleich.</li>" +
-        "<li>Einschränkende Maßnahmen brauchen mindestens " + AKZEPTANZ_SPERRE + " % Akzeptanz, und sie kosten Zustimmung, die nicht von selbst zurückkommt.</li>" +
-        "<li>Die schwächste Säule zählt doppelt: Wer eine Säule vernachlässigt, verliert Punkte, auch wenn die anderen glänzen.</li>" +
-        "<li>In den Runden " + namenListe(OTTER_RUNDEN.map(String)) + " taucht unten links im Meer ein Otter auf. Klicke ihn an, wenn du wissen willst, wie du gerade stehst.</li>" +
-        "</ul>"
+      titel: "Befreie die Küste von Müll",
+      html: '<div class="seekarte minikarte" role="img" aria-label="Die Karte deiner Region: Erst liegt überall Müll, ' +
+        'dann wird sie sauber, bis nur noch drei Teile übrig sind.">' + seekarteSvg(zustand) + "</div>",
+      breit: true,
+      start: minikarteAufraeumen
     }
   ];
 }
@@ -4685,6 +4677,7 @@ function einfuehrungZeigen(schrittNr) {
   einfuehrungSchritt = begrenzen(schrittNr, 0, seiten.length - 1);
   const seite = seiten[einfuehrungSchritt];
   el("einfuehrungTitel").innerHTML = seite.titel;
+  el("popupEinfuehrung").querySelector(".popup").classList.toggle("popup-breit", Boolean(seite.breit));
   el("einfuehrungInhalt").innerHTML = seite.html;
   el("einfuehrungPunkte").innerHTML = seiten.map(function (_, i) {
     return '<span class="' + (i === einfuehrungSchritt ? "aktiv" : "") + '"></span>';
@@ -4692,6 +4685,7 @@ function einfuehrungZeigen(schrittNr) {
   el("einfuehrungZurueck").classList.toggle("unsichtbar", einfuehrungSchritt === 0);
   el("einfuehrungWeiter").textContent = einfuehrungSchritt === seiten.length - 1 ? "Spiel starten" : "Weiter";
   popupOeffnen("popupEinfuehrung");
+  if (seite.start) seite.start(el("einfuehrungInhalt"));
 }
 
 function einfuehrungWeiter() {
@@ -4700,6 +4694,74 @@ function einfuehrungWeiter() {
   } else {
     popupSchliessen("popupEinfuehrung");
   }
+}
+
+// Status-Balken wie in der Seitenleiste, dazu Akzeptanz und Strandmüll.
+// ist = Startwert, soll = Mindestwert des guten Umweltzustands (Strandmüll: knapp unter dem Schwellenwert);
+// liegt ein Wert schon darüber, bleibt er stehen.
+function zielBalkenZeilen() {
+  const z = zustand;
+  return KENNZAHLEN.map(function (k) {
+    return { name: k.name, ist: z.kennzahlen[k.id], soll: Math.max(z.kennzahlen[k.id], k.mindest), marke: k.mindest,
+      einheit: " %", breite: function (x) { return x; }, farbe: function (x) { return ampelFarbe(x, k.mindest); } };
+  }).concat([
+    { name: "Akzeptanz", ist: z.akzeptanz, soll: Math.max(z.akzeptanz, AKZEPTANZ_MINDEST), marke: AKZEPTANZ_MINDEST,
+      einheit: " %", breite: function (x) { return x; }, farbe: akzeptanzFarbe },
+    { name: "Strandmüll", ist: z.strandmuell, soll: MUELL_SCHWELLE - 2, marke: muellProzent(MUELL_SCHWELLE),
+      einheit: " Teile", breite: muellProzent, farbe: function (x) { return x < MUELL_SCHWELLE ? AMPEL.gruen : AMPEL.rot; } }
+  ]);
+}
+
+function zielBalkenHtml() {
+  return '<div class="kennzahlen-liste ziel-balken">' + zielBalkenZeilen().map(function (k) {
+    return '<div class="kennzahl"><div class="kennzahl-kopf"><span class="kennzahl-name">' + k.name + "</span>" +
+      '<span class="kennzahl-wert"><strong>' + zahl(k.ist) + k.einheit + "</strong></span></div>" +
+      '<div class="balken"><div class="balken-fuellung" style="width:' + k.breite(k.ist) + "%;background-color:" + k.farbe(k.ist) + '"></div>' +
+      '<div class="balken-ziel" style="left:' + k.marke + '%"></div></div></div>';
+  }).join("") + "</div>";
+}
+
+// Balken, Zahl und Farbe wandern weich vom Ist- zum Soll-Wert
+function zielBalkenAnimieren(inhalt) {
+  const zeilen = zielBalkenZeilen();
+  const fuellungen = inhalt.querySelectorAll(".ziel-balken .balken-fuellung");
+  const zahlen = inhalt.querySelectorAll(".ziel-balken .kennzahl-wert strong");
+  const ruhig = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const beginn = performance.now() + (ruhig ? 0 : 700);
+  const dauer = ruhig ? 1 : 2600;
+  const bild = function (jetzt) {
+    if (!inhalt.contains(fuellungen[0])) return;              // Seite gewechselt
+    const t = begrenzen((jetzt - beginn) / dauer, 0, 1);
+    const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    zeilen.forEach(function (k, i) {
+      const wert = k.ist + (k.soll - k.ist) * e;
+      fuellungen[i].style.width = k.breite(wert) + "%";
+      fuellungen[i].style.backgroundColor = k.farbe(wert);
+      zahlen[i].textContent = zahl(Math.round(wert)) + k.einheit;
+    });
+    if (t < 1) requestAnimationFrame(bild);
+  };
+  requestAnimationFrame(bild);
+}
+
+// Minikarte: Der Müll verschwindet nach und nach von links nach rechts, drei verteilte Teile bleiben liegen
+function minikarteAufraeumen(inhalt) {
+  const teile = Array.prototype.filter.call(inhalt.querySelectorAll(".ka-muell"), function (t) {
+    return !t.parentElement.closest(".ka-muell");
+  }).map(function (t) { return { el: t, x: t.getBBox().x }; }).sort(function (a, b) { return a.x - b.x; });
+  const bleiben = [0.15, 0.5, 0.85].map(function (a) { return Math.round(a * (teile.length - 1)); });
+  const weg = teile.filter(function (_, i) { return bleiben.indexOf(i) < 0; });
+  const ruhig = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  weg.forEach(function (t, i) {
+    t.el.style.transition = "opacity 0.7s ease, transform 0.7s ease";
+    t.el.style.transitionDelay = ruhig ? "0s" : (0.9 + i * 3 / weg.length).toFixed(2) + "s";
+  });
+  // zwei Bilder warten, damit der volle Ist-Zustand erst gezeichnet ist
+  requestAnimationFrame(function () {
+    requestAnimationFrame(function () {
+      weg.forEach(function (t) { t.el.classList.add("ka-muell-weg"); });
+    });
+  });
 }
 
 // ---------- Infopunkt (Pop-up mit einem Fakt) ----------

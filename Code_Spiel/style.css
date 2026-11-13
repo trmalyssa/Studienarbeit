@@ -953,6 +953,26 @@ button {
   gap: 8px;
 }
 
+/* Einführung: Ziel-Balken und Minikarte */
+.ziel-balken {
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.ziel-balken .kennzahl-kopf { margin-bottom: 5px; }
+
+.minikarte { margin-top: 4px; }
+
+.seekarte .ka-muell {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.seekarte .ka-muell-weg {
+  opacity: 0;
+  transform: scale(0.3);
+}
+
 .balken {
   position: relative;
   height: 10px;
