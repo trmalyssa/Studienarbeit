@@ -3075,9 +3075,12 @@ function kuestenlinie(x) {
 
 // ---------- Sichtbereich ----------
 // Im Kern der Karte (0 bis 800 × 0 bis 320) liegen alle Spielinhalte. Die Karte füllt den ganzen Bildschirm
-// unter der Kopfleiste: Der Kern bleibt immer ganz sichtbar (links neben dem Maßnahmen-Fenster), der Rest des
-// Bildschirms wird je zur Hälfte mit Land (oben, dort liegt der Zustand der Region) und Meer (unten) aufgefüllt.
+// unter der Kopfleiste. Der Kern bleibt immer ganz sichtbar und liegt zwischen den Fenstern: links vom
+// Maßnahmen-Fenster und so weit rechts, dass der Fluss rechts neben dem Zustand der Region liegt (nicht
+// darunter). Beides gilt auch für zugeklappte Fenster, damit die Karte beim Auf- und Zuklappen nicht springt.
+// Der Rest des Bildschirms wird je zur Hälfte mit Land (oben) und Meer (unten) aufgefüllt.
 const KARTEN_KERN = { x: 0, y: 0, b: KARTE_B, h: KARTE_H };
+const FLUSS_LINKS = 108;     // linker Rand des Flusses mit Ufer und Aue (Kartenmaß)
 let kartenSicht = KARTEN_KERN;
 
 function sichtBerechnen() {
@@ -3085,16 +3088,19 @@ function sichtBerechnen() {
   const breite = karte.clientWidth;
   const hoehe = karte.clientHeight;
   if (!breite || !hoehe) return KARTEN_KERN;
-  // Liegt das Maßnahmen-Fenster über der Karte, bleibt der Kern links von ihm (auch wenn es zugeklappt ist,
-  // damit die Karte beim Auf- und Zuklappen nicht springt)
+  const links = karte.getBoundingClientRect().left;
   const fenster = el("entscheidungen");
-  let frei = breite;
-  if (getComputedStyle(fenster).position === "absolute") {
-    frei = Math.max(breite * 0.45, fenster.getBoundingClientRect().left - karte.getBoundingClientRect().left - 12);
-  }
-  const mass = Math.min(frei / KARTE_B, hoehe / KARTE_H);
+  const ueberKarte = getComputedStyle(fenster).position === "absolute";
+  // freier Bereich in Bildschirmpunkten: rechts endet er vor dem Maßnahmen-Fenster,
+  // links muss der Fluss rechts vom Zustand der Region beginnen
+  const rechts = ueberKarte ? fenster.getBoundingClientRect().left - links - 12 : breite;
+  const flussAb = ueberKarte ? el("kennzahlen").getBoundingClientRect().right - links + 12 : 0;
+  const mass = Math.min(hoehe / KARTE_H, rechts / KARTE_B, (rechts - flussAb) / (KARTE_B - FLUSS_LINKS));
+  // bleibt Platz übrig (sehr breite Bildschirme), steht der Kern mittig im freien Bereich
+  const vonLinks = Math.max(0, flussAb - FLUSS_LINKS * mass);
+  const x0 = (vonLinks + Math.max(vonLinks, rechts - KARTE_B * mass)) / 2;
   const h = hoehe / mass;
-  return { x: -Math.max(0, frei / mass - KARTE_B) / 2, y: -(h - KARTE_H) * 0.5, b: breite / mass, h: h };
+  return { x: -x0 / mass, y: -(h - KARTE_H) * 0.5, b: breite / mass, h: h };
 }
 
 // Lage eines Orts (in Prozent des Kerns) auf dem Bildschirm, in Prozent der sichtbaren Karte
