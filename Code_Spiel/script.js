@@ -129,17 +129,17 @@ const ANGEBOT_PRO_SAEULE = 3;              // so viele Maßnahmen werden je Säu
 const REGIONEN_FOLGE = ["strand", "meer", "land"];
 
 // Darstellung der Bereiche: eigene Farbe und eigenes Symbol, damit sofort klar ist,
-// für welchen Bereich die Ökologie-Maßnahmen dieser Runde gelten (Spaltenkopf und Karte)
+// für welchen Bereich die Ökologie-Maßnahmen dieser Runde gelten (Etikett im Maßnahmen-Fenster)
 const BEREICH_STIL = {
-  strand: { farbe: "#A86A12", flaeche: "#FBF0DA" },
-  meer:   { farbe: "#0F6E8C", flaeche: "#E1F1F6" },
-  land:   { farbe: "#4E7A2A", flaeche: "#E8F1DF" }
+  strand: { farbe: "#A86A12" },
+  meer:   { farbe: "#0F6E8C" },
+  land:   { farbe: "#4E7A2A" }
 };
 
-// Otter: taucht in diesen Runden unten links im Meer auf und meldet kurz den Zwischenstand.
-// Freiwillig, ohne Strafe. Ersetzt die frühere Sollkurs-Anzeige in der Seitenleiste.
+// Otter: taucht in diesen Runden im Meer auf und meldet kurz den Zwischenstand. Freiwillig, ohne Strafe.
+// Er schwimmt rechts der Mitte, damit ihn das Maßnahmen-Fenster unten links nicht verdeckt.
 const OTTER_RUNDEN = [3, 6, 9];
-const OTTER_ORT = { x: 6.5, y: 94 };   // Fußpunkt der Figur in Prozent der Kartenbreite/-höhe
+const OTTER_ORT = { x: 60, y: 94 };    // Fußpunkt der Figur in Prozent des Kartenkerns
 
 
 // Wissen: Anteil am Endergebnis
@@ -2547,22 +2547,70 @@ function bereichSymbolSvg(region) {
   return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + inhalt + "</svg>";
 }
 
-// Kopf des Entscheidungsfensters: Bereich dieser Runde
-function bereichBannerHtml(z, region) {
-  const stil = BEREICH_STIL[region];
-  return '<div class="bereich-banner" style="--bereich:' + stil.farbe + ";--bereich-flaeche:" + stil.flaeche + '">' +
-      '<span class="bereich-symbol">' + bereichSymbolSvg(region) + "</span>" +
-      '<span class="bereich-text">' +
-        '<span class="bereich-label">Bereich dieser Runde</span>' +
-        '<strong class="bereich-name">' + bereichName(region) + "</strong>" +
-      "</span>" +
-    "</div>";
+// ---------- Maßnahmen-Fenster ----------
+// Liegt unten links über der Karte und lässt sich auf- und zuklappen. Drei Reiter (Ökologie, Ökonomie,
+// Soziales) mit Symbol und Haken, sobald entschieden ist. Die Ökologie-Maßnahmen gelten jede Runde für einen
+// Bereich; das steht als Etikett im Reiter Ökologie. Zu Rundenbeginn ist das Fenster zugeklappt, solange
+// Pflicht-Infopunkte offen sind (die Karte bleibt frei), und klappt auf, sobald sie gelesen sind.
+const massnahmenFenster = { spiel: null, runde: 0, offen: true, reiter: "oeko" };
+
+const SAEULEN_SYMBOLE = {
+  // Blatt
+  oeko: '<path d="M5 19 C5 9 11 4 20 4 C20 13 15 19 5 19 Z" fill="currentColor" opacity="0.25"/>' +
+    '<path d="M5 19 C5 9 11 4 20 4 C20 13 15 19 5 19 Z M5 19 L14 10" fill="none" stroke="currentColor" stroke-width="1.8" ' +
+    'stroke-linejoin="round" stroke-linecap="round"/>',
+  // Münzstapel
+  oekonomie: '<ellipse cx="12" cy="6.5" rx="7" ry="2.8" fill="none" stroke="currentColor" stroke-width="1.8"/>' +
+    '<path d="M5 6.5 V12 C5 13.6 8 14.8 12 14.8 C16 14.8 19 13.6 19 12 V6.5 M5 12 V17.5 C5 19.1 8 20.3 12 20.3 ' +
+    'C16 20.3 19 19.1 19 17.5 V12" fill="none" stroke="currentColor" stroke-width="1.8"/>',
+  // zwei Personen
+  sozial: '<circle cx="9" cy="8" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/>' +
+    '<circle cx="16.5" cy="9.5" r="2.6" fill="none" stroke="currentColor" stroke-width="1.8"/>' +
+    '<path d="M3.5 19.5 C3.5 15.5 6 13.5 9 13.5 C12 13.5 14.5 15.5 14.5 19.5 M14 14.6 C14.8 14.2 15.6 14 16.5 14 ' +
+    'C19 14 21 15.8 21 19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'
+};
+
+function massnahmenFensterSetzen(offen) {
+  massnahmenFenster.offen = offen;
+  el("massnahmenInhalt").hidden = !offen;
+  el("massnahmenKlappe").setAttribute("aria-expanded", offen ? "true" : "false");
+  el("entscheidungen").classList.toggle("zu", !offen);
+}
+
+function reiterWaehlen(id) {
+  massnahmenFenster.reiter = id;
+  massnahmenAnzeigen();
+  el("reiter-" + id).focus();
+}
+
+// Pfeiltasten wechseln zwischen den Reitern (Tastaturbedienung wie bei Registerkarten üblich)
+function reiterTaste(ereignis) {
+  const ids = SAEULEN.map(function (s) { return s.id; });
+  const schritt = { ArrowRight: 1, ArrowLeft: -1 }[ereignis.key];
+  if (!schritt) return;
+  ereignis.preventDefault();
+  reiterWaehlen(ids[(ids.indexOf(massnahmenFenster.reiter) + schritt + ids.length) % ids.length]);
+}
+
+// Etikett im Reiter Ökologie: für welchen Bereich die Maßnahmen dieser Runde gelten
+function bereichEtikettHtml(region) {
+  return '<span class="bereich-etikett" style="--bereich:' + BEREICH_STIL[region].farbe + '">' +
+    '<span class="bereich-symbol">' + bereichSymbolSvg(region) + "</span>" +
+    "Bereich dieser Runde: <strong>" + bereichName(region) + "</strong></span>";
 }
 
 function massnahmenAnzeigen() {
   const z = zustand;
   const runde = Math.min(z.runde, RUNDEN);
   const region = regionDerRunde(runde);
+
+  // neue Runde oder neues Spiel: Reiter Ökologie, zugeklappt solange Pflicht-Infopunkte offen sind
+  if (massnahmenFenster.spiel !== z || massnahmenFenster.runde !== z.runde) {
+    massnahmenFenster.spiel = z;
+    massnahmenFenster.runde = z.runde;
+    massnahmenFenster.reiter = "oeko";
+    massnahmenFensterSetzen(!pflichtInfosOffen(z).length);
+  }
 
   // Hinweis auf offenen Förderaufruf (nur mit Sonderereignissen)
   const hinweis = el("foerderHinweis");
@@ -2575,25 +2623,40 @@ function massnahmenAnzeigen() {
     hinweis.classList.add("versteckt");
   }
 
-  // Bereich dieser Runde steht im Kopf über allen drei Spalten
-  el("bereichAnzeige").innerHTML = z.beendet ? "" : bereichBannerHtml(z, region);
-
+  const reiterLeiste = el("saeulenReiter");
   const liste = el("massnahmenListe");
+  reiterLeiste.innerHTML = "";
   liste.innerHTML = "";
 
   SAEULEN.forEach(function (s) {
-    // Drei Zeilen je Spalte (Kopf, Maßnahmen, „Nichts tun“). Über CSS-Subgrid liegen sie in allen
-    // Spalten auf gleicher Höhe, und alle Spalten sind gleich hoch.
-    const gruppe = elementBauen("section", "saeule saeule-" + s.id);
-    gruppe.setAttribute("aria-label", s.name);
+    const aktiv = massnahmenFenster.reiter === s.id;
     const entschieden = Boolean(z.auswahl[s.id]);
 
+    // Reiter mit Symbol, Name und Stand (Haken = entschieden, Punkt = offen)
+    const reiter = elementBauen("button", "reiter-knopf" + (entschieden ? " entschieden" : ""));
+    reiter.type = "button";
+    reiter.id = "reiter-" + s.id;
+    reiter.setAttribute("role", "tab");
+    reiter.setAttribute("aria-selected", aktiv ? "true" : "false");
+    reiter.setAttribute("aria-controls", "saeule-" + s.id);
+    reiter.tabIndex = aktiv ? 0 : -1;
+    reiter.innerHTML = '<svg class="reiter-symbol" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+      SAEULEN_SYMBOLE[s.id] + "</svg>" +
+      '<span class="reiter-name">' + s.name + "</span>" +
+      '<span class="reiter-stand" aria-hidden="true">' + (entschieden ? "✓" : "") + "</span>" +
+      '<span class="sr-only">' + (entschieden ? "entschieden" : "offen") + "</span>";
+    reiter.addEventListener("click", function () { reiterWaehlen(s.id); });
+    reiter.addEventListener("keydown", reiterTaste);
+    reiterLeiste.appendChild(reiter);
+
+    // Inhalt des Reiters: Untertitel (bei Ökologie mit Bereich), Maßnahmen, „Nichts tun“
+    const gruppe = elementBauen("section", "saeule");
+    gruppe.id = "saeule-" + s.id;
+    gruppe.setAttribute("role", "tabpanel");
+    gruppe.setAttribute("aria-labelledby", "reiter-" + s.id);
+    gruppe.hidden = !aktiv;
     const kopf = elementBauen("div", "saeule-kopf");
-    const titel = elementBauen("div", "saeule-titelzeile");
-    titel.appendChild(elementBauen("h3", "saeule-titel", s.name));
-    titel.appendChild(elementBauen("span", "saeule-status " + (entschieden ? "fertig" : "offen"),
-      entschieden ? "entschieden" : "offen"));
-    kopf.appendChild(titel);
+    if (s.id === "oeko" && !z.beendet) kopf.innerHTML = bereichEtikettHtml(region);
     kopf.appendChild(elementBauen("p", "saeule-untertitel", s.untertitel));
     gruppe.appendChild(kopf);
 
@@ -2612,12 +2675,8 @@ function massnahmenAnzeigen() {
     if (!optionen.length) {
       stapel.appendChild(elementBauen("p", "gruppe-notiz", "In diesem Bereich sind alle Maßnahmen umgesetzt."));
     }
+    stapel.appendChild(zurueckKarte(s));
     gruppe.appendChild(stapel);
-
-    const fuss = elementBauen("div", "saeule-fuss");
-    fuss.appendChild(zurueckKarte(s));
-    gruppe.appendChild(fuss);
-
     liste.appendChild(gruppe);
   });
 
@@ -2787,15 +2846,17 @@ function fokusAuf(selektor) {
 function uebersichtAnzeigen() {
   const z = zustand;
   const feld = el("auswahlUebersicht");
+  const stand = el("massnahmenStand");
   if (z.beendet) {
     feld.innerHTML = "";
+    stand.textContent = "";
     return;
   }
   const entschieden = SAEULEN.length - entscheidungenOffen(z).length;
   const kosten = geplanteKosten(z, null);
+  stand.textContent = entschieden + " von " + SAEULEN.length + " entschieden";
+  stand.classList.toggle("komplett", entschieden === SAEULEN.length);
   feld.innerHTML =
-    '<span class="uebersicht-zaehler' + (entschieden === SAEULEN.length ? " komplett" : "") + '">' +
-      entschieden + " von " + SAEULEN.length + " entschieden</span>" +
     '<span class="uebersicht-kosten">Kosten <strong>' + euro(kosten) + "</strong> · danach <strong" +
       (z.budget - kosten < 0 ? ' class="im-minus"' : "") + ">" + euro(z.budget - kosten) + "</strong></span>";
 }
@@ -2813,7 +2874,7 @@ function rundenKnopfAnzeigen() {
   // Hinweis unter dem Knopf: was noch fehlt
   const hinweis = el("anhoerungHinweis");
   const ueberflogen = z.anliegen.filter(function (a) { return a.zuSchnell; });
-  hinweis.className = "anhoerung-hinweis";
+  hinweis.className = "karten-hinweis";
   if (z.beendet) {
     hinweis.textContent = "";
   } else if (pflicht.length) {
@@ -2914,12 +2975,13 @@ function figurSvg(person) {
   return s + "</svg>";
 }
 
-// Knopf über der Karte; ort.x/ort.y in Prozent der Kartenbreite/-höhe
+// Knopf über der Karte; ort.x/ort.y in Prozent des Kartenkerns (siehe kartenPosition)
 function kartenKnopf(klasse, ort, label, html, aktion) {
   const knopf = elementBauen("button", klasse);
   knopf.type = "button";
-  knopf.style.left = ort.x + "%";
-  knopf.style.top = ort.y + "%";
+  const lage = kartenPosition(ort);
+  knopf.style.left = lage.left;
+  knopf.style.top = lage.top;
   knopf.setAttribute("aria-label", label);
   knopf.innerHTML = html;
   knopf.addEventListener("click", aktion);
@@ -2983,12 +3045,58 @@ function kuestenlinie(x) {
   return 104 + 9 * Math.sin(x / 95) + 5 * Math.sin(x / 41 + 1);
 }
 
-function linienPunkte(versatz) {
+// ---------- Sichtbereich ----------
+// Im Kern der Karte (0 bis 800 × 0 bis 320) liegen alle Spielinhalte. Die Karte füllt den ganzen Bildschirm
+// unter der Kopfleiste: Der Kern bleibt immer ganz sichtbar (links neben der Seitenleiste), der Rest des
+// Bildschirms wird mit Land (oben, 30 %) und Meer (unten, 70 %, dort liegt das Maßnahmen-Fenster) aufgefüllt.
+const KARTEN_KERN = { x: 0, y: 0, b: KARTE_B, h: KARTE_H };
+let kartenSicht = KARTEN_KERN;
+
+function sichtBerechnen() {
+  const karte = el("seekarte");
+  const breite = karte.clientWidth;
+  const hoehe = karte.clientHeight;
+  if (!breite || !hoehe) return KARTEN_KERN;
+  // Liegt die Seitenleiste über der Karte, bleibt der Kern links von ihr
+  const leiste = el("seitenleiste");
+  let frei = breite;
+  if (getComputedStyle(leiste).position === "absolute") {
+    frei = Math.max(breite * 0.45, leiste.getBoundingClientRect().left - karte.getBoundingClientRect().left - 12);
+  }
+  const mass = Math.min(frei / KARTE_B, hoehe / KARTE_H);
+  const h = hoehe / mass;
+  return { x: -Math.max(0, frei / mass - KARTE_B) / 2, y: -(h - KARTE_H) * 0.3, b: breite / mass, h: h };
+}
+
+// Lage eines Orts (in Prozent des Kerns) auf dem Bildschirm, in Prozent der sichtbaren Karte
+function kartenPosition(ort) {
+  return {
+    left: ((ort.x / 100 * KARTE_B - kartenSicht.x) / kartenSicht.b * 100).toFixed(2) + "%",
+    top: ((ort.y / 100 * KARTE_H - kartenSicht.y) / kartenSicht.h * 100).toFixed(2) + "%"
+  };
+}
+
+// Feste Zufallszahl zu einer Stelle: Verzierungen am Rand bleiben beim Ändern der Fenstergröße liegen
+function zufallBei(i, j, k) {
+  const w = Math.sin(i * 127.1 + j * 311.7 + k * 74.7) * 43758.5453;
+  return w - Math.floor(w);
+}
+
+// Punkte entlang der Küstenlinie (mit Versatz) über die ganze Breite der Sicht
+function linienPunkte(versatz, sicht) {
+  const v = sicht || KARTEN_KERN;
   const p = [];
-  for (let x = 0; x <= KARTE_B; x += 10) {
+  for (let x = Math.floor(v.x / 10) * 10 - 10; x <= v.x + v.b + 10; x += 10) {
     p.push(x + "," + (kuestenlinie(x) + versatz).toFixed(1));
   }
   return p.join(" ");
+}
+
+// Fläche von der Küstenlinie (mit Versatz) bis zum oberen Rand der Sicht
+function landFlaeche(versatz, sicht) {
+  const punkte = linienPunkte(versatz, sicht).split(" ");
+  const oben = (sicht.y - 2).toFixed(1);
+  return punkte[0].split(",")[0] + "," + oben + " " + punkte.join(" ") + " " + punkte[punkte.length - 1].split(",")[0] + "," + oben;
 }
 
 // Gleiche Startzahl = gleiche Folge: Symbole springen nicht von Runde zu Runde
@@ -3181,14 +3289,15 @@ function animStil(dauer, versatz) {
 }
 
 // Lichtreflexe auf dem Meer wie im Titelbild: kurze, helle Striche, nach unten seltener
-function meerGlitzerSvg() {
-  const r = zufallsfolge(73);
+function meerGlitzerSvg(sicht) {
   let d = "";
-  for (let i = 0; i < 34; i++) {
-    const x = r() * KARTE_B;
-    const y = kuestenlinie(x) + STRAND_BREITE + 14 + Math.pow(r(), 1.3) * 180;
-    if (y > KARTE_H - 4) continue;
-    d += "M" + x.toFixed(1) + "," + y.toFixed(1) + " h" + (6 + r() * 18).toFixed(1) + " ";
+  for (let i = Math.floor(sicht.x / 50); i <= (sicht.x + sicht.b) / 50; i++) {
+    for (let j = 0; j * 24 < sicht.y + sicht.h; j++) {
+      const x = i * 50 + zufallBei(i, j, 1) * 50;
+      const y = kuestenlinie(x) + STRAND_BREITE + 14 + j * 24 + zufallBei(i, j, 2) * 24;
+      if (y > sicht.y + sicht.h - 4 || zufallBei(i, j, 3) > 0.5 * Math.exp(-j / 9)) continue;
+      d += "M" + x.toFixed(1) + "," + y.toFixed(1) + " h" + (6 + zufallBei(i, j, 4) * 18).toFixed(1) + " ";
+    }
   }
   return '<path d="' + d + '" stroke="#FFFFFF" stroke-opacity="0.22" stroke-width="1.2" stroke-linecap="round"/>';
 }
@@ -3255,6 +3364,52 @@ function baumSvg(x, y, g, art) {
     '<circle cx="' + t(x - 1.6 * g) + '" cy="' + t(y - 16.8 * g) + '" r="' + t(3.8 * g) + '"/></g>';
   s += '<circle cx="' + t(x - 2.8 * g) + '" cy="' + t(y - 18 * g) + '" r="' + t(1.6 * g) + '" fill="#A3BE73"/>';
   return s;
+}
+
+// Land außerhalb des Kerns (oben und an den Seiten): Grasbüschel und vereinzelte Bäume nach Raster.
+// Neben dem Oberlauf des Flusses bleibt ein Streifen frei.
+function randLandSvg(sicht) {
+  const gras = ["#7E9A4E", "#91AB5B", "#6B8743", "#A3B868"];
+  let halme = "";
+  const baeume = [];
+  for (let i = Math.floor(sicht.x / 34); i <= (sicht.x + sicht.b) / 34; i++) {
+    for (let j = Math.floor(sicht.y / 30); j * 30 < KARTE_H; j++) {
+      const x = i * 34 + zufallBei(i, j, 5) * 34;
+      const y = j * 30 + zufallBei(i, j, 6) * 30;
+      const imKern = x > 0 && x < KARTE_B && y > 0;
+      if (imKern || y > kuestenlinie(x) - 12 || y < sicht.y + 4) continue;
+      if (y < 0 && Math.abs(x - 150) < 26) continue;                 // Oberlauf des Flusses
+      if (zufallBei(i, j, 7) < 0.16) {
+        baeume.push([x, y, 0.9 + zufallBei(i, j, 8) * 0.45, zufallBei(i, j, 9) < 0.45 ? "kiefer" : "laub"]);
+        continue;
+      }
+      let d = "";
+      for (let k = 0; k < 3; k++) {
+        d += "M" + (x + k * 0.8).toFixed(1) + "," + y.toFixed(1) + " l" + ((k - 1) * 1.6).toFixed(1) + "," + (-(3 + zufallBei(i, j, 10 + k) * 2.5)).toFixed(1) + " ";
+      }
+      halme += '<path d="' + d + '" stroke="' + gras[Math.floor(zufallBei(i, j, 13) * gras.length)] + '"/>';
+    }
+  }
+  return '<g fill="none" stroke-linecap="round" stroke-width="0.8" opacity="0.8">' + halme + "</g>" +
+    baeume.sort(function (a, b) { return a[1] - b[1]; }).map(function (b) { return baumSvg(b[0], b[1], b[2], b[3]); }).join("");
+}
+
+// Oberlauf des Flusses oberhalb des Kerns: führt vom Kartenrand zur Quelle des gezeichneten Flusses
+function flussOberlaufSvg(sicht, flussFarbe) {
+  if (sicht.y > -6) return "";
+  const start = flussGrund(0);
+  const d0 = richtung(flussGrund(0.02), start);                       // zeigt flussaufwärts
+  const punkte = [];
+  for (let t = 0; start[1] + d0[1] * t > sicht.y - 12; t += 6) {
+    const quer = 5 * Math.sin(t / 26) * Math.min(1, t / 30);
+    punkte.push((start[0] + d0[0] * t - d0[1] * quer).toFixed(1) + "," + (start[1] + d0[1] * t + d0[0] * quer).toFixed(1));
+  }
+  const linie = function (farbe, breite, zusatz) {
+    return '<polyline points="' + punkte.join(" ") + '" fill="none" stroke="' + farbe + '" stroke-width="' + breite +
+      '" stroke-linecap="round" stroke-linejoin="round"' + (zusatz || "") + "/>";
+  };
+  return linie("#B9A97C", flussBreite(0) + 8, ' opacity="0.6" filter="url(#kaWeich)"') +
+    linie("#9E8D62", flussBreite(0) + 2.8, ' opacity="0.45"') + linie(flussFarbe, flussBreite(0));
 }
 
 function baeumeSvg() {
@@ -3473,7 +3628,7 @@ function fischeSvg(artenvielfalt) {
       for (let versuch = 0; versuch < 25; versuch++) {
         x = 50 + r() * 690;
         y = art.boden ? 252 + r() * 50 : 208 + r() * 78;
-        const frei = !(x < 100 && y > 262) &&                                   // Otter unten links
+        const frei = !(Math.abs(x - OTTER_ORT.x * 8) < 40 && y > 262) &&        // Otter
           !tiere.some(function (t) { return Math.abs(t.x - x) < 34 && Math.abs(t.y - y) < 14; });
         if (frei) break;
       }
@@ -4334,7 +4489,9 @@ function muellfaengerSvg(aue) {
   return s;
 }
 
-function seekarteSvg(z) {
+// sicht = sichtbarer Ausschnitt {x, y, b, h} in Kartenmaßen (ohne Angabe: nur der Kern)
+function seekarteSvg(z, sicht) {
+  sicht = sicht || KARTEN_KERN;
   const k = z.kennzahlen;
   const w = aktiveWirkung(z, Math.min(z.runde, RUNDEN));
   const wirksam = function (id) {
@@ -4347,13 +4504,15 @@ function seekarteSvg(z) {
   // Flusswasser: trüb bei viel Eintrag aus dem Hinterland, klar bei wenig
   const flussTruebung = begrenzen(z.eintrag.land / EINTRAG_GRUND.land, 0, 1);
   const flussFarbe = mischfarbe([112, 178, 214], [140, 162, 140], flussTruebung);
-  s += '<svg viewBox="0 0 ' + KARTE_B + " " + KARTE_H + '" xmlns="http://www.w3.org/2000/svg" ' +
+  const unten = sicht.y + sicht.h;
+  s += '<svg viewBox="' + [sicht.x, sicht.y, sicht.b, sicht.h].map(function (v) { return v.toFixed(1); }).join(" ") +
+    '" xmlns="http://www.w3.org/2000/svg" ' +
     'preserveAspectRatio="xMidYMid slice" focusable="false">';
   s += "<defs>" +
     '<pattern id="schraffur" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">' +
     '<line x1="0" y1="0" x2="0" y2="9" stroke="#B0307A" stroke-width="1.2" opacity="0.35"/></pattern>' +
     // Meer: hell am Ufer, dunkler zur offenen See (wie das Meer im Titelbild)
-    '<linearGradient id="kaMeer" x1="0" y1="' + (104 + STRAND_BREITE) + '" x2="0" y2="' + KARTE_H + '" gradientUnits="userSpaceOnUse">' +
+    '<linearGradient id="kaMeer" x1="0" y1="' + (104 + STRAND_BREITE) + '" x2="0" y2="' + Math.max(KARTE_H, unten).toFixed(0) + '" gradientUnits="userSpaceOnUse">' +
     '<stop offset="0" stop-color="' + farben.flach + '"/><stop offset="1" stop-color="' + farben.tief + '"/></linearGradient>' +
     '<linearGradient id="kaLand" x1="0" y1="0" x2="0" y2="1">' +
     '<stop offset="0" stop-color="#C9D6AC"/><stop offset="1" stop-color="#DCDAAE"/></linearGradient>' +
@@ -4390,12 +4549,13 @@ function seekarteSvg(z) {
     "</defs>";
 
   // Meer mit Tiefenverlauf, sanften Dünungslinien und Lichtreflexen
-  s += '<rect width="' + KARTE_B + '" height="' + KARTE_H + '" fill="url(#kaMeer)"/>';
-  [52, 104, 160].forEach(function (versatz) {
-    s += '<polyline points="' + linienPunkte(versatz) + '" fill="none" stroke="#FFFFFF" ' +
+  const flaeche = 'x="' + sicht.x.toFixed(1) + '" y="' + sicht.y.toFixed(1) + '" width="' + sicht.b.toFixed(1) + '" height="' + sicht.h.toFixed(1) + '"';
+  s += "<rect " + flaeche + ' fill="url(#kaMeer)"/>';
+  for (let versatz = 52; 95 + versatz < unten; versatz += 54) {
+    s += '<polyline points="' + linienPunkte(versatz, sicht) + '" fill="none" stroke="#FFFFFF" ' +
       'stroke-opacity="0.1" stroke-width="1.3"/>';
-  });
-  s += meerGlitzerSvg();
+  }
+  s += meerGlitzerSvg(sicht);
 
   // Fische (Artenvielfalt): mehr Tiere und mehr Arten, je besser es der Artenvielfalt geht (siehe FISCH_ARTEN)
   s += fischeSvg(k.artenvielfalt);
@@ -4415,24 +4575,24 @@ function seekarteSvg(z) {
 
   // Offshore-Windpark (links unten)
   if (istUmgesetzt(z, "windpark")) {
-    // doppelt so große Windräder, deshalb weiter auseinander (der Otter unten links bleibt frei)
+    // doppelt so große Windräder, deshalb weiter auseinander
     [[112, 264], [170, 294], [228, 260], [286, 292], [344, 264]].forEach(function (p, i) {
       s += windradSvg(p[0], p[1], i, 2);
     });
   }
 
   // Strand und Land: Sandverlauf, nasser Sand und Schaumkante am Wasser, Dünenkante mit Strandhafer
-  s += '<polyline points="' + linienPunkte(STRAND_BREITE + 5) + '" fill="none" stroke="' + farben.flach + '" ' +
+  s += '<polyline points="' + linienPunkte(STRAND_BREITE + 5, sicht) + '" fill="none" stroke="' + farben.flach + '" ' +
     'stroke-width="12" stroke-opacity="0.55" filter="url(#kaWeich)"/>';
-  s += '<polygon points="0,0 ' + linienPunkte(STRAND_BREITE) + ' 800,0" fill="url(#kaSand)"/>';
-  s += '<polyline points="' + linienPunkte(STRAND_BREITE - 2.5) + '" fill="none" stroke="#C4AD80" stroke-width="5" stroke-opacity="0.45"/>';
-  s += '<polyline points="' + linienPunkte(STRAND_BREITE + 0.6) + '" fill="none" stroke="#FFFFFF" stroke-width="2.2" ' +
+  s += '<polygon points="' + landFlaeche(STRAND_BREITE, sicht) + '" fill="url(#kaSand)"/>';
+  s += '<polyline points="' + linienPunkte(STRAND_BREITE - 2.5, sicht) + '" fill="none" stroke="#C4AD80" stroke-width="5" stroke-opacity="0.45"/>';
+  s += '<polyline points="' + linienPunkte(STRAND_BREITE + 0.6, sicht) + '" fill="none" stroke="#FFFFFF" stroke-width="2.2" ' +
     'stroke-opacity="0.9" stroke-linejoin="round"/>';
-  s += '<polyline points="' + linienPunkte(STRAND_BREITE + 5) + '" fill="none" stroke="#FFFFFF" stroke-width="1.2" ' +
+  s += '<polyline points="' + linienPunkte(STRAND_BREITE + 5, sicht) + '" fill="none" stroke="#FFFFFF" stroke-width="1.2" ' +
     'stroke-opacity="0.45" stroke-dasharray="38 14 10 24" stroke-linecap="round"/>';
-  s += '<polygon points="0,0 ' + linienPunkte(0) + ' 800,0" fill="url(#kaLand)"/>';
-  s += '<polygon points="0,' + (kuestenlinie(0) - 16).toFixed(1) + " " + linienPunkte(-16) + " " +
-    linienPunkte(0).split(" ").reverse().join(" ") + '" fill="url(#kaDuene)"/>';
+  s += '<polygon points="' + landFlaeche(0, sicht) + '" fill="url(#kaLand)"/>';
+  s += '<polygon points="' + linienPunkte(-16, sicht) + " " + linienPunkte(0, sicht).split(" ").reverse().join(" ") + '" fill="url(#kaDuene)"/>';
+  s += randLandSvg(sicht);
   s += wiesenSvg();
   s += strandhaferSvg();
   s += baeumeSvg();
@@ -4457,8 +4617,8 @@ function seekarteSvg(z) {
   const aue = istUmgesetzt(z, "aue");
   const flussD = "M" + flussMitte(aue ? 30 : 14, aue).map(function (p) { return p.x.toFixed(1) + "," + p.y.toFixed(1); }).join(" L");
   // Der Fluss endet an der Schaumkante und geht dort ins Meer über (Ausschnitt nur über Land und Strand)
-  s += '<clipPath id="kaFlussRaum"><polygon points="0,0 ' + linienPunkte(STRAND_BREITE + 1) + ' 800,0"/></clipPath>';
-  s += '<g clip-path="url(#kaFlussRaum)">';
+  s += '<clipPath id="kaFlussRaum"><polygon points="' + landFlaeche(STRAND_BREITE + 1, sicht) + '"/></clipPath>';
+  s += '<g clip-path="url(#kaFlussRaum)">' + flussOberlaufSvg(sicht, flussFarbe);
   if (aue) {
     s += '<path d="' + glatterPfad(flussUmriss(1, 17, aue)) + '" fill="#97BD72" opacity="0.55" filter="url(#kaWeich)"/>';
     [[0.62, 1], [1.12, -1]].forEach(function (a) {
@@ -4566,7 +4726,7 @@ function seekarteSvg(z) {
   });
 
   // Licht von oben links, wie die Sonne im Titelbild
-  s += '<rect width="' + KARTE_B + '" height="' + KARTE_H + '" fill="url(#kaLicht)" pointer-events="none"/>';
+  s += "<rect " + flaeche + ' fill="url(#kaLicht)" pointer-events="none"/>';
 
   s += "</svg>";
   return s;
@@ -4574,7 +4734,8 @@ function seekarteSvg(z) {
 
 function seekarteAnzeigen() {
   const z = zustand;
-  el("seekarte").innerHTML = seekarteSvg(z);
+  kartenSicht = sichtBerechnen();
+  el("seekarte").innerHTML = seekarteSvg(z, kartenSicht);
 
   // Legende: nur Symbole, die gerade auf der Karte zu sehen sind
   const w = aktiveWirkung(z, Math.min(z.runde, RUNDEN));
@@ -4666,7 +4827,7 @@ function einfuehrungSeiten() {
       titel: "Befreie die Küste von Müll",
       html: '<div class="seekarte minikarte" role="img" aria-label="Die Karte deiner Region: Erst liegt überall Müll, ' +
         'dann wird sie sauber, bis nur noch drei Teile übrig sind.">' +
-        seekarteSvg(zustand).replace('viewBox="0 0 ' + KARTE_B + " " + KARTE_H + '"', 'viewBox="' + MINIKARTE.join(" ") + '"') + "</div>",
+        seekarteSvg(zustand, { x: MINIKARTE[0], y: MINIKARTE[1], b: MINIKARTE[2], h: MINIKARTE[3] }) + "</div>",
       breit: true,
       start: minikarteAufraeumen
     }
@@ -4804,6 +4965,7 @@ function infopunktOeffnen(id) {
     seekarteAnzeigen();
     if (warOffen && pflichtInfosOffen(z).length === 0) {
       el("anhoerungHinweis").textContent = "Jetzt melden sich die Menschen vor Ort. Klicke auf die Sprechblasen in der Karte.";
+      massnahmenFensterSetzen(true);
     }
   });
 }
@@ -6704,7 +6866,17 @@ function leaderboardOeffnen() {
 // ==========================================================
 // 12. START
 // ==========================================================
+let kartenGroesseTimer = null;
+function kartenGroesseAnpassen() {
+  clearTimeout(kartenGroesseTimer);
+  kartenGroesseTimer = setTimeout(function () {
+    seekarteAnzeigen();
+    markerAnzeigen();
+  }, 150);
+}
+
 function oberflaecheVerbinden() {
+  window.addEventListener("resize", kartenGroesseAnpassen);
   // Knopf → Aktion
   const aktionen = {
     startNeuesSpiel: namePopupOeffnen,
@@ -6713,6 +6885,7 @@ function oberflaecheVerbinden() {
     einfuehrungWeiter: einfuehrungWeiter,
     einfuehrungZurueck: function () { einfuehrungZeigen(einfuehrungSchritt - 1); },
     naechsteRunde: rundeBeenden,
+    massnahmenKlappe: function () { massnahmenFensterSetzen(!massnahmenFenster.offen); },
     berichtWeiter: berichtWeiter,
     infoOk: function () { popupFertig("popupInfo"); },
     quizWeiter: quizWeiter,
@@ -6755,7 +6928,7 @@ function oberflaecheVerbinden() {
 
 // Prüft, ob index.html und style.css zur Version dieses Skripts passen.
 // Passt etwas nicht (z. B. alte Datei oder Browser-Cache), erscheint ein Hinweis statt einer kaputten Seite.
-const BENOETIGTE_ELEMENTE = ["auswahlUebersicht", "popupInfo", "infoOk", "popupQuiz",
+const BENOETIGTE_ELEMENTE = ["auswahlUebersicht", "massnahmenKlappe", "massnahmenInhalt", "massnahmenStand", "saeulenReiter", "popupInfo", "infoOk", "popupQuiz",
   "quizWeiter", "massnahmenListe", "personen", "muellInfoKnopf",
   "popupMuell", "muellInhalt", "muellSchliessen", "entscheidungen", "startSzene", "startBilder", "ladebildschirm",
   "ladeKarte", "ladeFuellung", "ladeBalken", "ladeMarken", "ladeWeiter", "startVollbild", "popupQuellen", "popupUeber", "bildNachweis", "ueberBewertung", "startSonne", "startWolken", "startMeer", "startWindsack", "startHalme",
@@ -6763,7 +6936,7 @@ const BENOETIGTE_ELEMENTE = ["auswahlUebersicht", "popupInfo", "infoOk", "popupQ
 
 function versionPruefen() {
   const fehlend = BENOETIGTE_ELEMENTE.filter(function (id) { return !document.getElementById(id); });
-  const cssNeu = getComputedStyle(document.documentElement).getPropertyValue("--layout-version").trim() === "11";
+  const cssNeu = getComputedStyle(document.documentElement).getPropertyValue("--layout-version").trim() === "12";
   if (!fehlend.length && cssNeu) return true;
   const hinweis = document.createElement("div");
   hinweis.setAttribute("role", "alert");
