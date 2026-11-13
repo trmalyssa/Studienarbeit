@@ -24,7 +24,6 @@
   --zustand-breite: 250px;   /* Zustand der Region, links oben über der Karte */
   --fenster-breite: 400px;   /* Maßnahmen-Fenster, rechts unten über der Karte */
   --abstand: 16px;
-  --radius: 8px;
   --schrift: "Barlow", "Segoe UI", system-ui, sans-serif;
   --schrift-schmal: "Barlow Semi Condensed", "Barlow", "Segoe UI", sans-serif;
 }
@@ -114,12 +113,6 @@ button {
 }
 
 .knopf-gefahr:hover { background: #A82C23; }
-
-.gross {
-  min-height: 52px;
-  padding: 0 1.6rem;
-  font-size: 1.08rem;
-}
 
 /* ===== Kopfleiste ===== */
 #kopfleiste {
@@ -311,27 +304,13 @@ button {
 .kopf-knopf:hover { background: rgba(255, 255, 255, 0.12); }
 
 /* ===== Hauptlayout: Karte füllt den Bildschirm unter der Kopfleiste ===== */
-/* Darüber liegen Hinweis (oben), Seitenleiste (rechts) und Maßnahmen-Fenster (unten links). */
+/* Darüber liegen Hinweis (oben mittig), Zustand der Region (links oben), Legendenknopf (links unten)
+   und Maßnahmen-Fenster (rechts unten). */
 #layout {
   position: fixed;
   inset: var(--kopfhoehe) 0 0 0;
   overflow: hidden;
   background: var(--wasser);
-}
-
-.tafel {
-  background: var(--flaeche);
-  border: 1px solid var(--linie);
-  border-radius: var(--radius);
-}
-
-.tafel-kopf {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 4px 16px;
-  margin-bottom: 12px;
 }
 
 .tafel-zusatz {
@@ -583,7 +562,7 @@ button {
   border-radius: 3px;
 }
 
-/* Otter: taucht unten links im Meer auf; seine Sprechblase ist weiß mit „!“ (freiwillig, kein Anliegen) */
+/* Otter: taucht rechts der Mitte im Meer auf; seine Sprechblase ist weiß mit „!“ (freiwillig, kein Anliegen) */
 .person.otter { animation: auftauchen 0.9s ease-out both; }
 
 .otter-figur {
@@ -753,25 +732,17 @@ button {
   gap: 7px;
 }
 
-/* Legendenzeichen (auch im Bericht) */
+/* Legendenzeichen aus CSS */
 .lg {
   display: inline-block;
   flex: none;
 }
 
-/* Müllsymbole in der Legende (SVG aus script.js) */
+/* Symbole in der Legende (SVG aus script.js) */
 .lg-symbol {
   flex: none;
   width: 20px;
   height: 15px;
-}
-
-.lg-fisch {
-  width: 15px;
-  height: 7px;
-  background: var(--tinte);
-  border-radius: 50% 30% 30% 50%;
-  opacity: 0.75;
 }
 
 .lg-wasser {
@@ -796,35 +767,12 @@ button {
   border: 1.5px dashed var(--magenta);
 }
 
-.lg-person {
-  width: 14px;
-  height: 10px;
-  background: var(--orange);
-  border: 1.5px solid var(--tinte);
-  border-radius: 3px;
-}
-
-.lg-infopunkt {
-  width: 12px;
-  height: 12px;
-  background: var(--blau);
-  border: 1.5px solid var(--tinte);
-  border-radius: 50%;
-}
-
 .lg-brut {
   width: 16px;
   height: 10px;
   background: rgba(200, 56, 46, 0.1);
   border: 1.5px dashed var(--rot);
   border-radius: 2px;
-}
-
-.lg-windpark {
-  width: 3px;
-  height: 12px;
-  background: var(--tinte-2);
-  box-shadow: -4px -4px 0 -1px var(--tinte-2), 4px -4px 0 -1px var(--tinte-2);
 }
 
 /* ===== Strandmüll: Pop-up „neuer Müll pro Runde“ ===== */
@@ -1135,11 +1083,7 @@ button {
   background: var(--tinte);
 }
 
-.kennzahl-legende + .kennzahl-legende { margin-top: 6px; }
-
-/* ===== Bericht: Säulen, Konflikte, Kompetenzprofil ===== */
-.saeulen-bericht { margin: 0 0 10px; }
-
+/* ===== Endauswertung: Konflikte und Kompetenzprofil; Trendpfeile ===== */
 .konflikt-liste {
   margin: 0;
   padding-left: 18px;
@@ -2462,35 +2406,22 @@ button {
 p + .info-tabelle { margin-top: 10px; }
 .info-tabelle + p { margin-top: 12px; }
 
-.bericht-tabelle,
 .info-tabelle {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.92rem;
 }
 
-.bericht-tabelle th,
-.bericht-tabelle td,
 .info-tabelle td {
   padding: 6px 8px;
   text-align: right;
   border-bottom: 1px solid var(--linie);
 }
 
-.bericht-tabelle th:first-child,
-.bericht-tabelle td:first-child,
 .info-tabelle td:first-child {
   padding-left: 0;
   text-align: left;
 }
-
-.bericht-tabelle thead th {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--tinte-3);
-}
-
-.bericht-tabelle tbody th { font-weight: 500; }
 
 .bilanz {
   display: grid;
@@ -2908,7 +2839,6 @@ p + .info-tabelle { margin-top: 10px; }
   padding-left: 12px;
 }
 
-/* ===== Ergänzungen: Säulen, Quiz ===== */
 /* ===== Übersicht über die Entscheidungen der Runde ===== */
 .auswahl-uebersicht {
   margin: 0 0 8px;
@@ -2920,7 +2850,7 @@ p + .info-tabelle { margin-top: 10px; }
 .uebersicht-kosten { color: var(--tinte-2); }
 .uebersicht-kosten .im-minus { color: var(--rot); }
 
-/* „Zurückstellen“ ist eine bewusste Entscheidung, aber optisch zurückgenommen */
+/* „Nichts tun“ ist eine bewusste Entscheidung, aber optisch zurückgenommen */
 .massnahme.zurueck {
   background: transparent;
   border-style: dashed;

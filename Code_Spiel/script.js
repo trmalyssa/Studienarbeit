@@ -29,8 +29,8 @@
 //   Pro Runde bewegt sie sich höchstens MAX_AENDERUNG Punkte. Dadurch wirken
 //   Maßnahmen verzögert, aber nachvollziehbar.
 // - Pro Runde trifft der Spieler DREI Entscheidungen, je eine pro Säule der
-//   Nachhaltigkeit: Ökologie, Ökonomie und Soziales. Jede Säule kann er auch
-//   zurückstellen. Die ökologischen Maßnahmen wechseln mit der Region im Fokus
+//   Nachhaltigkeit: Ökologie, Ökonomie und Soziales. In jeder Säule kann er auch
+//   „Nichts tun“ wählen. Die ökologischen Maßnahmen wechseln mit der Region im Fokus
 //   (Strand → Meer → Land).
 // - GELD IST KNAPP: Das Budget reicht nicht für alle Maßnahmen. Wer alles
 //   kaufen will, scheitert; wer nichts tut, auch. Jede Runde heißt deshalb:
@@ -98,6 +98,9 @@ const STARTWERTE = {
 
 // Sonderereignisse (Sturmflut, Algenblüte …) sind vorerst ausgeschaltet, damit
 // sich das Grundkonzept ungestört prüfen lässt. Zum Einschalten auf true setzen.
+// Bewusst behalten, solange sie aus sind: EREIGNISSE (Abschnitt 3), ereignisPlanErstellen,
+// ereignisAusloesen, ereignisZeigen, Pop-up „Ereignis“ (index.html) und der EU-Förderaufruf
+// (foerderaufruf, foerderHinweis, Etikett „gefördert“), den nur ein Ereignis auslöst.
 const EREIGNISSE_AKTIV = false;
 // Zufallsereignisse: so viele, in diesen Runden. Level 1 bleibt ereignisfrei,
 // in Level 3 bleibt Zeit, den guten Umweltzustand zu stabilisieren.
@@ -108,12 +111,9 @@ const EREIGNIS_RUNDEN = { von: 4, bis: 8, anzahl: 4 };
 // gewicht: So stark zählt der Rundenscore dieses Levels im Nachhaltigkeitsscore. In der Einarbeitung
 // zählt er halb (Ausprobieren soll sich nicht rächen), in der Stabilisierung eineinhalbfach.
 const LEVEL = [
-  { nr: 1, name: "Einarbeitung",  von: 1,  bis: 3,  kostenFaktor: 0.8, gewicht: 0.5,
-    text: "Finde heraus, wie deine Maßnahmen wirken. Aufbauhilfe: Alle Maßnahmen sind 20 % günstiger, und diese Runden zählen nur halb." },
-  { nr: 2, name: "Bewährung",     von: 4,  bis: 9,  kostenFaktor: 1,   gewicht: 1,
-    text: "Senke den Müll-Eintrag an allen drei Quellen. Die Aufbauhilfe ist ausgelaufen." },
-  { nr: 3, name: "Stabilisieren", von: 10, bis: 12, kostenFaktor: 1,   gewicht: 1.5,
-    text: "Zielprüfung: Halte den guten Umweltzustand bis zum Ende. Diese Runden zählen eineinhalbfach." }
+  { nr: 1, name: "Einarbeitung",  von: 1,  bis: 3,  kostenFaktor: 0.8, gewicht: 0.5 },
+  { nr: 2, name: "Bewährung",     von: 4,  bis: 9,  kostenFaktor: 1,   gewicht: 1 },
+  { nr: 3, name: "Stabilisieren", von: 10, bis: 12, kostenFaktor: 1,   gewicht: 1.5 }
 ];
 
 // Drei Säulen der Nachhaltigkeit: pro Runde eine Entscheidung je Säule
@@ -137,10 +137,9 @@ const BEREICH_STIL = {
 };
 
 // Otter: taucht in diesen Runden im Meer auf und meldet kurz den Zwischenstand. Freiwillig, ohne Strafe.
-// Er schwimmt rechts der Mitte, damit ihn das Maßnahmen-Fenster unten links nicht verdeckt.
+// Er schwimmt rechts der Mitte im Meer, abseits von Windpark und Fischschwärmen.
 const OTTER_RUNDEN = [3, 6, 9];
 const OTTER_ORT = { x: 60, y: 94 };    // Fußpunkt der Figur in Prozent des Kartenkerns
-
 
 // Wissen: Anteil am Endergebnis
 const WISSEN_ANTEIL = 0.2;        // Endergebnis = 80 % Nachhaltigkeit + 20 % Wissen
@@ -1679,10 +1678,6 @@ function massnahmeFinden(id) {
   return MASSNAHMEN.find(function (m) { return m.id === id; }) || null;
 }
 
-function saeuleFinden(id) {
-  return SAEULEN.find(function (s) { return s.id === id; });
-}
-
 function istUmgesetzt(z, id) {
   return Boolean(z.umgesetzt[id] && z.umgesetzt[id].length > 0);
 }
@@ -1915,11 +1910,6 @@ function rueckstaende(s, saeuleId) {
     return { id: id, name: KENNZAHL_NAMEN[id], wert: s[id], soll: Math.round(kursSoll(id, s.runde)),
       einheit: id === "strandmuell" ? " Teile" : " %", hoeher: id !== "strandmuell" };
   });
-}
-
-// Schwächste Säule einer Momentaufnahme (bei Gleichstand die erste)
-function schwaechsteSaeule(s) {
-  return SAEULEN.slice().sort(function (a, b) { return s.saeulen[a.id] - s.saeulen[b.id]; })[0];
 }
 
 // Maßnahmen, die in einer Runde umgesetzt wurden
@@ -2547,7 +2537,7 @@ function legendeSetzen(offen) {
 }
 
 // ---------- Entscheidungsfenster ----------
-// Drei gleich hohe Spalten (Ökologie, Ökonomie, Soziales). Jede Maßnahme ist eine Karte:
+// Jede Maßnahme ist eine Karte im Reiter ihrer Säule (Ökologie, Ökonomie, Soziales):
 // Ein Klick klappt sie auf und zeigt Beschreibung, Leitfrage und die Bedeutung der Etiketten;
 // gewählt wird erst mit dem Knopf in der aufgeklappten Karte. Es ist immer höchstens eine Karte offen.
 
@@ -2576,7 +2566,7 @@ function bereichSymbolSvg(region) {
 }
 
 // ---------- Maßnahmen-Fenster ----------
-// Liegt unten links über der Karte und lässt sich auf- und zuklappen. Drei Reiter (Ökologie, Ökonomie,
+// Liegt rechts unten über der Karte und lässt sich auf- und zuklappen. Drei Reiter (Ökologie, Ökonomie,
 // Soziales) mit Symbol und Haken, sobald entschieden ist. Die Ökologie-Maßnahmen gelten jede Runde für einen
 // Bereich; das steht als Etikett im Reiter Ökologie. Zu Rundenbeginn ist das Fenster zugeklappt, solange
 // Pflicht-Infopunkte offen sind (die Karte bleibt frei), und klappt auf, sobald sie gelesen sind.
@@ -2899,7 +2889,7 @@ function rundenKnopfAnzeigen() {
   knopf.textContent = z.beendet ? "Spiel beendet"
     : z.runde === RUNDEN ? "Letzte Runde beenden" : "Runde " + z.runde + " beenden";
 
-  // Hinweis unter dem Knopf: was noch fehlt
+  // Hinweis oben über der Karte: was noch fehlt
   const hinweis = el("anhoerungHinweis");
   const ueberflogen = z.anliegen.filter(function (a) { return a.zuSchnell; });
   hinweis.className = "karten-hinweis";
@@ -2915,7 +2905,7 @@ function rundenKnopfAnzeigen() {
       (offen.length > 1 ? " zu sagen haben" : " zu sagen hat") + ". Klicke dazu auf die Sprechblase in der Karte.";
   } else if (saeulenOffen.length) {
     hinweis.textContent = "Noch offen: " + namenListe(saeulenOffen.map(function (s) { return s.name; })) +
-      ". Wähle eine Maßnahme oder stelle den Bereich zurück.";
+      ". Wähle jeweils eine Maßnahme oder „Nichts tun“.";
   } else if (ueberflogen.length) {
     hinweis.classList.add("warnung");
     hinweis.textContent = namenListe(ueberflogen.map(function (a) { return PERSONEN[a.region].name; })) +
@@ -3064,7 +3054,7 @@ function markerAnzeigen() {
 // Müllsymbole an Strand und Land = Strandmüll und Eintrag, gebündelt an den Verursachern (Glas bei der
 // Industrie, Essensreste bei den Hotels, Plastik an Flussmündung und Kiosk), Müll im Fluss und
 // schwimmender Plastikmüll = Eintrag, Fische = Artenvielfalt.
-// Beschriftet sind nur Fabrik, große Hotels und der Kiosk; die Legende steht darunter.
+// Beschriftet sind nur Fabrik, große Hotels und der Kiosk; die Legende öffnet sich über ihrem Knopf links unten.
 const KARTE_B = 800;
 const KARTE_H = 320;
 const STRAND_BREITE = 22;
@@ -4166,7 +4156,6 @@ function hotspotPlaetze(z, lage) {
       const teil = lage === "strand"
         ? muellTeil(wahl.art, wahl.form, x, y, r, 1.1, 1.25)
         : muellTeil(wahl.art, wahl.form, x, y, r, 0.95, 1.1);
-      teil.hotspot = h.id;
       teil.quelle = h.quelle;
       teil.rang = (eigene.length + 0.5) / h.plaetze;
       eigene.push(teil);
@@ -4236,8 +4225,6 @@ function treibgutAnzahl(z) {
   return Math.min(TREIBGUT_MAX, Math.round(z.eintrag.gesamt / 5));
 }
 
-// Kleines Symbol für die Legende unter der Karte. Breite und Höhe stehen direkt am SVG,
-// damit die Größe auch ohne passende CSS-Regel stimmt.
 // Legendentext zu den Fischen: welche Arten gerade zu sehen sind
 function fischLegende(artenvielfalt) {
   const namen = sichtbareFischArten(artenvielfalt).map(function (a) { return a.name; });
@@ -4246,6 +4233,8 @@ function fischLegende(artenvielfalt) {
     : namen.slice(0, 2).join(", ") + " und " + (namen.length - 2) + " weitere Arten");
 }
 
+// Kleines Symbol für die Legende. Breite und Höhe stehen direkt am SVG,
+// damit die Größe auch ohne passende CSS-Regel stimmt.
 function legendenSvg(inhalt, viewBox) {
   return '<svg class="lg-symbol" width="20" height="15" viewBox="' + viewBox + '" aria-hidden="true" focusable="false">' +
     inhalt + "</svg>";
@@ -5107,7 +5096,7 @@ function berichtZeigen(bericht) {
   bericht.entscheidungen.forEach(function (e) {
     const kopf = '<span class="bericht-saeule">' + e.saeule.name + "</span>" +
       '<span class="bericht-massnahme' + (e.massnahme ? "" : " gedaempft") + '">' +
-      (e.massnahme ? e.massnahme.name : "Zurückgestellt") + "</span>";
+      (e.massnahme ? e.massnahme.name : "Nichts tun") + "</span>";
     html += e.massnahme
       ? '<details class="bericht-entscheidung"><summary>' + kopf +
         '<span class="bericht-pfeil" aria-hidden="true">▼</span></summary>' +
@@ -5516,13 +5505,13 @@ function budgetZeigen() {
 }
 
 // ---------- Bewertung: Ziel und Score ----------
-// Inhalt der Bewertung: im Spiel als eigenes Pop-up, auf dem Startbildschirm unter „Spielinfo“
+// Inhalt der Bewertung im Pop-up „Spielinfo“ auf dem Startbildschirm
 function bewertungHtml() {
   const fenster = zielFenster();
   let html = "<h3>Guter Umweltzustand</h3>" +
     "<p>Das Spiel gilt als gewonnen, wenn in den Runden " + fenster.von + " bis " + fenster.bis +
-    " alle Mindestbedingungen gleichzeitig erfüllt sind. Welche das sind und wie du gerade stehst, zeigt " +
-    "die Tafel „Ziel: guter Umweltzustand“.</p>";
+    " alle Mindestbedingungen gleichzeitig erfüllt sind:</p>" +
+    '<ul class="liste-kompakt">' + ZIELE.map(function (ziel) { return "<li>" + ziel.text + "</li>"; }).join("") + "</ul>";
 
   html += "<h3>Endergebnis</h3>" +
     '<table class="info-tabelle"><tbody>' +
@@ -5615,8 +5604,8 @@ function diagrammSvg(verlauf, reihen, yMax, schwelle, schwelleFarbe) {
   }
   reihen.forEach(function (reihe) {
     const punkte = verlauf.map(function (v) { return xPos(v.runde).toFixed(1) + "," + yPos(v[reihe.id]).toFixed(1); });
-    s += '<polyline points="' + punkte.join(" ") + '" fill="none" stroke="' + reihe.farbe + '" stroke-width="' +
-      (reihe.dick ? 3.2 : 2.2) + '" stroke-linejoin="round"' + (reihe.gestrichelt ? ' stroke-dasharray="7 5"' : "") + "/>";
+    s += '<polyline points="' + punkte.join(" ") + '" fill="none" stroke="' + reihe.farbe +
+      '" stroke-width="2.2" stroke-linejoin="round"/>';
   });
   s += "</svg>";
   return s;
@@ -5696,7 +5685,7 @@ function auswertungZeigen() {
     '<span class="klein">' + anzahlMassnahmen + " Maßnahmen</span>" +
     '<span class="bericht-pfeil" aria-hidden="true">▼</span></summary>' +
     (anzahlMassnahmen
-      ? '<p class="klein">„–“ heißt: in dieser Säule zurückgestellt.</p>' +
+      ? '<p class="klein">„–“ heißt: In dieser Säule wurde nichts umgesetzt.</p>' +
         '<div class="entscheidungen-rahmen"><table class="entscheidungen-tabelle"><thead><tr><th scope="col">Runde</th>' +
         SAEULEN.map(function (sl) { return '<th scope="col">' + sl.name + "</th>"; }).join("") + "</tr></thead><tbody>" +
         proRunde.map(function (zeile, i) {
@@ -5874,7 +5863,6 @@ function startbildschirmVerbergen() {
 //   startZeit    performance.now() beim Start; Ende = startZeit + gesamtDauer
 //   faktStart    performance.now(), seit der aktuelle Fakt steht
 //   fakt         der angezeigte Fakt
-//   anzahl       wie viele Fakten in dieser Ladung schon gezeigt wurden
 //   endeTimer    setTimeout-ID der Gesamtuhr
 //   faktTimer    setTimeout-ID der Faktuhr
 //   schleife     requestAnimationFrame-ID der Zeichenschleife
@@ -5885,7 +5873,7 @@ function startbildschirmVerbergen() {
 const lade = {
   aktiv: false,
   startZeit: 0, faktStart: 0,
-  fakt: null, anzahl: 0,
+  fakt: null,
   endeTimer: null, faktTimer: null, schleife: 0,
   abbruch: null,
   prozent: -1, phase: -1,
@@ -5936,7 +5924,6 @@ function ladebildschirmStarten(fertig) {
   ladeAufraeumen();                                // falls noch ein alter Durchlauf hängt
   lade.fertig = fertig;
   lade.aktiv = true;
-  lade.anzahl = 0;
   lade.fakt = null;
   lade.prozent = -1;
   lade.phase = -1;
@@ -5974,7 +5961,6 @@ function ladeNaechsterFakt() {
   if (!lade.aktiv) return;
   clearTimeout(lade.faktTimer);                    // laufende Faktuhr verwerfen (Reset beim Skip)
   lade.fakt = naechsterFakt(lade.fakt);
-  lade.anzahl += 1;
   lade.faktStart = performance.now();
   ladeFaktZeigen(lade.fakt);
   lade.faktTimer = setTimeout(ladeNaechsterFakt, LADEBILDSCHIRM.faktDauer);
