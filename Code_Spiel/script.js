@@ -4640,7 +4640,7 @@ function popupFertig(id) {
 }
 
 // ---------- Einführung ----------
-// Drei Seiten: Willkommen, Ziel (Status-Balken wandern vom Ist- zum Soll-Zustand) und
+// Drei Seiten: Willkommen, Ziel (Status-Balken pendeln zwischen Ist- und Soll-Zustand) und
 // „Befreie die Küste von Müll“ (Minikarte räumt sich bis auf drei Müllteile auf).
 // start(inhalt) läuft, sobald die Seite sichtbar ist, und startet ihre Animation.
 let einfuehrungSchritt = 0;
@@ -4721,25 +4721,30 @@ function zielBalkenHtml() {
   }).join("") + "</div>";
 }
 
-// Balken, Zahl und Farbe wandern weich vom Ist- zum Soll-Wert
+// Balken, Zahl und Farbe pendeln in einer Schleife: 1 s Ist-Wert stehen, weich zum Soll-Wert wechseln,
+// 1 s Soll-Wert stehen, weich zurück zum Ist-Wert wechseln. Bei „Bewegung reduzieren“ stehen sie still.
+const ZIEL_BALKEN_TAKT = { stehen: 1000, wechseln: 1500 };
+
 function zielBalkenAnimieren(inhalt) {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const zeilen = zielBalkenZeilen();
   const fuellungen = inhalt.querySelectorAll(".ziel-balken .balken-fuellung");
   const zahlen = inhalt.querySelectorAll(".ziel-balken .kennzahl-wert strong");
-  const ruhig = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const beginn = performance.now() + (ruhig ? 0 : 700);
-  const dauer = ruhig ? 1 : 2600;
+  const halb = ZIEL_BALKEN_TAKT.stehen + ZIEL_BALKEN_TAKT.wechseln;     // Ist → Soll, danach Soll → Ist
+  const beginn = performance.now();
   const bild = function (jetzt) {
-    if (!inhalt.contains(fuellungen[0])) return;              // Seite gewechselt
-    const t = begrenzen((jetzt - beginn) / dauer, 0, 1);
+    if (!inhalt.contains(fuellungen[0])) return;              // Seite gewechselt oder Fenster neu gefüllt
+    const zeit = (jetzt - beginn) % (2 * halb);
+    const t = begrenzen(((zeit % halb) - ZIEL_BALKEN_TAKT.stehen) / ZIEL_BALKEN_TAKT.wechseln, 0, 1);
     const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    const anteil = zeit < halb ? e : 1 - e;                   // 0 = Ist, 1 = Soll
     zeilen.forEach(function (k, i) {
-      const wert = k.ist + (k.soll - k.ist) * e;
+      const wert = k.ist + (k.soll - k.ist) * anteil;
       fuellungen[i].style.width = k.breite(wert) + "%";
       fuellungen[i].style.backgroundColor = k.farbe(wert);
       zahlen[i].textContent = zahl(Math.round(wert)) + k.einheit;
     });
-    if (t < 1) requestAnimationFrame(bild);
+    requestAnimationFrame(bild);
   };
   requestAnimationFrame(bild);
 }
