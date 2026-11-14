@@ -2525,26 +2525,13 @@ function kennzahlenAnzeigen() {
   }).join("");
 }
 
-// ---------- Fenster über der Karte: Zustand und Legende ----------
-// Zustand der Region (links oben) klappt auf die Kurzwerte zusammen; die Legende öffnet sich über ihrem Knopf
-// (links unten). Ein Punkt am Knopf zeigt, dass seit dem letzten Öffnen ein neues Symbol dazugekommen ist.
+// ---------- Fenster über der Karte: Zustand der Region ----------
+// Zustand der Region (links oben) klappt auf die Kurzwerte zusammen
 function zustandFensterSetzen(offen) {
   el("zustandInhalt").hidden = !offen;
   el("kennzahlenKurz").hidden = offen;
   el("zustandKlappe").setAttribute("aria-expanded", offen ? "true" : "false");
   el("kennzahlen").classList.toggle("zu", !offen);
-}
-
-const legende = { spiel: null, gesehen: [] };
-
-function legendeSetzen(offen) {
-  el("legendeInhalt").hidden = !offen;
-  el("legendeKnopf").setAttribute("aria-expanded", offen ? "true" : "false");
-  el("legendeKnopf").setAttribute("aria-label", offen ? "Legende schließen" : "Legende anzeigen");
-  if (offen) {
-    legende.gesehen = Array.prototype.map.call(el("kartenLegende").children, function (li) { return li.textContent; });
-    el("legendeKnopf").classList.remove("neu");
-  }
 }
 
 // ---------- Entscheidungsfenster ----------
@@ -2893,40 +2880,50 @@ function uebersichtAnzeigen() {
 function rundenKnopfAnzeigen() {
   const z = zustand;
   const knopf = el("naechsteRunde");
-  const pflicht = pflichtInfosOffen(z);
-  const offen = offeneAnliegen(z);
-  const saeulenOffen = entscheidungenOffen(z);
   knopf.disabled = !rundeBereit(z);
   knopf.textContent = z.beendet ? "Spiel beendet"
     : z.runde === RUNDEN ? "Letzte Runde beenden" : "Runde " + z.runde + " beenden";
+  otterSprechblaseAktualisieren();
+}
 
-  // Hinweis oben über der Karte: was noch fehlt
-  const hinweis = el("anhoerungHinweis");
+// Was als Nächstes zu tun ist; in Runde 1 sagt es der Otter in seiner Sprechblase
+function rundenHinweis(z) {
+  const pflicht = pflichtInfosOffen(z);
+  const offen = offeneAnliegen(z);
+  const saeulenOffen = entscheidungenOffen(z);
   const ueberflogen = z.anliegen.filter(function (a) { return a.zuSchnell; });
-  hinweis.className = "karten-hinweis";
-  if (z.beendet) {
-    hinweis.textContent = "";
-  } else if (pflicht.length) {
-    hinweis.textContent = "Lies zuerst die Infopunkte zu " +
+  if (pflicht.length) {
+    return { warnung: false, text: "Lies zuerst die Infopunkte zu " +
       namenListe(pflicht.map(function (p) { return bereichName(p.region); })) +
-      ". Klicke dazu auf die blauen i-Zeichen in der Karte.";
-  } else if (offen.length) {
-    const namen = offen.map(function (a) { return PERSONEN[a.region].name; });
-    hinweis.textContent = "Hör dir an, was " + namenListe(namen) +
-      (offen.length > 1 ? " zu sagen haben" : " zu sagen hat") + ". Klicke dazu auf die Sprechblase in der Karte.";
-  } else if (saeulenOffen.length) {
-    hinweis.textContent = "Noch offen: " + namenListe(saeulenOffen.map(function (s) { return s.name; })) +
-      ". Wähle jeweils eine Maßnahme oder „Nichts tun“.";
-  } else if (ueberflogen.length) {
-    hinweis.classList.add("warnung");
-    hinweis.textContent = namenListe(ueberflogen.map(function (a) { return PERSONEN[a.region].name; })) +
-      (ueberflogen.length > 1 ? " fühlen" : " fühlt") + " sich übergangen. Am Rundenende sinkt die Akzeptanz um " +
-      ANHOERUNG_STRAFE * ueberflogen.length + " Punkte.";
-  } else {
-    hinweis.textContent = quizFuerRunde(z.runde).length
-      ? "Alles entschieden. Zum Rundenende wartet ein kurzes Quiz."
-      : "Alles entschieden.";
+      ". Klicke dazu auf die blauen i-Zeichen in der Karte." };
   }
+  if (offen.length) {
+    const namen = offen.map(function (a) { return PERSONEN[a.region].name; });
+    return { warnung: false, text: "Hör dir an, was " + namenListe(namen) +
+      (offen.length > 1 ? " zu sagen haben. Klicke dazu auf die Sprechblasen" : " zu sagen hat. Klicke dazu auf die Sprechblase") +
+      " in der Karte." };
+  }
+  if (saeulenOffen.length) {
+    return { warnung: false, text: "Noch offen: " + namenListe(saeulenOffen.map(function (s) { return s.name; })) +
+      ". Wähle jeweils eine Maßnahme oder „Nichts tun“." };
+  }
+  if (ueberflogen.length) {
+    return { warnung: true, text: namenListe(ueberflogen.map(function (a) { return PERSONEN[a.region].name; })) +
+      (ueberflogen.length > 1 ? " fühlen" : " fühlt") + " sich übergangen. Am Rundenende sinkt die Akzeptanz um " +
+      ANHOERUNG_STRAFE * ueberflogen.length + " Punkte." };
+  }
+  return { warnung: false, text: quizFuerRunde(z.runde).length
+    ? "Alles entschieden. Zum Rundenende wartet ein kurzes Quiz."
+    : "Alles entschieden." };
+}
+
+// Sprechblase des Otters in Runde 1 (sie gibt es nur dann, siehe markerAnzeigen)
+function otterSprechblaseAktualisieren() {
+  const blase = el("otterSprechblase");
+  if (!blase) return;
+  const hinweis = rundenHinweis(zustand);
+  blase.textContent = hinweis.text;
+  blase.classList.toggle("warnung", hinweis.warnung);
 }
 
 function namenListe(namen) {
@@ -3004,13 +3001,18 @@ function figurSvg(person) {
   return s + "</svg>";
 }
 
+// Setzt ein Element über der Karte an einen Ort (ort.x/ort.y in Prozent des Kartenkerns, siehe kartenPosition)
+function platzieren(element, ort) {
+  const lage = kartenPosition(ort);
+  element.style.left = lage.left;
+  element.style.top = lage.top;
+}
+
 // Knopf über der Karte; ort.x/ort.y in Prozent des Kartenkerns (siehe kartenPosition)
 function kartenKnopf(klasse, ort, label, html, aktion) {
   const knopf = elementBauen("button", klasse);
   knopf.type = "button";
-  const lage = kartenPosition(ort);
-  knopf.style.left = lage.left;
-  knopf.style.top = lage.top;
+  platzieren(knopf, ort);
   knopf.setAttribute("aria-label", label);
   knopf.innerHTML = html;
   knopf.addEventListener("click", aktion);
@@ -3033,8 +3035,16 @@ function markerAnzeigen() {
       function () { infopunktOeffnen(p.id); }));
   });
 
-  // Otter mit dem Zwischenstand (freiwillig, auch vor den Infopunkten anklickbar)
-  if (otterDa(z)) {
+  // Otter: in Runde 1 erklärt er in einer Sprechblase, was als Nächstes zu tun ist;
+  // in den OTTER_RUNDEN meldet er den Zwischenstand (freiwillig, auch vor den Infopunkten anklickbar)
+  if (z.runde === 1 && !z.beendet) {
+    const otter = elementBauen("div", "person otter erklaert");
+    platzieren(otter, OTTER_ORT);
+    otter.innerHTML = '<p id="otterSprechblase" class="otter-sprechblase" aria-live="polite"></p>' + otterSvg() +
+      '<span class="person-name" aria-hidden="true">Otter</span>';
+    ebene.appendChild(otter);
+    otterSprechblaseAktualisieren();
+  } else if (otterDa(z)) {
     const gelesen = z.otterGelesen.indexOf(z.runde) >= 0;
     ebene.appendChild(kartenKnopf("person otter " + (gelesen ? "gelesen" : "ungelesen"), OTTER_ORT,
       gelesen ? "Otter: Zwischenstand noch einmal ansehen" : "Otter: Zwischenstand ansehen",
@@ -3062,10 +3072,11 @@ function markerAnzeigen() {
 // 8. SEEKARTE (SVG)
 // ==========================================================
 // Die Karte zeigt den Zustand der Region: Wasserfarbe = Meeresgesundheit,
-// Müllsymbole an Strand und Land = Strandmüll und Eintrag, gebündelt an den Verursachern (Glas bei der
-// Industrie, Essensreste bei den Hotels, Plastik an Flussmündung und Kiosk), Müll im Fluss und
-// schwimmender Plastikmüll = Eintrag, Fische = Artenvielfalt.
-// Beschriftet sind nur Fabrik, große Hotels, Kiosk und Flughafen; die Legende öffnet sich über ihrem Knopf links unten.
+// Müll am Strand = Strandmüll, gleichmäßig über die ganze Länge, die Art nach dem nächsten Verursacher (Glas bei der
+// Industrie, Essensreste bei den Hotels, Plastik an Flussmündung und Kiosk); Müll an Land gebündelt an den
+// Verursachern, Müll im Fluss und schwimmender Plastikmüll im ganzen Meer = Eintrag;
+// Fische und Landtiere = Artenvielfalt.
+// Beschriftet sind nur Fabrik, große Hotels, Kiosk und Flughafen.
 const KARTE_B = 800;
 const KARTE_H = 320;
 const STRAND_BREITE = 22;
@@ -3354,7 +3365,7 @@ function wiesenSvg() {
     const y = 6 + r() * (kuestenlinie(x) - 26);
     if (x > 118 && x < 218) continue;                              // Fluss
     if (x > 420 && x < 760 && y > 14) continue;                    // Ort und Fabrik
-    if (imRechteck(x, y, [FLUGHAFEN.flaeche])) continue;
+    if (imRechteck(x, y, [flughafenFlaeche()])) continue;
     let d = "";
     for (let j = 0; j < 3; j++) {
       const neigung = (j - 1) * 1.6 + (r() - 0.5);
@@ -3403,7 +3414,7 @@ function baumSvg(x, y, g, art) {
 }
 
 // Land außerhalb des Kerns (oben und an den Seiten): Grasbüschel und vereinzelte Bäume nach Raster.
-// Neben dem Oberlauf des Flusses bleibt ein Streifen frei.
+// Neben dem Oberlauf des Flusses bleibt ein Streifen frei, ebenso der Flughafen.
 function randLandSvg(sicht) {
   const gras = ["#7E9A4E", "#91AB5B", "#6B8743", "#A3B868"];
   let halme = "";
@@ -3415,6 +3426,7 @@ function randLandSvg(sicht) {
       const imKern = x > 0 && x < KARTE_B && y > 0;
       if (imKern || y > kuestenlinie(x) - 12 || y < sicht.y + 4) continue;
       if (y < 0 && Math.abs(x - 150) < 26) continue;                 // Oberlauf des Flusses
+      if (imRechteck(x, y, [flughafenFlaeche()])) continue;
       if (zufallBei(i, j, 7) < 0.16) {
         baeume.push([x, y, 0.9 + zufallBei(i, j, 8) * 0.45, zufallBei(i, j, 9) < 0.45 ? "kiefer" : "laub"]);
         continue;
@@ -3462,7 +3474,7 @@ function strandhaferSvg() {
   const frei = function (x, y) {
     if (x > 120 && x < 230) return false;                        // Fluss und Mündung
     if (x > 420 && x < 770 && y < 104) return false;             // Ort, Fabrik, Steg
-    if (imRechteck(x, y, [FLUGHAFEN.flaeche])) return false;
+    if (imRechteck(x, y, [flughafenFlaeche()])) return false;
     return true;
   };
   let s = '<g fill="none" stroke-linecap="round" opacity="0.85">';
@@ -3492,32 +3504,36 @@ function strandhaferSvg() {
 // die Artenvielfalt, kommen mehr Tiere und weitere Arten dazu: die Jungfische der „Kinderstube“
 // (Scholle, Wittling, Hornhecht), dann Standfische (Seeskorpion, Steinpicker) und zuletzt Katzenhai und
 // Nagelrochen, die an der Wattenmeerküste heute selten bzw. ausgerottet sind.
-// ab = nötige Artenvielfalt; anzahl = Stufen [ab Artenvielfalt, Tiere]; schwarm = Fische pro Tier;
+// anzahl = Stufen [ab Artenvielfalt, Tiere]; schwarm = Fische pro Tier;
 // boden = lebt am Grund (schwimmt weiter unten und ruhiger)
 const FISCH_ARTEN = [
-  { id: "hering",      name: "Hering",      ab: 0,  anzahl: [[0, 1], [40, 2], [62, 3], [80, 4]], schwarm: 3 },
-  { id: "grundel",     name: "Sandgrundel", ab: 0,  anzahl: [[0, 1], [45, 2], [66, 3], [85, 4]], boden: true },
-  { id: "scholle",     name: "Scholle",     ab: 57, anzahl: [[57, 1], [72, 2]], boden: true },
-  { id: "wittling",    name: "Wittling",    ab: 62, anzahl: [[62, 1], [78, 2]] },
-  { id: "hornhecht",   name: "Hornhecht",   ab: 67, anzahl: [[67, 1]], schwarm: 2 },
-  { id: "seeskorpion", name: "Seeskorpion", ab: 72, anzahl: [[72, 1]], boden: true },
-  { id: "steinpicker", name: "Steinpicker", ab: 77, anzahl: [[77, 1]], boden: true },
-  { id: "katzenhai",   name: "Katzenhai",   ab: 84, anzahl: [[84, 1]], groesse: 1.1 },
-  { id: "rochen",      name: "Nagelrochen", ab: 91, anzahl: [[91, 1]], boden: true, groesse: 1.15 }
+  { id: "hering",      name: "Hering",      anzahl: [[0, 1], [40, 2], [62, 3], [80, 4]], schwarm: 3 },
+  { id: "grundel",     name: "Sandgrundel", anzahl: [[0, 1], [45, 2], [66, 3], [85, 4]], boden: true },
+  { id: "scholle",     name: "Scholle",     anzahl: [[57, 1], [72, 2]], boden: true },
+  { id: "wittling",    name: "Wittling",    anzahl: [[62, 1], [78, 2]] },
+  { id: "hornhecht",   name: "Hornhecht",   anzahl: [[67, 1]], schwarm: 2 },
+  { id: "seeskorpion", name: "Seeskorpion", anzahl: [[72, 1]], boden: true },
+  { id: "steinpicker", name: "Steinpicker", anzahl: [[77, 1]], boden: true },
+  { id: "katzenhai",   name: "Katzenhai",   anzahl: [[84, 1]], groesse: 1.1 },
+  { id: "rochen",      name: "Nagelrochen", anzahl: [[91, 1]], boden: true, groesse: 1.15 }
 ];
 
-function sichtbareFischArten(artenvielfalt) {
-  return FISCH_ARTEN.filter(function (a) { return artenvielfalt >= a.ab; });
+// So viele Tiere einer Art sind bei dieser Artenvielfalt zu sehen (Fische und Landtiere)
+function tierAnzahl(art, artenvielfalt) {
+  let anzahl = 0;
+  art.anzahl.forEach(function (stufe) { if (artenvielfalt >= stufe[0]) anzahl = stufe[1]; });
+  return anzahl;
+}
+
+// Kleines Auge mit Lichtpunkt (Fische und Landtiere)
+function auge(x, y, r) {
+  return '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="#1E3445"/>' +
+    '<circle cx="' + (x - r * 0.35).toFixed(2) + '" cy="' + (y - r * 0.35).toFixed(2) + '" r="' + (r * 0.35).toFixed(2) + '" fill="#FFFFFF" opacity="0.8"/>';
 }
 
 // Fische in Seitenansicht (Rochen und Scholle von oben), Kopf links, um (0,0), etwa 16 Einheiten lang.
 // Ohne Umrisslinie wie im Titelbild: dunklerer Rücken, hellerer Bauch, kleines Auge mit Lichtpunkt.
 // Die Schwanzflosse steht in einer eigenen Gruppe, damit sie schlagen kann.
-function fischAuge(x, y, r) {
-  return '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="#1E3445"/>' +
-    '<circle cx="' + (x - r * 0.35).toFixed(2) + '" cy="' + (y - r * 0.35).toFixed(2) + '" r="' + (r * 0.35).toFixed(2) + '" fill="#FFFFFF" opacity="0.8"/>';
-}
-
 function fischSchwanz(inhalt) {
   return '<g class="ka-fisch-schwanz">' + inhalt + "</g>";
 }
@@ -3530,7 +3546,7 @@ const FISCH_FORMEN = {
       '<path d="M-8,0 C-6.4,-2.7 0.5,-3.3 6.4,-1 L6.4,1 C0.5,3.1 -6.4,2.7 -8,0 Z" fill="#DCE7EC"/>' +
       '<path d="M-8,0 C-6.4,-2.7 0.5,-3.3 6.4,-1 L6.4,-0.2 C1,-1.3 -4.5,-1.1 -8,0 Z" fill="#4E7E9C"/>' +
       '<path d="M-6,0.9 C-2,1.9 2,1.7 5.5,0.7" fill="none" stroke="#FFFFFF" stroke-opacity="0.6" stroke-width="0.5"/>' +
-      fischAuge(-5.6, -0.5, 0.75);
+      auge(-5.6, -0.5, 0.75);
   },
   // Sandgrundel: klein, keulenförmig, sandfarben mit dunklen Tupfen, zwei Rückenflossen, Augen oben
   grundel: function () {
@@ -3539,7 +3555,7 @@ const FISCH_FORMEN = {
       '<path d="M-6.5,0.3 C-6.5,-2.6 -2.5,-3 0.5,-1.9 C3,-1 5,-0.7 6.2,-0.5 L6.2,0.8 C4.5,1.1 2,1.9 -1,2.3 C-4.5,2.6 -6.5,2.1 -6.5,0.3 Z" fill="#D4C098"/>' +
       '<path d="M-6.5,0.3 C-6.5,-2.6 -2.5,-3 0.5,-1.9 C3,-1 5,-0.7 6.2,-0.5 L6.2,0 C3,-0.2 -1,-0.6 -6.5,0.3 Z" fill="#A68D63"/>' +
       '<g fill="#7F6A48" opacity="0.7"><circle cx="-2" cy="-0.6" r="0.5"/><circle cx="1" cy="-0.4" r="0.45"/><circle cx="3.6" cy="-0.2" r="0.4"/></g>' +
-      fischAuge(-4.6, -1.9, 0.75);
+      auge(-4.6, -1.9, 0.75);
   },
   // Scholle: Plattfisch von oben, rundlich mit Flossensaum, bräunlich mit orangen Flecken, Augen auf einer Seite
   scholle: function () {
@@ -3550,7 +3566,7 @@ const FISCH_FORMEN = {
       '<path d="M-5,0.3 Q0,-0.6 7,0" fill="none" stroke="#7E6A4C" stroke-opacity="0.5" stroke-width="0.35"/>' +
       '<g fill="#E07B39"><circle cx="-2" cy="-1.8" r="0.75"/><circle cx="1.8" cy="1.4" r="0.75"/><circle cx="3.8" cy="-1.5" r="0.7"/>' +
       '<circle cx="-0.6" cy="2.2" r="0.7"/><circle cx="-4" cy="1.3" r="0.6"/></g>' +
-      fischAuge(-5.4, -1.2, 0.6) + fischAuge(-4.4, -2.5, 0.6);
+      auge(-5.4, -1.2, 0.6) + auge(-4.4, -2.5, 0.6);
   },
   // Wittling: „kleiner Bruder des Kabeljaus“, drei Rücken- und zwei Afterflossen, ohne Kinnfaden
   wittling: function () {
@@ -3561,7 +3577,7 @@ const FISCH_FORMEN = {
       '<path d="M-9,0 C-7,-2.9 0,-3.4 7,-1.1 L7,-0.2 C1,-1.2 -5,-1 -9,0 Z" fill="#A69777"/>' +
       '<path d="M-6.5,-0.6 Q0,-1.4 6.5,-0.4" fill="none" stroke="#8C7F62" stroke-width="0.35"/>' +
       '<circle cx="-4.6" cy="0.5" r="0.55" fill="#4A4232" opacity="0.7"/>' +
-      fischAuge(-6.6, -0.6, 0.75);
+      auge(-6.6, -0.6, 0.75);
   },
   // Hornhecht: sehr schlank mit gezähntem „Schnabel“, blaugrüner Rücken
   hornhecht: function () {
@@ -3570,7 +3586,7 @@ const FISCH_FORMEN = {
       '<path d="M-5.6,-0.35 L-13.5,0 L-5.6,0.5 Z" fill="#2F6F78"/>' +
       '<path d="M-6,0 C-2,-1.5 6,-1.6 11,-0.6 L11,0.6 C6,1.6 -2,1.4 -6,0 Z" fill="#DCE6E3"/>' +
       '<path d="M-6,0 C-2,-1.5 6,-1.6 11,-0.6 L11,-0.05 C6,-0.5 -1,-0.5 -6,0 Z" fill="#2F6F78"/>' +
-      fischAuge(-4.4, -0.3, 0.6);
+      auge(-4.4, -0.3, 0.6);
   },
   // Seeskorpion: großer Kopf mit weitem Maul, marmoriert, Flossen braun-weiß quergestreift
   seeskorpion: function () {
@@ -3583,7 +3599,7 @@ const FISCH_FORMEN = {
       '<path d="M-3.2,0.4 C-0.5,0.6 1.6,2.8 1.4,5 C-0.8,4.4 -2.8,2.8 -3.2,0.4 Z" fill="#E9DFC9"/>' +
       '<path d="M-2.4,1.6 L0.6,2.8 M-2,3 L0.6,4.3" stroke="#7A6143" stroke-width="0.5"/>' +
       '<path d="M-8.6,0.4 Q-7,1.2 -5.6,0.5" fill="none" stroke="#3F3020" stroke-width="0.45"/>' +
-      fischAuge(-6, -1.6, 0.8);
+      auge(-6, -1.6, 0.8);
   },
   // Steinpicker: eckige Knochenplatten, langer Schwanzstiel, graubraun gebändert, Kinnfäden
   steinpicker: function () {
@@ -3595,7 +3611,7 @@ const FISCH_FORMEN = {
       '<path d="M-4.5,0.6 C-3,0.2 -1,1.4 -1.6,3.8 C-3.4,3.8 -4.8,2.4 -4.5,0.6 Z" fill="#B5AD9C" opacity="0.9"/>' +
       '<path d="M-7.2,1.3 l-0.8,1.5 M-6.6,1.6 l-0.2,1.7 M-6,1.8 l0.3,1.5" stroke="#5E574C" stroke-width="0.35" stroke-linecap="round"/>' +
       '<path d="M-5.6,-2.1 L-5.2,-3.2 L-4.6,-2.3" fill="none" stroke="#6E675B" stroke-width="0.5"/>' +
-      fischAuge(-5.6, -1, 0.7);
+      auge(-5.6, -1, 0.7);
   },
   // Kleingefleckter Katzenhai: langgestreckt, sandfarben mit dunklen Punkten, breite Brustflossen
   katzenhai: function () {
@@ -3610,7 +3626,7 @@ const FISCH_FORMEN = {
       '<path d="M-12,0.6 C-12,-1.8 -6,-2.6 0,-2.2 C6,-1.8 10,-1 12,-0.4 L12,0.1 C6,-0.6 -4,-0.8 -12,0.6 Z" fill="#B59C70"/>' +
       '<g fill="#5F4E36" opacity="0.75">' + flecken + "</g>" +
       '<path d="M-7,-0.4 v1.5 M-6.2,-0.4 v1.5" stroke="#9C8460" stroke-width="0.3"/>' +
-      fischAuge(-9.2, -0.4, 0.6);
+      auge(-9.2, -0.4, 0.6);
   },
   // Nagelrochen von oben: rautenförmig wie ein Kinderdrachen mit langem Schwanz, dunkelgrau mit
   // hellen, dunkel umrandeten Flecken und einer Dornenreihe bis zur Schwanzspitze
@@ -3624,7 +3640,7 @@ const FISCH_FORMEN = {
       '<g fill="#D8D2C2" stroke="#2A2E31" stroke-width="0.3"><circle cx="-2" cy="-4.4" r="0.7"/><circle cx="-2" cy="4.4" r="0.7"/>' +
       '<circle cx="1" cy="-2.2" r="0.6"/><circle cx="1" cy="2.2" r="0.6"/></g></g>' +
       '<g fill="#C9C1AE">' + dornen + "</g>" +
-      fischAuge(-5.5, -0.9, 0.45) + fischAuge(-5.5, 0.9, 0.45);
+      auge(-5.5, -0.9, 0.45) + auge(-5.5, 0.9, 0.45);
   }
 };
 
@@ -3655,9 +3671,7 @@ function fischSvg(art, x, y, richtung, nummer) {
 function fischeSvg(artenvielfalt) {
   const tiere = [];
   FISCH_ARTEN.forEach(function (art, artNummer) {
-    if (artenvielfalt < art.ab) return;
-    let anzahl = 0;
-    art.anzahl.forEach(function (stufe) { if (artenvielfalt >= stufe[0]) anzahl = stufe[1]; });
+    const anzahl = tierAnzahl(art, artenvielfalt);
     for (let n = 0; n < anzahl; n++) {
       const r = zufallsfolge(300 + artNummer * 37 + n * 11);
       let x = 0;
@@ -3665,7 +3679,7 @@ function fischeSvg(artenvielfalt) {
       for (let versuch = 0; versuch < 25; versuch++) {
         x = 50 + r() * 690;
         y = art.boden ? 252 + r() * 50 : 208 + r() * 78;
-        const frei = !(Math.abs(x - OTTER_ORT.x * 8) < 40 && y > 262) &&        // Otter
+        const frei = !(Math.abs(x - OTTER_ORT.x * 8) < 46 && y > 244) &&        // Otter
           !tiere.some(function (t) { return Math.abs(t.x - x) < 34 && Math.abs(t.y - y) < 14; });
         if (frei) break;
       }
@@ -3674,6 +3688,108 @@ function fischeSvg(artenvielfalt) {
   });
   return tiere.sort(function (a, b) { return a.y - b.y; }).map(function (t) {
     return fischSvg(t.art, t.x, t.y, t.richtung, t.nummer);
+  }).join("");
+}
+
+// ---------- Landtiere ----------
+// Typische Tiere im Grünland hinter den Dünen. Wie bei den Fischen kommen mit steigender Artenvielfalt mehr Tiere
+// und weitere Arten dazu: Wildkaninchen und Feldhase sind von Anfang an da, später der Austernfischer, der auf
+// Wiesen und am Strand brütet, und Rehe. Seitenansicht, Kopf links, Füße auf y = 0.
+// anzahl = Stufen [ab Artenvielfalt, Tiere]; hoppelt = bewegt sich in kleinen Sprüngen; schatten = Breite des Schattens
+const LANDTIER_ARTEN = [
+  { id: "kaninchen",      anzahl: [[0, 2], [60, 3], [74, 4]], hoppelt: true, schatten: 5 },
+  { id: "hase",           anzahl: [[0, 1], [66, 2]], hoppelt: true, schatten: 6 },
+  { id: "austernfischer", anzahl: [[58, 1], [70, 2], [82, 3]], schatten: 4 },
+  { id: "reh",            anzahl: [[64, 1], [78, 2]], schatten: 6.5 }
+];
+
+const LANDTIER_FORMEN = {
+  // Wildkaninchen: graubraun, kurze Ohren, weiße „Blume“ am Schwanz
+  kaninchen: function () {
+    return '<path d="M-2,-0.3 C-3.6,-0.6 -4,-3.4 -2.4,-4.8 C-0.6,-6.2 3,-6 4.4,-4 C5.6,-2.4 5,-0.2 3.4,-0.2 Z" fill="#A08C72"/>' +
+      '<path d="M-2.4,-4.8 C-0.6,-6.2 3,-6 4.4,-4 C3,-4.6 0,-4.9 -2.4,-4.8 Z" fill="#7E6B55"/>' +
+      '<ellipse cx="2.6" cy="-0.7" rx="2.4" ry="0.8" fill="#8C7862"/>' +
+      '<path d="M-3,-6.2 C-3.4,-8.8 -2.2,-9.6 -1.6,-8.8 C-1.4,-7.8 -2,-6.6 -2.4,-6 Z" fill="#8C7862"/>' +
+      '<ellipse cx="-3.6" cy="-4.6" rx="2.3" ry="2" fill="#A08C72"/>' +
+      '<path d="M-3.2,-2.8 L-3.4,-0.3" stroke="#8C7862" stroke-width="0.9" stroke-linecap="round"/>' +
+      '<circle cx="4.8" cy="-3" r="1.1" fill="#FFFFFF"/>' +
+      '<circle cx="-5.8" cy="-4.3" r="0.4" fill="#C98A86"/>' + auge(-4.2, -5, 0.45);
+  },
+  // Feldhase: größer und rötlicher, lange Ohren mit schwarzen Spitzen, kräftige Hinterläufe
+  hase: function () {
+    return '<path d="M3.2,-2.6 C5.8,-2.8 6.4,-0.6 5.6,0 L2,0 C2.6,-0.6 2.6,-1.6 3.2,-2.6 Z" fill="#94704C"/>' +
+      '<path d="M-3,-2 C-4.4,-3.6 -3.8,-6.6 -1,-7.2 C2.4,-7.8 5.8,-6.2 6.2,-3.6 C6.4,-1.6 5,-0.8 3.6,-1 C1,-1.4 -1.6,-0.6 -3,-2 Z" fill="#A9805A"/>' +
+      '<path d="M-1,-7.2 C2.4,-7.8 5.8,-6.2 6.2,-3.6 C4.6,-5.4 2,-6.4 -1,-7.2 Z" fill="#8A6642"/>' +
+      '<path d="M-2.6,-2.6 L-3,0 M-1.4,-2.2 L-1.6,0" stroke="#94704C" stroke-width="0.9" stroke-linecap="round"/>' +
+      '<path d="M-3.4,-8.2 C-3.4,-12 -2,-13 -1.4,-12.2 C-1.2,-10.8 -2,-9.2 -2.6,-8 Z" fill="#A9805A"/>' +
+      '<path d="M-2.3,-12.3 C-1.9,-12.9 -1.4,-12.6 -1.4,-12 C-1.7,-11.6 -2.1,-11.7 -2.3,-12.3 Z" fill="#2B2B2B"/>' +
+      '<ellipse cx="-4.2" cy="-6.6" rx="2.4" ry="1.9" fill="#A9805A"/>' +
+      '<circle cx="6.2" cy="-4" r="0.8" fill="#F4EBDD"/>' +
+      '<circle cx="-6.5" cy="-6.3" r="0.4" fill="#5B3A2A"/>' + auge(-4.7, -7, 0.45);
+  },
+  // Austernfischer: schwarz-weiß, langer orangeroter Schnabel, rote Augen, rosa Beine
+  austernfischer: function () {
+    return '<path d="M0.6,-3.2 L0.4,0 M2,-3.2 L2.4,0" stroke="#E79A9A" stroke-width="0.7" stroke-linecap="round"/>' +
+      '<path d="M-2.6,-6.2 C-1,-7.2 4,-6.6 6.8,-4.6 L4.8,-4.2 C3,-2.6 0.6,-2.4 -1,-3.2 C-2.4,-4 -3,-5.2 -2.6,-6.2 Z" fill="#FFFFFF"/>' +
+      '<path d="M-2.6,-6.2 C-1,-7.2 4,-6.6 6.8,-4.6 C4,-4.9 1,-5.3 -1.4,-4.6 C-2.2,-4.9 -2.6,-5.4 -2.6,-6.2 Z" fill="#1F2328"/>' +
+      '<path d="M0.2,-5.2 L4.4,-4.8" stroke="#FFFFFF" stroke-width="0.5"/>' +
+      '<circle cx="-3.2" cy="-7.2" r="1.7" fill="#1F2328"/>' +
+      '<path d="M-4.6,-7.6 L-8.6,-6.9 L-4.6,-6.7 Z" fill="#E8662A"/>' +
+      '<circle cx="-3.7" cy="-7.6" r="0.45" fill="#D9473C"/>';
+  },
+  // Reh: rotbraunes Sommerfell, schlanke Beine, große Ohren, weißer Fleck am Hinterteil
+  reh: function () {
+    return '<path d="M-3.4,-5 L-3.6,0 M-2,-5 L-1.8,0 M3.2,-5 L3,0 M4.6,-5 L5,0" stroke="#7E4A2A" stroke-width="0.9" stroke-linecap="round"/>' +
+      '<ellipse cx="0.8" cy="-6.4" rx="5.6" ry="2.6" fill="#A8643A"/>' +
+      '<path d="M-4,-5.6 C-1,-4 3,-4 6,-5.4 C5,-4.2 2,-3.8 0.8,-3.8 C-1.4,-3.8 -3.2,-4.4 -4,-5.6 Z" fill="#C98A5E"/>' +
+      '<ellipse cx="5.9" cy="-6.6" rx="1.2" ry="1.5" fill="#F4EBDD"/>' +
+      '<path d="M-3.6,-7.6 L-5.6,-11.8 L-3.8,-12.4 L-2,-8.2 Z" fill="#A8643A"/>' +
+      '<path d="M-4,-12.8 C-5,-13.4 -7.2,-12.4 -7.8,-11.2 C-7,-10.8 -5.2,-11 -4,-11.4 Z" fill="#A8643A"/>' +
+      '<path d="M-4.6,-12.8 L-4.2,-15 L-3.4,-12.8 Z M-3.8,-12.6 L-2.6,-14.6 L-2.8,-12.2 Z" fill="#94552F"/>' +
+      '<circle cx="-7.6" cy="-11.3" r="0.45" fill="#1E1E1E"/>' + auge(-5.4, -12.2, 0.4);
+  }
+};
+
+// Ein Landtier mit Schatten. Es läuft oder hoppelt ein kurzes Stück, wendet und kommt zurück
+// (gleiche Bewegung wie bei den Fischen, nur kürzer und langsamer).
+function landtierSvg(art, x, y, richtung, nummer) {
+  const r = zufallsfolge(600 + nummer * 13);
+  const weg = 6 + r() * 10;
+  const dauer = art.hoppelt ? 12 + r() * 8 : 18 + r() * 10;
+  const g = 1.5;
+  const form = LANDTIER_FORMEN[art.id]();
+  return '<g transform="translate(' + x.toFixed(1) + "," + y.toFixed(1) + ") scale(" + (richtung * g).toFixed(2) + "," + g + ')">' +
+    '<g class="ka-landtier" style="--weg:-' + weg.toFixed(1) + "px;" + animStil(dauer, r() * dauer) + '">' +
+    '<ellipse cx="0.8" cy="0.2" rx="' + art.schatten + '" ry="0.9" fill="#0B2238" opacity="0.18"/>' +
+    (art.hoppelt ? '<g class="ka-hoppeln" style="' + animStil(0.9, r()) + '">' + form + "</g>" : form) + "</g></g>";
+}
+
+// Alle Landtiere zur aktuellen Artenvielfalt auf festen Plätzen im Grünland (gleiche Zufallsfolge = nichts springt).
+// Fluss, Ort, Fabriken, Flughafen, Bäume, Infopunkte und Personen bleiben frei.
+function landtiereSvg(z) {
+  const sperre = muellSperrflaechen(z);
+  const fluss = flussMitte(20, istUmgesetzt(z, "aue"));
+  const tiere = [];
+  LANDTIER_ARTEN.forEach(function (art, artNummer) {
+    const anzahl = tierAnzahl(art, z.kennzahlen.artenvielfalt);
+    for (let n = 0; n < anzahl; n++) {
+      const r = zufallsfolge(500 + artNummer * 37 + n * 11);
+      for (let versuch = 0; versuch < 60; versuch++) {
+        const x = 16 + r() * (KARTE_B - 32);
+        const y = 14 + r() * (kuestenlinie(x) - 30);
+        const frei = !imRechteck(x, y, sperre) && !(x > 420 && x < 770 && y > 14) &&
+          abstandZumFluss(x, y, fluss) > 12 &&
+          !BAEUME.some(function (b) { return Math.abs(b[0] - x) < 16 && Math.abs(b[1] - y) < 12; }) &&
+          !tiere.some(function (t) { return Math.abs(t.x - x) < 30 && Math.abs(t.y - y) < 12; });
+        if (frei) {
+          tiere.push({ art: art, x: x, y: y, richtung: r() > 0.5 ? 1 : -1, nummer: artNummer * 10 + n });
+          break;
+        }
+      }
+    }
+  });
+  return tiere.sort(function (a, b) { return a.y - b.y; }).map(function (t) {
+    return landtierSvg(t.art, t.x, t.y, t.richtung, t.nummer);
   }).join("");
 }
 
@@ -4056,7 +4172,7 @@ function muellSymbolSvg(form, x, y, winkel, groesse, schwimmt) {
 function muellSperrflaechen(z) {
   const flaechen = [
     [612, 26, 74, 54], [434, 16, 76, 76], [508, 72, 44, 33],     // Fabrik, Hotel, Kiosk
-    [730, 90, 22, 80], [647, 76, 10, 34], FLUGHAFEN.flaeche        // Hafensteg, Abwasserrohr, Flughafen
+    [730, 90, 22, 80], [647, 76, 10, 34], flughafenFlaeche()       // Hafensteg, Abwasserrohr, Flughafen
   ];
   if (istUmgesetzt(z, "gewerbe")) {
     flaechen.push([684, 46, 58, 38], [374, 14, 76, 72], [516, 34, 36, 38], [548, 16, 36, 38]);
@@ -4090,24 +4206,35 @@ function abstandZumFluss(x, y, punkte) {
   return Math.min.apply(null, punkte.map(function (p) { return Math.hypot(p.x - x, p.y - y) - flussBreite(p.s) / 2; }));
 }
 
-// Hotspots am Strand: Abschnitt von x bis x + b, Anteile der Müllarten, Anzahl Plätze
-// Hotspots an Land: Ellipse um (x, y) mit Halbachsen rx, ry; „amFluss“ = entlang beider Ufer.
-// quelle: welcher Eintrag die Menge an Land steuert (strand = Strandbesucher, land = Hinterland)
-const MUELL_HOTSPOTS = {
-  strand: [
-    { id: "muendung",  x: 160, b: 140, arten: { plastik: 1 }, plaetze: 8 },
-    { id: "hotels",    x: 316, b: 188, arten: { essen: 0.7, plastik: 0.3 }, plaetze: 10 },
-    { id: "kiosk",     x: 506, b: 92,  arten: { plastik: 0.85, essen: 0.15 }, plaetze: 5 },
-    { id: "industrie", x: 600, b: 128, arten: { glas: 0.75, plastik: 0.25 }, plaetze: 8 }
-  ],
-  land: [
-    { id: "hotels",    x: 470, y: 70, rx: 96, ry: 24, arten: { essen: 0.75, plastik: 0.25 }, plaetze: 8, quelle: "strand" },
-    { id: "industrie", x: 664, y: 80, rx: 86, ry: 30, arten: { glas: 0.65, plastik: 0.35 }, plaetze: 7, quelle: "land" },
-    { id: "fluss", amFluss: true, arten: { plastik: 0.8, glas: 0.2 }, plaetze: 6, quelle: "land" }
-  ]
-};
+// Gleichmäßig verteilte Stellen zwischen 0 und 1 (Van-der-Corput-Folge, i ab 1). Jeder Anfang der Folge ist
+// gleichmäßig verteilt: Bei jeder Menge liegt der Müll überall, und weniger Müll verschwindet überall zugleich.
+function gleichverteilt(i, basis) {
+  let wert = 0;
+  let teil = 1 / basis;
+  for (let n = i; n > 0; n = Math.floor(n / basis)) {
+    wert += (n % basis) * teil;
+    teil /= basis;
+  }
+  return wert;
+}
+
+// Strand: Abschnitte bis zur x-Grenze „bis“ mit den Anteilen der Müllarten des nächsten Verursachers
+const STRAND_ABSCHNITTE = [
+  { bis: 316,     arten: { plastik: 1 } },                    // Flussmündung
+  { bis: 504,     arten: { essen: 0.7, plastik: 0.3 } },      // Hotels
+  { bis: 600,     arten: { plastik: 0.85, essen: 0.15 } },    // Kiosk
+  { bis: KARTE_B, arten: { glas: 0.75, plastik: 0.25 } }      // Industrie
+];
 const MUELL_STRAND_MAX = 32;
-const MUELL_ABSTAND = 9;          // Mindestabstand zwischen zwei Symbolen
+
+// Land: Hotspots als Ellipse um (x, y) mit Halbachsen rx, ry; „amFluss“ = entlang beider Ufer.
+// quelle: welcher Eintrag die Menge steuert (strand = Strandbesucher, land = Hinterland)
+const MUELL_HOTSPOTS_LAND = [
+  { x: 470, y: 70, rx: 96, ry: 24, arten: { essen: 0.75, plastik: 0.25 }, plaetze: 8, quelle: "strand" },
+  { x: 664, y: 80, rx: 86, ry: 30, arten: { glas: 0.65, plastik: 0.35 }, plaetze: 7, quelle: "land" },
+  { amFluss: true, arten: { plastik: 0.8, glas: 0.2 }, plaetze: 6, quelle: "land" }
+];
+const MUELL_ABSTAND = 9;          // Mindestabstand zwischen zwei Symbolen an Land
 
 function formWaehlen(arten, r) {
   let wert = r();
@@ -4130,23 +4257,37 @@ function muellTeil(art, form, x, y, r, groesseLiegend, groesseAufrecht) {
   };
 }
 
-// Feste Plätze je Hotspot (gleiche Zufallsfolge = Müll springt nicht von Runde zu Runde).
-// Rang = Platznummer / Plätze: Bei weniger Müll leeren sich alle Hotspots gleichmäßig.
-function hotspotPlaetze(z, lage) {
+// Strand: feste, gleichmäßig verteilte Plätze (gleiche Folge = Müll springt nicht von Runde zu Runde);
+// die Anzahl folgt dem Strandmüll (Bestand)
+function strandMuellListe(z) {
+  const anzahl = Math.min(MUELL_STRAND_MAX, Math.round(z.strandmuell / 8));
+  const sperre = muellSperrflaechen(z);
+  const fluss = flussMitte(20, istUmgesetzt(z, "aue"));
+  const r = zufallsfolge(7);
+  const liste = [];
+  for (let i = 1; liste.length < anzahl && i < 4 * MUELL_STRAND_MAX; i++) {
+    const x = 8 + gleichverteilt(i, 2) * (KARTE_B - 16);
+    const y = kuestenlinie(x) + 7 + r() * 10;
+    const wahl = formWaehlen(STRAND_ABSCHNITTE.find(function (a) { return x < a.bis; }).arten, r);
+    const teil = muellTeil(wahl.art, wahl.form, x, y, r, 1.1, 1.25);
+    if (!imRechteck(x, y, sperre) && abstandZumFluss(x, y, fluss) >= 6) liste.push(teil);
+  }
+  return liste;
+}
+
+// Land: feste Plätze je Hotspot. Rang = Platznummer / Plätze: Bei weniger Müll leeren sich alle Hotspots gleichmäßig.
+function landMuellPlaetze(z) {
   const sperre = muellSperrflaechen(z);
   const aue = istUmgesetzt(z, "aue");
   const fluss = flussMitte(20, aue);
-  const r = zufallsfolge(lage === "strand" ? 7 : 13);
+  const r = zufallsfolge(13);
   const alle = [];
-  MUELL_HOTSPOTS[lage].forEach(function (h) {
+  MUELL_HOTSPOTS_LAND.forEach(function (h) {
     const eigene = [];
     for (let versuch = 0; versuch < 400 && eigene.length < h.plaetze; versuch++) {
       let x;
       let y;
-      if (lage === "strand") {
-        x = h.x + r() * h.b;
-        y = kuestenlinie(x) + 7 + r() * 10;
-      } else if (h.amFluss) {
+      if (h.amFluss) {
         // Ufer im Mittel- und Unterlauf, abwechselnd links und rechts
         const stelle = 0.5 + r() * 1.25;
         const p = flussPunkt(stelle, aue);
@@ -4159,28 +4300,19 @@ function hotspotPlaetze(z, lage) {
         x = h.x + Math.cos(winkel) * h.rx * radius;
         y = h.y + Math.sin(winkel) * h.ry * radius;
       }
-      if (x < 8 || x > KARTE_B - 8 || y < 10) continue;
-      if (lage === "land" && y > kuestenlinie(x) - 6) continue;            // nicht im Sand
+      if (x < 8 || x > KARTE_B - 8 || y < 10 || y > kuestenlinie(x) - 6) continue;   // nicht im Sand
       if (imRechteck(x, y, sperre)) continue;
       if (abstandZumFluss(x, y, fluss) < 6) continue;                      // nicht im Fluss und nicht direkt am Ufer
       if (eigene.concat(alle).some(function (m) { return Math.hypot(m.x - x, m.y - y) < MUELL_ABSTAND; })) continue;
       const wahl = formWaehlen(h.arten, r);
-      const teil = lage === "strand"
-        ? muellTeil(wahl.art, wahl.form, x, y, r, 1.1, 1.25)
-        : muellTeil(wahl.art, wahl.form, x, y, r, 0.95, 1.1);
+      const teil = muellTeil(wahl.art, wahl.form, x, y, r, 0.95, 1.1);
       teil.quelle = h.quelle;
       teil.rang = (eigene.length + 0.5) / h.plaetze;
       eigene.push(teil);
     }
     Array.prototype.push.apply(alle, eigene);
   });
-  return alle.sort(function (a, b) { return a.rang - b.rang; });
-}
-
-// Strand: Anzahl folgt dem Strandmüll (Bestand)
-function strandMuellListe(z) {
-  const anzahl = Math.min(MUELL_STRAND_MAX, Math.round(z.strandmuell / 8));
-  return hotspotPlaetze(z, "strand").slice(0, anzahl);
+  return alle;
 }
 
 // Land: um die Hotels folgt der Müll den Strandbesuchern, um Fabrik und Fluss dem Eintrag aus dem Hinterland
@@ -4189,7 +4321,7 @@ function landMuellListe(z) {
     strand: begrenzen(z.eintrag.strand / EINTRAG_GRUND.strand, 0, 1),
     land: begrenzen(z.eintrag.land / EINTRAG_GRUND.land, 0, 1)
   };
-  return hotspotPlaetze(z, "land").filter(function (m) { return m.rang < anteil[m.quelle]; });
+  return landMuellPlaetze(z).filter(function (m) { return m.rang < anteil[m.quelle]; });
 }
 
 // Müll im Fluss: treibt mit der Strömung Richtung Meer. Ein wirksamer Müllfänger hält ihn auf.
@@ -4213,48 +4345,34 @@ function flussMuellSvg(z, muellfaengerWirkt) {
   return s;
 }
 
-// Treibgut nahe dem Strand: schwimmende Plastikflaschen und -tüten mit kleinen Wellen
-const TREIBGUT_MAX = 18;
+// Treibgut: schwimmende Plastikflaschen und -tüten mit kleinen Wellen, gleichmäßig über das ganze Meer vom Strand
+// bis zum unteren Kartenrand verteilt; die Anzahl folgt dem Eintrag. Hafen, Boote und Otter bleiben frei.
+const TREIBGUT_MAX = 24;
 const TREIBGUT_FORMEN = ["flasche", "tuete", "flasche", "tuete", "verpackung", "flasche"];
 
-function treibgutSvg(anzahl) {
+function treibgutSvg(z) {
+  const anzahl = Math.min(TREIBGUT_MAX, Math.round(z.eintrag.gesamt / 4));
+  const sperre = muellSperrflaechen(z).concat([
+    [672, 112, 128, 160],                                         // Hafen mit Steg, Kutter und Kreuzfahrtschiffen
+    [OTTER_ORT.x * 8 - 36, OTTER_ORT.y * 3.2 - 60, 72, 64]       // Otter
+  ]);
+  if (istUmgesetzt(z, "quoten")) sperre.push([262, 186, 56, 26], [740, 286, 50, 28]);   // Kutter auf See
   const r = zufallsfolge(31);
   let s = "";
-  for (let i = 0; i < TREIBGUT_MAX; i++) {
-    const x = 26 + r() * 690;
-    const y = kuestenlinie(x) + STRAND_BREITE + 9 + Math.pow(r(), 1.3) * 42;
+  let gezeigt = 0;
+  for (let i = 1; gezeigt < anzahl && i < 4 * TREIBGUT_MAX; i++) {
+    const x = 16 + gleichverteilt(i, 2) * (KARTE_B - 32);
+    const oben = kuestenlinie(x) + STRAND_BREITE + 9;
+    const y = oben + gleichverteilt(i, 3) * (KARTE_H - 12 - oben);
     const form = TREIBGUT_FORMEN[Math.floor(r() * TREIBGUT_FORMEN.length)];
     const winkel = form === "flasche" ? (r() - 0.5) * 30 + (r() < 0.5 ? 180 : 0) : (r() - 0.5) * 50;
-    if (i >= anzahl) continue;
+    if (imRechteck(x, y, sperre)) continue;
+    gezeigt++;
     s += muellSymbolSvg(form, x, y, winkel, 1.2, true) +
       '<path d="M' + (x - 8).toFixed(1) + "," + (y + 5.6).toFixed(1) + " q4,-1.8 8,0 t8,0\" fill=\"none\" " +
       'stroke="#FFFFFF" stroke-opacity="0.5" stroke-width="0.8" stroke-linecap="round"/>';
   }
   return s;
-}
-
-function treibgutAnzahl(z) {
-  return Math.min(TREIBGUT_MAX, Math.round(z.eintrag.gesamt / 5));
-}
-
-// Legendentext zu den Fischen: welche Arten gerade zu sehen sind
-function fischLegende(artenvielfalt) {
-  const namen = sichtbareFischArten(artenvielfalt).map(function (a) { return a.name; });
-  return "Fische: " + (namen.length <= 3
-    ? namenListe(namen)
-    : namen.slice(0, 2).join(", ") + " und " + (namen.length - 2) + " weitere Arten");
-}
-
-// Kleines Symbol für die Legende. Breite und Höhe stehen direkt am SVG,
-// damit die Größe auch ohne passende CSS-Regel stimmt.
-function legendenSvg(inhalt, viewBox) {
-  return '<svg class="lg-symbol" width="20" height="15" viewBox="' + viewBox + '" aria-hidden="true" focusable="false">' +
-    inhalt + "</svg>";
-}
-
-function legendenSymbol(form, winkel, groesse) {
-  return legendenSvg('<g transform="rotate(' + (winkel || 0) + ") scale(" + (groesse || 1) + ')">' + MUELL_FORMEN[form] + "</g>",
-    "-8 -6 16 12");
 }
 
 // ---------- Hafen, Schiffe und Mülleimer ----------
@@ -4413,22 +4531,36 @@ function windradSvg(x, y, nummer, groesse) {
 }
 
 // ---------- Flughafen ----------
-// Regionalflughafen rechts oben im Kartenkern: Dort ist er auf jedem Bildschirm sichtbar und liegt nie unter dem
-// Maßnahmen-Fenster. Die Startbahn läuft schräg über den Fabriken, darunter liegen Vorfeld, Tower und Terminal.
+// Regionalflughafen rechts oben am Kartenkern. Die rechte Hälfte ragt über den Kern hinaus und darf unter einem
+// aufgeklappten Maßnahmen-Fenster liegen. Gezeichnet wird in eigenen Einheiten (Ursprung links oben); FLUGHAFEN.ort
+// und FLUGHAFEN.groesse setzen alles auf die Karte. Die Startbahn liegt waagerecht wie die Vorderseiten der Gebäude.
 // „Flugverkehr ausbauen“: mehr Flugzeuge auf dem Vorfeld und doppelt so viele Starts.
 // „Biokraftstoff für den Flughafen“: grüner Tank neben dem Terminal.
 const FLUGHAFEN = {
-  bahn: [[702, 6], [796, 22]],       // Mittellinie der Startbahn von West nach Ost
-  bahnBreite: 12,
-  flugzeug: 0.85,                    // Größe der Flugzeuge (Spannweite etwa 13)
-  vorfeld: { x: 744, y: 28, b: 54, h: 18 },
-  flaeche: [698, 0, 102, 64]         // bleibt frei von Müll, Gras und Bäumen (x, y, Breite, Höhe)
+  ort: { x: 708, y: -78 },           // linke obere Ecke im Kartenmaß
+  groesse: 1.7,                      // eigene Einheiten → Kartenmaß
+  breite: 112,
+  hoehe: 66,
+  bahn: { x0: 4, x1: 108, y: 11, breite: 12 },
+  vorfeld: { x: 44, y: 24, b: 64, h: 16 },
+  boden: 64,                         // Unterkante von Tower, Terminal und Tank
+  flugzeug: 0.85                     // Größe der Flugzeuge (Spannweite etwa 13)
 };
+
+// Fläche im Kartenmaß (x, y, Breite, Höhe): bleibt frei von Müll, Gras, Bäumen und Tieren
+function flughafenFlaeche() {
+  const f = FLUGHAFEN;
+  return [f.ort.x, f.ort.y, f.breite * f.groesse, f.hoehe * f.groesse];
+}
+
+function flughafenRahmen(inhalt) {
+  return '<g transform="translate(' + FLUGHAFEN.ort.x + "," + FLUGHAFEN.ort.y + ") scale(" + FLUGHAFEN.groesse + ')">' + inhalt + "</g>";
+}
 
 // Flugzeug von oben, Nase in Richtung +x, etwa 17 lang und 15 breit
 function flugzeugSvg(x, y, winkel, groesse) {
   const kante = ' stroke="#8C9AA4" stroke-width="0.35" stroke-linejoin="round"';
-  return '<g transform="translate(' + x.toFixed(1) + "," + y.toFixed(1) + ") rotate(" + winkel + ") scale(" + (groesse || 1) + ')">' +
+  return '<g transform="translate(' + x + "," + y + ") rotate(" + winkel + ") scale(" + groesse + ')">' +
     '<path d="M1.6,-0.9 L-2.6,-7.6 L-4.4,-7.6 L-2.4,-0.9 Z M1.6,0.9 L-2.6,7.6 L-4.4,7.6 L-2.4,0.9 Z" fill="#DDE3E7"' + kante + "/>" +
     '<path d="M-5.6,-0.6 L-7.6,-3.4 L-8.6,-3.4 L-7.6,-0.6 Z M-5.6,0.6 L-7.6,3.4 L-8.6,3.4 L-7.6,0.6 Z" fill="#DDE3E7"' + kante + "/>" +
     '<rect x="-0.6" y="-4.7" width="2.6" height="1.3" rx="0.6" fill="#9AA7B0"/><rect x="-0.6" y="3.4" width="2.6" height="1.3" rx="0.6" fill="#9AA7B0"/>' +
@@ -4440,58 +4572,54 @@ function flugzeugSvg(x, y, winkel, groesse) {
 
 // Boden: Grasstreifen, Startbahn mit Markierungen, Rollweg und Vorfeld. Liegt unter Rauch und Gebäuden.
 function flughafenBodenSvg() {
-  const p0 = FLUGHAFEN.bahn[0];
-  const p1 = FLUGHAFEN.bahn[1];
-  const d = richtung(p0, p1);
-  // Punkt auf der Bahn: t = 0 (West) bis 1 (Ost), q = Abstand quer zur Mittellinie
-  const punkt = function (t, q) {
-    return [p0[0] + (p1[0] - p0[0]) * t - d[1] * q, p0[1] + (p1[1] - p0[1]) * t + d[0] * q];
-  };
-  const streifen = function (t0, t1, q0, q1) { return vieleck([punkt(t0, q0), punkt(t1, q0), punkt(t1, q1), punkt(t0, q1)]); };
-  const linie = function (a, b) { return "M" + a[0].toFixed(1) + "," + a[1].toFixed(1) + " L" + b[0].toFixed(1) + "," + b[1].toFixed(1) + " "; };
-  const halb = FLUGHAFEN.bahnBreite / 2;
+  const b = FLUGHAFEN.bahn;
   const v = FLUGHAFEN.vorfeld;
-  let s = '<path d="' + streifen(-0.04, 1.03, -halb - 3, halb + 3) + '" fill="#B9C792" opacity="0.75"/>';
-  // Rollweg von der Bahn zum Vorfeld, dann Vorfeld und Bahn
-  s += '<path d="' + linie(punkt(0.72, 0), [v.x + 26, v.y + 2]) + '" stroke="#7C858B" stroke-width="4" stroke-linecap="round"/>';
-  s += '<rect x="' + v.x + '" y="' + v.y + '" width="' + v.b + '" height="' + v.h + '" rx="2" fill="#A9B1B6"/>';
-  s += '<path d="' + streifen(0, 1, -halb, halb) + '" fill="#6B747A"/>';
-  let weiss = linie(punkt(0.02, -halb + 0.9), punkt(0.98, -halb + 0.9)) + linie(punkt(0.02, halb - 0.9), punkt(0.98, halb - 0.9));
+  const oben = b.y - b.breite / 2;
+  const unten = b.y + b.breite / 2;
+  const laenge = b.x1 - b.x0;
+  let s = '<rect x="' + (b.x0 - 3) + '" y="' + (oben - 3) + '" width="' + (laenge + 6) + '" height="' + (b.breite + 6) +
+    '" rx="3" fill="#B9C792" opacity="0.75"/>';
+  // Rollweg zum Vorfeld, Vorfeld mit gelber Führungslinie, Bahn
+  s += '<path d="M' + (v.x + 26) + "," + b.y + " V" + (v.y + 2) + '" stroke="#7C858B" stroke-width="4" stroke-linecap="round"/>' +
+    '<rect x="' + v.x + '" y="' + v.y + '" width="' + v.b + '" height="' + v.h + '" rx="2" fill="#A9B1B6"/>' +
+    '<path d="M' + (v.x + 4) + "," + (v.y + 3) + " H" + (v.x + v.b - 4) + '" stroke="#E2C14A" stroke-width="0.5"/>' +
+    '<rect x="' + b.x0 + '" y="' + oben + '" width="' + laenge + '" height="' + b.breite + '" fill="#6B747A"/>';
+  // Randlinien, Schwellenmarkierung an beiden Enden, unterbrochene Mittellinie
+  let weiss = "M" + (b.x0 + 2) + "," + (oben + 0.9) + " H" + (b.x1 - 2) + " M" + (b.x0 + 2) + "," + (unten - 0.9) + " H" + (b.x1 - 2);
   [-3.6, -1.2, 1.2, 3.6].forEach(function (q) {
-    weiss += linie(punkt(0.02, q), punkt(0.07, q)) + linie(punkt(0.93, q), punkt(0.98, q));
+    weiss += " M" + (b.x0 + 2) + "," + (b.y + q) + " h5 M" + (b.x1 - 7) + "," + (b.y + q) + " h5";
   });
-  s += '<path d="' + weiss + '" stroke="#FFFFFF" stroke-opacity="0.85" stroke-width="0.5"/>';
-  s += '<path d="' + linie(punkt(0.1, 0), punkt(0.9, 0)) + '" stroke="#FFFFFF" stroke-width="0.6" stroke-dasharray="4 3"/>';
-  // gelbe Führungslinien zu den Abstellplätzen
-  s += '<path d="M' + (v.x + 4) + "," + (v.y + 3) + " H" + (v.x + v.b - 4) + '" stroke="#E2C14A" stroke-width="0.5"/>';
-  return s;
+  s += '<path d="' + weiss + '" stroke="#FFFFFF" stroke-opacity="0.85" stroke-width="0.5"/>' +
+    '<path d="M' + (b.x0 + 10) + "," + b.y + " H" + (b.x1 - 10) + '" stroke="#FFFFFF" stroke-width="0.6" stroke-dasharray="4 3"/>';
+  return flughafenRahmen(s);
 }
 
-// Gebäude und abgestellte Flugzeuge als Einträge für die Gebäudeliste der Karte (nach Unterkante sortiert)
+// Abgestellte Flugzeuge, Tower, Terminal und Tank als ein Eintrag für die Gebäudeliste der Karte
 function flughafenGebaeude(z) {
-  const v = FLUGHAFEN.vorfeld;
-  const flugzeuge = istUmgesetzt(z, "flugverkehr") ? [758, 773, 788] : [758];
-  const liste = [{ unten: v.y + v.h, svg: flugzeuge.map(function (x) { return flugzeugSvg(x, v.y + 9, 90, FLUGHAFEN.flugzeug); }).join("") }];
+  const f = FLUGHAFEN;
+  const v = f.vorfeld;
+  const flugzeuge = istUmgesetzt(z, "flugverkehr") ? [60, 76, 92] : [76];
+  let s = flugzeuge.map(function (x) { return flugzeugSvg(x, v.y + v.h / 2, 90, f.flugzeug); }).join("");
   // Tower: schmaler Schaft mit verglaster Kanzel und Antenne
-  let tower = quaderSvg(744, 38, 4, 24, 3, { front: "#DDE3E6", seite: "#B6C0C6", dach: "#EEF1F2" });
-  tower += quaderSvg(742.4, 33.6, 7.2, 4.4, 4, { front: "#2F5F86", seite: "#244B6B", dach: "#E9EDEF" }) +
-    '<path d="M743,35 H749" stroke="#9CC7E0" stroke-width="0.6"/>' +
-    '<path d="M747.2,31.5 V27.5" stroke="#5E5A52" stroke-width="0.5"/>';
+  s += quaderSvg(36, 38, 4.4, f.boden - 38, 3, { front: "#DDE3E6", seite: "#B6C0C6", dach: "#EEF1F2" }) +
+    quaderSvg(34.2, 33.2, 8, 4.8, 4, { front: "#2F5F86", seite: "#244B6B", dach: "#E9EDEF" }) +
+    '<path d="M34.8,34.8 H41.6" stroke="#9CC7E0" stroke-width="0.6"/><path d="M39,31 V26.6" stroke="#5E5A52" stroke-width="0.5"/>';
   // Terminal: Glasfront, blaues Schild, Eingang
-  const tx = 752;
-  const oben = 50;
-  let terminal = quaderSvg(tx, oben, 34, 12, 9, { front: "#EEF2F3", seite: "#C3CDD2", dach: "#F7F9FA" });
-  terminal += '<rect x="' + (tx + 1.5) + '" y="' + (oben + 5.6) + '" width="31" height="4.4" fill="url(#kaGlas)" stroke="#6F8796" stroke-opacity="0.6" stroke-width="0.4"/>';
+  const tx = 46;
+  const b = 42;
+  const oben = f.boden - 18;
+  s += quaderSvg(tx, oben, b, 18, 10, { front: "#EEF2F3", seite: "#C3CDD2", dach: "#F7F9FA" }) +
+    '<rect x="' + (tx + 1.5) + '" y="' + (oben + 10) + '" width="' + (b - 3) + '" height="5.4" fill="url(#kaGlas)" ' +
+    'stroke="#6F8796" stroke-opacity="0.6" stroke-width="0.4"/>';
   let pfosten = "";
-  for (let px = tx + 5.5; px < tx + 32; px += 4) pfosten += "M" + px + "," + (oben + 5.6) + " V" + (oben + 10) + " ";
-  terminal += '<path d="' + pfosten + '" stroke="#6F8796" stroke-opacity="0.7" stroke-width="0.4"/>' +
-    '<rect x="' + (tx + 14.5) + '" y="' + (oben + 7.4) + '" width="5" height="4.6" fill="#3D4F5E"/>' +
-    '<rect x="' + (tx + 5) + '" y="' + (oben + 1.1) + '" width="24" height="3.6" rx="0.8" fill="#1D4F8C"/>' +
-    '<text x="' + (tx + 17) + '" y="' + (oben + 3.85) + '" text-anchor="middle" font-size="2.9" font-weight="700" ' +
-    'letter-spacing="0.4" fill="#ffffff">FLUGHAFEN</text>';
-  liste.push({ unten: 62, svg: tower }, { unten: 62, svg: terminal });
-  if (istUmgesetzt(z, "biokraftstoff")) liste.push({ unten: 62, svg: tankSvg(790, 62) });
-  return liste;
+  for (let px = tx + 5.5; px < tx + b - 2; px += 4) pfosten += "M" + px + "," + (oben + 10) + " V" + (oben + 15.4) + " ";
+  s += '<path d="' + pfosten + '" stroke="#6F8796" stroke-opacity="0.7" stroke-width="0.4"/>' +
+    '<rect x="' + (tx + b / 2 - 2.8) + '" y="' + (f.boden - 5.6) + '" width="5.6" height="5.6" fill="#3D4F5E"/>' +
+    '<rect x="' + (tx + 4) + '" y="' + (oben + 1.6) + '" width="' + (b - 8) + '" height="6.6" rx="1" fill="#1D4F8C"/>' +
+    '<text x="' + (tx + b / 2) + '" y="' + (oben + 6.5) + '" text-anchor="middle" font-size="4.8" font-weight="700" ' +
+    'letter-spacing="0.3" fill="#ffffff">FLUGHAFEN</text>';
+  if (istUmgesetzt(z, "biokraftstoff")) s += tankSvg(tx + b + 4, f.boden);
+  return { unten: f.ort.y + f.boden * f.groesse, svg: flughafenRahmen(s) };
 }
 
 // Grüner Tank für nachhaltigen Flugkraftstoff mit weißem Blatt. (x, unten) = linke Kante am Boden
@@ -4503,17 +4631,16 @@ function tankSvg(x, unten) {
     " Q" + (x + 4.8) + "," + (unten - 2.8) + " " + (x + 2) + "," + (unten - 2.4) + ' Z" fill="#FFFFFF"/>';
 }
 
-// Startendes Flugzeug: rollt von Osten über die Bahn, hebt ab, steigt nach Westen und wird dabei größer (näher)
-// und blasser. Mit ausgebautem Flugverkehr startet doppelt so oft eine Maschine.
+// Startendes Flugzeug: wartet am Ostende der Bahn, rollt nach Westen, hebt ab und steigt nach links oben; dabei
+// wird es größer (näher am Betrachter) und blasser. Mit ausgebautem Flugverkehr startet doppelt so oft eine Maschine.
+// Rollen und Steigen in eigenen Einheiten ab dem Startpunkt; der Steigwinkel steht in style.css (ka-abflug).
 function abflugSvg(z) {
-  const p0 = FLUGHAFEN.bahn[0];
-  const p1 = FLUGHAFEN.bahn[1];
-  const winkel = Math.atan2(p0[1] - p1[1], p0[0] - p1[0]) * 180 / Math.PI;
-  const bahn = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
+  const b = FLUGHAFEN.bahn;
+  const start = b.x1 - 6;
   const dauer = istUmgesetzt(z, "flugverkehr") ? 10 : 20;
-  return '<g transform="translate(' + p1[0] + "," + p1[1] + ") rotate(" + winkel.toFixed(1) + ')">' +
-    '<g class="ka-abflug" style="--bahn:' + bahn.toFixed(1) + "px;--steigen:" + (bahn + 90).toFixed(1) + "px;" + animStil(dauer) + '">' +
-    flugzeugSvg(0, 0, 0, FLUGHAFEN.flugzeug) + "</g></g>";
+  return flughafenRahmen('<g transform="translate(' + start + "," + b.y + ')">' +
+    '<g class="ka-abflug" style="--rollen:' + (b.x0 + 26 - start) + "px;--steigen-x:" + (b.x0 - 50 - start) +
+    "px;--steigen-y:-30px;" + animStil(dauer) + '">' + flugzeugSvg(0, 0, 180, FLUGHAFEN.flugzeug) + "</g></g>");
 }
 
 // Hinweisschild „Müll in den Eimer“: gelbe Raute mit weißem Rand auf einem Pfosten, darauf eine Figur,
@@ -4721,6 +4848,7 @@ function seekarteSvg(z, sicht) {
   s += strandhaferSvg();
   s += baeumeSvg();
   s += flughafenBodenSvg();
+  s += landtiereSvg(z);
 
   // Brutzone am Strand: rot gestrichelter Bereich links der Flussmündung, mit Schild.
   // Das Schild steht links, damit Müllfänger und Infopunkte am Strand frei bleiben.
@@ -4801,7 +4929,7 @@ function seekarteSvg(z, sicht) {
   // Fabrik mit Schornstein; mit „Gewerbegebiet erweitern“ eine zweite, kleinere Fabrik rechts daneben
   gebaeude.push({ unten: 76, svg: fabrikSvg(616, 46, 62, 30, 4, 7.6) });
   if (gewerbe) gebaeude.push({ unten: 80, svg: fabrikSvg(688, 56, 46, 24, 3, 6.2) });
-  Array.prototype.push.apply(gebaeude, flughafenGebaeude(z));
+  gebaeude.push(flughafenGebaeude(z));
   s += '<g filter="url(#kaSchatten)">' + gebaeude.sort(function (a, b) { return a.unten - b.unten; }).map(function (g) {
     return g.svg;
   }).join("") + "</g>";
@@ -4839,11 +4967,10 @@ function seekarteSvg(z, sicht) {
   // Startendes Flugzeug über allem anderen
   s += abflugSvg(z);
 
-  // Treibgut im Wasser (Eintrag): Plastikflaschen und -tüten nahe dem Strand
-  s += treibgutSvg(treibgutAnzahl(z));
+  // Treibgut im ganzen Meer (Eintrag): Plastikflaschen und -tüten
+  s += treibgutSvg(z);
 
-  // Müll am Strand und an Land, gebündelt an den Verursachern.
-  // Hinten liegende Teile zuerst, damit vordere sie überdecken.
+  // Müll am Strand und an Land. Hinten liegende Teile zuerst, damit vordere sie überdecken.
   strandMuellListe(z).concat(landMuellListe(z)).sort(function (a, b) { return a.y - b.y; }).forEach(function (m) {
     s += muellSymbolSvg(m.form, m.x, m.y, m.winkel, m.groesse);
   });
@@ -4859,55 +4986,6 @@ function seekarteAnzeigen() {
   const z = zustand;
   kartenSicht = sichtBerechnen();
   el("seekarte").innerHTML = seekarteSvg(z, kartenSicht);
-
-  // Legende: nur Symbole, die gerade auf der Karte zu sehen sind
-  const w = aktiveWirkung(z, Math.min(z.runde, RUNDEN));
-  const arten = { plastik: false, glas: false, essen: false };
-  strandMuellListe(z).concat(landMuellListe(z)).forEach(function (m) { arten[m.art] = true; });
-  // Gebäude für die Legende: Defs (Verläufe) liegen in der Karte; hier eigene, gleich benannte Verläufe
-  const gebaeudeDefs = '<defs><linearGradient id="lgWand" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFBF2"/>' +
-    '<stop offset="1" stop-color="#EADFC8"/></linearGradient><linearGradient id="lgHolz" x1="0" y1="0" x2="0" y2="1">' +
-    '<stop offset="0" stop-color="#D9B48A"/><stop offset="1" stop-color="#BF9466"/></linearGradient></defs>';
-  const legendeGebaeude = function (svg) {
-    return gebaeudeDefs + svg.replace(/url\(#kaWandHell\)/g, "url(#lgWand)").replace(/url\(#kaHolz\)/g, "url(#lgHolz)")
-      .replace(/url\(#kaGlas\)/g, "#A9CFE3");
-  };
-  const eintraege = [
-    [legendenSvg(legendeGebaeude(hotelGrossSvg(0, 0)), "-2 -56 62 58"), "Hotel", true],
-    [legendenSvg(legendeGebaeude(kioskSvg(0, 0)), "-3 -24 34 25"), "Strandkiosk", true],
-    [legendenSvg(flugzeugSvg(0, 0, -25, 1), "-10 -9 20 18"), "Flughafen", true],
-    [legendenSvg(tankSvg(0, 0), "-2 -10 11 11"), "Biokraftstoff-Tank", istUmgesetzt(z, "biokraftstoff")],
-    [legendenSymbol("flasche", -20, 1.1), "Plastikmüll", arten.plastik],
-    [legendenSymbol("scherbe", -15, 1.05), "Glas", arten.glas],
-    [legendenSymbol("apfel", 0, 1.1), "Essensreste", arten.essen],
-    [legendenSymbol("tuete", 10, 0.8), "Plastiktüte", treibgutAnzahl(z) > 0],
-    [legendenSvg(muelleimerSvg(0, 0, "#12304A"), "-7 -12.5 14 13.5"), "Mülleimer", istUmgesetzt(z, "schilder")],
-    [legendenSvg(hinweisSchildSvg(0, 0), "-9 -26 18 26"), "Hinweisschild", istUmgesetzt(z, "schilder")],
-    [legendenSvg('<rect x="-10.5" y="-7" width="25" height="14" rx="3.5" fill="#3F84B5"/>' + FISCH_FORMEN.hering(),
-      "-10.5 -7 25 14"), fischLegende(z.kennzahlen.artenvielfalt), true],
-    ["lg-wasser", "Wasserfarbe, Meeresgesundheit", true],
-    ["lg-abwasser", "Abwasserfahne", DRUCK_START.wasser + w.druckWasser > 6],
-    ["lg-schutz", "Meeresschutzgebiet", istUmgesetzt(z, "schutzgebiet")],
-    ["lg-brut", "Brutzone", istUmgesetzt(z, "brutschutz")],
-    [legendenSvg('<g stroke="#3E5A70" stroke-width="1.4" stroke-linecap="round" fill="none">' +
-      '<path d="M0,6 V-2 M0,-2 l-5,-2.5 M0,-2 l5,-2.5 M0,-2 l0,5"/></g><circle cx="0" cy="-2" r="1.2" fill="#12304A"/>',
-      "-8 -6 16 12"), "Windpark", istUmgesetzt(z, "windpark")]
-  ];
-  const sichtbar = eintraege.filter(function (e) { return e[2]; });
-  el("kartenLegende").innerHTML = sichtbar.map(function (e) {
-    const zeichen = e[0].charAt(0) === "<" ? e[0] : '<span class="lg ' + e[0] + '" aria-hidden="true"></span>';
-    return "<li>" + zeichen + e[1] + "</li>";
-  }).join("");
-  // Punkt am Knopf, sobald ein Eintrag dazukommt, den man noch nicht gesehen hat (neues Spiel: alles neu)
-  if (legende.spiel !== z) {
-    legende.spiel = z;
-    legende.gesehen = [];
-  }
-  if (!el("legendeInhalt").hidden) {
-    legendeSetzen(true);
-  } else if (sichtbar.some(function (e) { return legende.gesehen.indexOf(e[1]) < 0; })) {
-    el("legendeKnopf").classList.add("neu");
-  }
 }
 
 // ==========================================================
@@ -5100,10 +5178,7 @@ function infopunktOeffnen(id) {
     markerAnzeigen();
     rundenKnopfAnzeigen();
     seekarteAnzeigen();
-    if (warOffen && pflichtInfosOffen(z).length === 0) {
-      el("anhoerungHinweis").textContent = "Jetzt melden sich die Menschen vor Ort. Klicke auf die Sprechblasen in der Karte.";
-      massnahmenFensterSetzen(true);
-    }
+    if (warOffen && pflichtInfosOffen(z).length === 0) massnahmenFensterSetzen(true);
   });
 }
 
@@ -7011,16 +7086,6 @@ function kartenGroesseAnpassen() {
 
 function oberflaecheVerbinden() {
   window.addEventListener("resize", kartenGroesseAnpassen);
-  // Legende schließt bei Klick daneben oder mit Esc
-  document.addEventListener("click", function (e) {
-    if (!el("legendeInhalt").hidden && !e.target.closest(".legenden-ecke")) legendeSetzen(false);
-  });
-  document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && !el("legendeInhalt").hidden) {
-      legendeSetzen(false);
-      el("legendeKnopf").focus();
-    }
-  });
   // Knopf → Aktion
   const aktionen = {
     startNeuesSpiel: namePopupOeffnen,
@@ -7031,7 +7096,6 @@ function oberflaecheVerbinden() {
     naechsteRunde: rundeBeenden,
     massnahmenKlappe: function () { massnahmenFensterSetzen(!massnahmenFenster.offen); },
     zustandKlappe: function () { zustandFensterSetzen(el("zustandInhalt").hidden); },
-    legendeKnopf: function () { legendeSetzen(el("legendeInhalt").hidden); },
     berichtWeiter: berichtWeiter,
     infoOk: function () { popupFertig("popupInfo"); },
     quizWeiter: quizWeiter,
@@ -7074,7 +7138,7 @@ function oberflaecheVerbinden() {
 
 // Prüft, ob index.html und style.css zur Version dieses Skripts passen.
 // Passt etwas nicht (z. B. alte Datei oder Browser-Cache), erscheint ein Hinweis statt einer kaputten Seite.
-const BENOETIGTE_ELEMENTE = ["zustandKlappe", "zustandInhalt", "kennzahlenKurz", "legendeKnopf", "legendeInhalt",
+const BENOETIGTE_ELEMENTE = ["zustandKlappe", "zustandInhalt", "kennzahlenKurz",
   "auswahlUebersicht", "massnahmenKlappe", "massnahmenInhalt", "massnahmenStand", "saeulenReiter", "popupInfo", "infoOk", "popupQuiz",
   "quizWeiter", "massnahmenListe", "personen", "muellInfoKnopf",
   "popupMuell", "muellInhalt", "muellSchliessen", "entscheidungen", "startSzene", "startBilder", "ladebildschirm",
@@ -7083,7 +7147,7 @@ const BENOETIGTE_ELEMENTE = ["zustandKlappe", "zustandInhalt", "kennzahlenKurz",
 
 function versionPruefen() {
   const fehlend = BENOETIGTE_ELEMENTE.filter(function (id) { return !document.getElementById(id); });
-  const cssNeu = getComputedStyle(document.documentElement).getPropertyValue("--layout-version").trim() === "13";
+  const cssNeu = getComputedStyle(document.documentElement).getPropertyValue("--layout-version").trim() === "14";
   if (!fehlend.length && cssNeu) return true;
   const hinweis = document.createElement("div");
   hinweis.setAttribute("role", "alert");
