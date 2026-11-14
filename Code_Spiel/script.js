@@ -39,7 +39,8 @@
 //   unterschiedlichen Nebenwirkungen (hart gegen sanft, Vorbeugen gegen
 //   Aufräumen, Wachstum gegen grüne Wirtschaft). Es gibt keine Pflicht-Maßnahme.
 // - GEGENSPIELER: Zu viele Gäste kosten Akzeptanz, mehr Gäste bringen mehr Müll,
-//   Schutz kostet oft Wirtschaft, Wachstum belastet oft das Meer.
+//   Schutz kostet oft Wirtschaft, Wachstum belastet oft das Meer. Der Flughafen
+//   bringt Gäste, aber auch Fluglärm und Klimabelastung.
 // - Wissen: Infopunkte auf der Karte (Runde 1 Pflicht, danach freiwillig),
 //   Quiz am Rundenende und ein Abschlussquiz ergeben den Wissensscore.
 // - Endergebnis = 80 % Nachhaltigkeitsscore + 20 % Wissensscore.
@@ -77,8 +78,10 @@ const MUELL_ABTRAG = 0.5;       // Anteil des Bestands, der pro Runde natürlich
 const EINTRAG_GRUND = { strand: 15, meer: 12.5, land: 15.5 };
 const TOURISMUS_BEZUG = 60;
 
-// Belastungen der Meeresgesundheit (Punkte, die vom Höchstwert 100 abgehen)
-const DRUCK_START = { wasser: 7, fischerei: 6, klima: 3 };
+// Belastungen der Meeresgesundheit (Punkte, die vom Höchstwert 100 abgehen).
+// Die Erwärmung hat zwei Anteile: klima (Industrie und Energie, der Windpark senkt ihn) und flug (der
+// Regionalflughafen). Sie sind getrennt, weil ein Windpark keine Flugzeuge sauberer macht.
+const DRUCK_START = { wasser: 7, fischerei: 6, klima: 2, flug: 1 };
 // Gegenspieler der Ökologie: Wachstum belastet das Meer. Für jeden Punkt über diesen Grenzen
 // kommt Belastung durch Abwasser, Schiffsverkehr und Küstenbebauung dazu.
 const WACHSTUM_GRENZE = { tourismus: 60, wirtschaft: 58 };
@@ -256,12 +259,11 @@ const AMPEL_ABSTAND = 20;   // bis so viele Punkte unter dem Mindestwert ist der
 //                   ab     = Runden bis zum Wirkungsbeginn (0 = in dieser Runde)
 //                   dauer  = Anzahl Runden (weglassen = dauerhaft)
 //                   wirkung: eintragStrand/-Meer/-Land = Faktor (0.6 heißt −40 %)
-//                            druckWasser/-Fischerei/-Klima = Belastung (+/− Punkte)
+//                            druckWasser/-Fischerei/-Klima/-Flug = Belastung (+/− Punkte)
 //                            tourismus/wirtschaft/artenvielfalt/akzeptanz
 //                            = Verschiebung des Richtwerts (+/− Punkte)
 //                            reinigung = Anteil des Strandmülls, der JEDE Runde entfernt wird
 //                            einnahmen = zusätzliches Geld pro Runde (€)
-//                   popup  = Meldung beim Wirkungsbeginn
 // teaser          VOR der Entscheidung: nur anteasern, keine Zahlen
 // erklaerung(r)   NACH der Entscheidung: Wirkungskette erklären (r = Runde)
 const MASSNAHMEN = [
@@ -341,20 +343,6 @@ const MASSNAHMEN = [
     }
   },
   {
-    id: "geisternetze", saeule: "oeko", bereich: "meer",
-    name: "Geisternetze bergen",
-    beschreibung: "Taucher bergen verlorene Fischernetze von Wracks und vom Meeresboden.",
-    kosten: 1800, kostenAnstieg: 300, wiederholbar: true,
-    akzeptanz: 2,
-    wirkungen: [{ ab: 0, dauer: 2, wirkung: { druckFischerei: -4 } }],
-    teaser: "Geborgene Netze fangen keine Tiere mehr. Doch kommen neue nach?",
-    erklaerung: function (r) {
-      return "Die Bergung entlastet das Meer in Runde " + r + " und " + (r + 1) + ". Solange weiter Netze " +
-        "verloren gehen, baut sich die Belastung danach wieder auf. Dauerhaft hilft nur, den Verlust " +
-        "neuer Netze zu verhindern.";
-    }
-  },
-  {
     id: "schutzgebiet", saeule: "oeko", bereich: "meer",
     name: "Meeresschutzgebiet ausweisen",
     beschreibung: "In einem Teil des Meeres werden Fischerei und Schiffsverkehr dauerhaft verboten.",
@@ -371,6 +359,21 @@ const MASSNAHMEN = [
         "Artenvielfalt steigt Runde für Runde, höchstens 5 Punkte pro Runde. Als Ausgleich zahlt der " +
         "EU-Meeresschutzfonds jede Runde 700 €. Fischerei und Betriebe tragen die Auflagen nur " +
         "widerwillig: Der Richtwert der Akzeptanz liegt dauerhaft um 3 Punkte niedriger.";
+    }
+  },
+  {
+    id: "flugrouten", saeule: "oeko", bereich: "meer",
+    name: "Flugrouten über dem Watt anheben",
+    beschreibung: "Flugzeuge müssen über dem Wattenmeer höher fliegen. Rundflüge über Seehundbänken und Rastplätzen der Vögel entfallen.",
+    kosten: 1500, einschraenkend: true,
+    akzeptanz: -2,
+    wirkungen: [{ ab: 1, wirkung: { artenvielfalt: 4, tourismus: -1 } }],
+    teaser: "Seehunde und Rastvögel flüchten vor tief fliegenden Maschinen. Wie viel Abstand brauchen sie, und wer verzichtet dafür?",
+    erklaerung: function (r) {
+      return "Ab Runde " + (r + 1) + " fliegen die Maschinen über dem Watt höher, und die Rundflüge über den " +
+        "Seehundbänken fallen weg. Seehunde und Rastvögel werden seltener aufgescheucht, die Artenvielfalt erholt " +
+        "sich. Unter Wasser ändert sich wenig, denn Fluglärm dringt kaum ins Meer ein. Einige Gäste vermissen die " +
+        "Rundflüge, und die Flugschulen ärgern sich über die Auflagen.";
     }
   },
   {
@@ -403,27 +406,6 @@ const MASSNAHMEN = [
       return "Ab Runde " + (r + 1) + " gelangen 55 % weniger Abfälle von Schiffen ins Meer, weil sie ihren Müll im Hafen " +
         "abgeben müssen. Das wirkt nur auf den Teil des Mülls, der von See kommt. Strandbesucher und Flüsse " +
         "bleiben davon unberührt. Die Hafenkontrolle kostet 100 € pro Runde.";
-    }
-  },
-  {
-    id: "forschung", saeule: "oeko", bereich: "meer",
-    name: "Forschung zu Plastikmüll",
-    beschreibung: "Die Region finanziert eine Studie zu Herkunft und Wegen des Plastikmülls.",
-    kosten: 3000,
-    akzeptanz: 2,
-    wirkungen: [{
-      ab: 3,
-      wirkung: { eintragStrand: 0.85, eintragMeer: 0.85, eintragLand: 0.85, druckFischerei: -1 },
-      popup: {
-        titel: "Forschungsdurchbruch",
-        text: "Die Studie zeigt, über welche Wege der meiste Müll an deine Küste gelangt. Ab jetzt " +
-          "lassen sich alle Maßnahmen gezielter einsetzen: Der Eintrag aus allen drei Quellen sinkt um 15 %."
-      }
-    }],
-    teaser: "Forschung kostet Geld und zeigt zunächst keinen sichtbaren Erfolg. Machen die Erkenntnisse später den Unterschied?",
-    erklaerung: function (r) {
-      return "Die Studie läuft drei Runden. Ab Runde " + (r + 3) + " können alle Maßnahmen gezielter " +
-        "eingesetzt werden: Der Eintrag aus allen drei Quellen sinkt um 15 %.";
     }
   },
 
@@ -479,6 +461,22 @@ const MASSNAHMEN = [
     }
   },
   {
+    id: "biokraftstoff", saeule: "oeko", bereich: "land",
+    name: "Biokraftstoff für den Flughafen",
+    beschreibung: "Der Flughafen mischt dem Kerosin nachhaltigen Flugkraftstoff aus Altspeiseöl und Reststoffen bei. Die Region zahlt den Aufpreis.",
+    kosten: 2500, laufendeKosten: 250,
+    akzeptanz: 1,
+    wirkungen: [{ ab: 1, wirkung: { druckFlug: -2 } }],
+    teaser: "Kraftstoff aus Reststoffen statt aus Erdöl. Schadet Fliegen dem Klima dann nicht mehr?",
+    erklaerung: function (r) {
+      return "Ab Runde " + (r + 1) + " tanken die Flugzeuge zum Teil nachhaltigen Kraftstoff. Über seinen ganzen " +
+        "Lebensweg verursacht er etwa 70 bis über 90 % weniger Treibhausgase als Kerosin, er ist aber knapp und " +
+        "teuer: 2024 machte er weltweit nur rund 0,3 % des Flugkraftstoffs aus. Kondensstreifen und Stickoxide, die " +
+        "zusammen stärker wärmen als das CO2 selbst, entstehen weiter. Eine Region allein rettet das Klima nicht; die " +
+        "Maßnahme steht für ihren Beitrag. Der Aufpreis kostet 250 € pro Runde.";
+    }
+  },
+  {
     id: "aue", saeule: "oeko", bereich: "land",
     name: "Flussaue renaturieren",
     beschreibung: "Der begradigte Fluss bekommt Seitenarme und Auwiesen zurück. Die Landwirte erhalten Ausgleichsflächen.",
@@ -490,25 +488,6 @@ const MASSNAHMEN = [
       return "Bagger legen Flussarme frei, Auwiesen entstehen. Bis die Vegetation steht, vergehen Jahre. Ab Runde " +
         (r + 3) + " halten die Auen Nährstoffe zurück (Abwasserbelastung sinkt), fangen 15 % des Mülls aus dem " +
         "Hinterland ab und bieten Tieren Lebensraum. Gegen starke Einleitungen reicht das allein nicht.";
-    }
-  },
-  {
-    id: "co2", saeule: "oeko", bereich: "land",
-    name: "CO2-Gesetz für die Industrie",
-    beschreibung: "Die Industrie der Region muss ihren CO2-Ausstoß gesetzlich senken.",
-    kosten: 4000, einschraenkend: true,
-    akzeptanz: -6,
-    wirkungen: [
-      { ab: 1, dauer: 3, wirkung: { wirtschaft: -6, akzeptanz: -3 } },
-      { ab: 3, wirkung: { druckKlima: -5 } },
-      { ab: 4, wirkung: { wirtschaft: 4 } }
-    ],
-    teaser: "Klimaschutz gilt als Aufgabe für die ganze Welt. Kann eine Region damit ihr eigenes Meer schützen?",
-    erklaerung: function (r) {
-      return "Die Umstellung belastet die Betriebe drei Runden lang. Ab Runde " + (r + 3) + " sinkt im " +
-        "Spiel die Belastung durch Erwärmung und Versauerung, ab Runde " + (r + 4) + " zahlen sich die " +
-        "neuen Technologien für die Wirtschaft aus. Die Umstellung kostet drei Runden lang Rückhalt. " +
-        "Eine Region allein kann das Klima nicht retten; die Maßnahme steht für ihren Beitrag.";
     }
   },
 
@@ -525,6 +504,21 @@ const MASSNAHMEN = [
       return "Ab Runde " + (r + 1) + " legen Kreuzfahrtschiffe an. Tourismus und Wirtschaft wachsen spürbar, " +
         "deine Einnahmen steigen. Die Schiffe hinterlassen aber Abwasser und Abfall: Der Eintrag aus " +
         "Schifffahrt steigt um 30 %, und das Wasser wird stärker belastet. Viele Anwohner stört der Andrang.";
+    }
+  },
+  {
+    id: "flugverkehr", saeule: "oekonomie",
+    name: "Flugverkehr ausbauen",
+    beschreibung: "Der Regionalflughafen bekommt neue Direktflüge aus den Großstädten und längere Öffnungszeiten.",
+    kosten: 4000,
+    akzeptanz: -2,
+    wirkungen: [{ ab: 1, wirkung: { tourismus: 6, wirtschaft: 3, druckFlug: 3, akzeptanz: -3, artenvielfalt: -2 } }],
+    teaser: "Direktflüge bringen Gäste in wenigen Stunden an die Küste. Was bringen die Flugzeuge außer Gästen mit?",
+    erklaerung: function (r) {
+      return "Ab Runde " + (r + 1) + " landen mehr Flugzeuge: Tourismus und Wirtschaft wachsen, deine Einnahmen " +
+        "steigen, und mehr Gäste hinterlassen mehr Müll am Strand. Die Flugzeuge belasten das Klima, und ihr Lärm " +
+        "stört Anwohner, Seehunde und Rastvögel: Der Richtwert der Akzeptanz liegt dauerhaft um 3 Punkte " +
+        "niedriger, der der Artenvielfalt um 2.";
     }
   },
   {
@@ -620,20 +614,6 @@ const MASSNAHMEN = [
     }
   },
   {
-    id: "werbung", saeule: "oekonomie",
-    name: "Werbekampagne für die Küste",
-    beschreibung: "Plakate, Online-Anzeigen und Reiseblogs werben für Urlaub in der Region.",
-    kosten: 1500, kostenAnstieg: 500, wiederholbar: true,
-    akzeptanz: 0,
-    wirkungen: [{ ab: 0, dauer: 2, wirkung: { tourismus: 7 } }],
-    teaser: "Mehr Gäste füllen die Kassen. Und den Strand?",
-    erklaerung: function (r) {
-      return "In Runde " + r + " und " + (r + 1) + " kommen mehr Gäste. Das bringt Einnahmen, aber mehr " +
-        "Gäste hinterlassen auch mehr Müll am Strand, und wenn es zu viele werden, fühlen sich die " +
-        "Einheimischen überrannt. Danach lässt der Effekt nach. Jede weitere Kampagne kostet 500 € mehr.";
-    }
-  },
-  {
     id: "kurtaxe", saeule: "oekonomie",
     name: "Kurtaxe für Gäste",
     beschreibung: "Übernachtungsgäste zahlen eine Abgabe, die direkt in die Gemeindekasse fließt.",
@@ -646,6 +626,25 @@ const MASSNAHMEN = [
         "weniger Gäste, und viele Betriebe und Anwohner lehnen die Abgabe ab. Das Verursacherprinzip bringt " +
         "Geld für den Meeresschutz, kostet aber dauerhaft Rückhalt: Der Richtwert der Akzeptanz " +
         "liegt um 3 Punkte niedriger.";
+    }
+  },
+  {
+    id: "co2ausgleich", saeule: "oekonomie",
+    name: "Flüge mit CO2-Ausgleich bewerben",
+    beschreibung: "Eine Kampagne wirbt mit Flügen, deren CO2 über Klimaprojekte in anderen Ländern ausgeglichen werden soll.",
+    kosten: 1000,
+    akzeptanz: 2,
+    wirkungen: [
+      { ab: 0, dauer: 3, wirkung: { tourismus: 4 } },
+      { ab: 2, wirkung: { akzeptanz: -3 } }
+    ],
+    teaser: "Ein kleiner Aufpreis, und der Flug gilt als klimafreundlich. Fliegt das Flugzeug dann sauberer?",
+    erklaerung: function (r) {
+      return "Drei Runden lang kommen mehr Gäste. Am Ausstoß der Flugzeuge ändert die Kampagne nichts: " +
+        "Ausgleichsprojekte sollen CO2 anderswo einsparen, und ob sie das wirklich tun, ist schwer zu prüfen. Ab Runde " +
+        (r + 2) + " kritisieren Umweltverbände die Werbung als Greenwashing, und das Vertrauen ist dauerhaft " +
+        "beschädigt: Der Richtwert der Akzeptanz liegt um 3 Punkte niedriger. Seit September 2026 darf in der EU " +
+        "ein Produkt nicht mehr allein wegen solcher Ausgleichszahlungen als „klimaneutral“ beworben werden.";
     }
   },
 
@@ -696,17 +695,17 @@ const MASSNAHMEN = [
     }
   },
   {
-    id: "runderTisch", saeule: "sozial",
-    name: "Runder Tisch mit Fischerei und Betrieben",
-    beschreibung: "Fischer, Hotels, Betriebe und Naturschutz beraten gemeinsam über die nächsten Schritte.",
-    kosten: 1500, kostenAnstieg: 500, wiederholbar: true,
-    akzeptanz: 5,
-    wirkungen: [{ ab: 1, dauer: 3, wirkung: { akzeptanz: 4 } }],
-    teaser: "Wer mitreden darf, trägt Entscheidungen eher mit. Aber ersetzt Reden das Handeln?",
+    id: "schallschutz", saeule: "sozial",
+    name: "Schallschutzfenster für Anwohner",
+    beschreibung: "Häuser in der Einflugschneise des Flughafens bekommen Schallschutzfenster, bezahlt aus der Gemeindekasse.",
+    kosten: 2000,
+    akzeptanz: 2,
+    wirkungen: [{ ab: 1, wirkung: { akzeptanz: 4 } }],
+    teaser: "Ruhige Nächte für die Menschen in der Einflugschneise. Wird es dadurch auch über dem Watt leiser?",
     erklaerung: function (r) {
-      return "Die Akzeptanz steigt sofort um 5 Punkte, und von Runde " + (r + 1) + " bis " + (r + 3) +
-        " tragen die Beteiligten deine Entscheidungen eher mit. Am Müll und am Meer ändert der Runde " +
-        "Tisch selbst nichts. Jedes weitere Treffen kostet 500 € mehr.";
+      return "Ab Runde " + (r + 1) + " schlafen die Anwohner ruhiger, der Richtwert der Akzeptanz liegt dauerhaft " +
+        "um 4 Punkte höher. Draußen bleibt es so laut wie vorher: Seehunden und Rastvögeln im Watt helfen die " +
+        "Fenster nicht.";
     }
   },
   {
@@ -748,6 +747,7 @@ const WIRKUNG_TEXTE = {
   druckWasser:    "Belastung durch Abwasser",
   druckFischerei: "Belastung durch Fischerei",
   druckKlima:     "Belastung durch Erwärmung",
+  druckFlug:      "Belastung durch Flugverkehr",
   tourismus:      "Richtwert Tourismus",
   wirtschaft:     "Richtwert Wirtschaft",
   artenvielfalt:  "Richtwert Artenvielfalt",
@@ -755,6 +755,22 @@ const WIRKUNG_TEXTE = {
   reinigung:      "Strandreinigung pro Runde",
   einnahmen:      "Zusatzeinnahmen pro Runde"
 };
+
+// Belege für die Zahlen in den Flughafen-Maßnahmen und der Quizfrage (Pop-up „Quellen“)
+const QUELLEN_FLUGVERKEHR = [
+  { thema: "Kondensstreifen und Stickoxide wärmen stärker als das CO2", name: "Lee et al., Atmospheric Environment 2021",
+    url: "https://centaur.reading.ac.uk/92633" },
+  { thema: "Biokraftstoff spart 70 bis über 90 % Treibhausgase", name: "EASA, Sustainable Aviation Fuel",
+    url: "https://www.easa.europa.eu/en/node/130804" },
+  { thema: "Anteil am Flugkraftstoff 2024 rund 0,3 %", name: "IATA nach International Airport Review, 2024",
+    url: "https://www.internationalairportreview.com/news/232770/iata-reveals-saf-production-growth-in-2024-urges-acceleration-to-meet-decarbonisation-targets" },
+  { thema: "Werbung mit „klimaneutral“ durch Ausgleich", name: "IHK Dresden zur EmpCo-Richtlinie",
+    url: "https://www.ihk.de/dresden/servicenavigation/presse-publikationen/meldungen/neue-gesetzliche-anforderungen-7174388" },
+  { thema: "Fluglärm unter Wasser", name: "Erbe et al., Marine Pollution Bulletin 2018",
+    url: "https://agris.fao.org/search/en/records/65df83bc0f3e94b9e5d95dfa" },
+  { thema: "Seehunde flüchten bei Störungen", name: "Nationalpark Wattenmeer, Wassersport-Faltblatt 2025",
+    url: "https://www.nationalpark-wattenmeer.de/wp-content/uploads/2025/12/Wassersport-Folder-2025.pdf" }
+];
 
 // ==========================================================
 // 3. EREIGNISSE (nur Daten)
@@ -903,10 +919,6 @@ function kuerzlich(z, id, n) {
   return z.runde - liste[liste.length - 1] <= n;
 }
 
-function belastungFischerei(w) {
-  return DRUCK_START.fischerei + w.druckFischerei;
-}
-
 function belastungAbwasser(w) {
   return DRUCK_START.wasser + w.druckWasser;
 }
@@ -926,6 +938,9 @@ const AUSSAGEN = {
     { id: "kreuzfahrt", prio: 7.5, wenn: function (z) { return kuerzlich(z, "kreuzfahrt", 2); },
       text: "Wenn ein Kreuzfahrtschiff anlegt, ist mein Kiosk leer gekauft. Aber danach liegt der Strand " +
         "voller Becher, und die Stammgäste beschweren sich über den Trubel." },
+    { id: "flugverkehr", prio: 7.2, wenn: function (z) { return kuerzlich(z, "flugverkehr", 2); },
+      text: "Seit es die Direktflüge gibt, stehen morgens neue Gesichter an meinem Kiosk. Aber wenn eine " +
+        "Maschine startet, versteht man am Tresen sein eigenes Wort nicht mehr." },
     { id: "kontrollen", prio: 7, wenn: function (z) { return kuerzlich(z, "kontrollen", 2); },
       text: "Seit die Streifen kontrollieren, fühlen sich manche Gäste beobachtet. Es liegt weniger Müll " +
         "herum, aber ich hoffe, die Gäste kommen trotzdem wieder." },
@@ -982,9 +997,9 @@ const AUSSAGEN = {
     { id: "schutzErfolg", prio: 5, wenn: function (z) { return istUmgesetzt(z, "schutzgebiet") && z.kennzahlen.artenvielfalt >= 65; },
       text: "Am Rand des Schutzgebiets fange ich wieder größere Fische. Die Jungfische wachsen dort in " +
         "Ruhe auf. Damit hätte ich nicht gerechnet." },
-    { id: "altnetze", prio: 4, wenn: function (z, w) { return istUmgesetzt(z, "netzrueckgabe") && belastungFischerei(w) >= 6; },
-      text: "Die Rückgabestation wird gut angenommen. Aber am Meeresboden liegen noch die alten Netze von " +
-        "früher. Die fangen weiter Fische, ohne dass sie jemand einholt." },
+    { id: "rundfluege", prio: 6.6, wenn: function (z) { return !istUmgesetzt(z, "flugrouten"); },
+      text: "Wenn ein Rundflug tief über die Sandbank zieht, robben alle Seehunde ins Wasser, auch die " +
+        "Mütter mit ihren Jungen. Von oben sieht das bestimmt schön aus. Für die Tiere ist es Stress." },
     { id: "klar", prio: 3, wenn: function (z) { return z.kennzahlen.meeresgesundheit >= 80; },
       text: "Das Wasser ist so klar wie lange nicht. Wenn das so bleibt, hat auch mein Sohn eine Zukunft " +
         "als Fischer." },
@@ -1002,6 +1017,12 @@ const AUSSAGEN = {
     { id: "gewerbe", prio: 7.5, wenn: function (z) { return kuerzlich(z, "gewerbe", 2); },
       text: "Im neuen Gewerbegebiet wird eingestellt, das freut uns. Nur der Graben dahinter sieht nach " +
         "jedem Regen aus wie eine Müllkippe." },
+    { id: "fluglaerm", prio: 7.2, wenn: function (z) { return istUmgesetzt(z, "flugverkehr") && !istUmgesetzt(z, "schallschutz"); },
+      text: "Unsere Siedlung liegt genau in der Einflugschneise. Seit dem Ausbau weckt uns die erste Maschine " +
+        "um sechs Uhr. Wenigstens bessere Fenster könnte die Gemeinde doch bezahlen." },
+    { id: "co2ausgleich", prio: 6.8, wenn: function (z) { return kuerzlich(z, "co2ausgleich", 3); },
+      text: "Auf den Plakaten steht jetzt, Fliegen sei klimafreundlich, weil anderswo Bäume gepflanzt werden. " +
+        "Die Maschinen über unserem Dach stoßen trotzdem genauso viel aus wie vorher." },
     { id: "klaerFolge", prio: 7, wenn: function (z) { return kuerzlich(z, "abwasser", 3); },
       text: "Die Nachrüstung der Kläranlage kostet uns gerade viel, Kurzarbeit ist im Gespräch. Ich hoffe, " +
         "das zahlt sich aus, wie versprochen." },
@@ -1017,9 +1038,6 @@ const AUSSAGEN = {
     { id: "pfand", prio: 4, wenn: function (z) { return !istUmgesetzt(z, "pfand"); },
       text: "In den Straßengräben liegen überall Dosen und Einwegflaschen. Wenn eine Flasche Geld wert " +
         "wäre, würde sie niemand wegwerfen." },
-    { id: "schornstein", prio: 3, wenn: function (z) { return !istUmgesetzt(z, "co2") && z.runde >= 4; },
-      text: "Unser Schornstein raucht noch wie vor zwanzig Jahren. Wer modernisiert, ist auf Dauer " +
-        "konkurrenzfähiger. Nur der Anfang ist teuer." },
     { id: "standard", prio: 0, wenn: function () { return true; },
       text: "Hier im Hinterland merkt man kaum, was an der Küste passiert. Dabei hängt alles zusammen: Was " +
         "wir in den Fluss werfen, liegt später am Strand." }
@@ -1151,7 +1169,7 @@ const INFOPUNKTE = [
     }
   },
   {
-    id: "versauerung", runde: 9, region: "land", x: 88, y: 9, titel: "Saurer werdendes Meer",
+    id: "versauerung", runde: 9, region: "land", x: 66, y: 6, titel: "Saurer werdendes Meer",
     text: "Der Ozean nimmt rund 30 % des Kohlendioxids auf, das in die Luft gelangt. Dadurch ist das " +
       "Oberflächenwasser seit Beginn der Industrialisierung um rund 30 % saurer geworden.",
     frage: {
@@ -1307,7 +1325,7 @@ const FRAGEN = [
       "Beschäftigte und Gemeinden nicht allein belasten. Im Spiel entspricht dem die Umstiegshilfe für " +
       "betroffene Betriebe." },
 
-  // ab Runde 5: einzelne Fragen; Runde 4 und 10 bringen nur den Infopunkt
+  // ab Runde 5: ein bis zwei Fragen; Runde 12 hat keine, danach folgt das Abschlussquiz
   { id: "geisternetz", runde: 5, art: "vorab",
     frage: "Was passiert mit Fischernetzen, die im Meer verloren gehen?",
     antworten: [
@@ -1329,6 +1347,12 @@ const FRAGEN = [
     erklaerung: "Als Mikroplastik gelten Teilchen unter 5 mm. Ein großer Teil entsteht, wenn Flaschen, " +
       "Tüten oder Netze durch Sonne und Wellen zerfallen. Wer heute Müll vom Strand holt, verhindert " +
       "also auch das Mikroplastik von morgen." },
+  { id: "flugklima", runde: 7, art: "vorab",
+    frage: "Welcher Anteil der Klimawirkung des Fliegens geht nicht auf das CO2 zurück, sondern vor allem auf " +
+      "Kondensstreifen und Stickoxide?",
+    antworten: ["fast nichts", "etwa ein Zehntel", "etwa ein Drittel", "etwa zwei Drittel"], richtig: 3,
+    erklaerung: "Kondensstreifen-Wolken und Stickoxide machen rund zwei Drittel der Klimawirkung des Luftverkehrs " +
+      "aus, das CO2 etwa ein Drittel (Lee und andere, 2021). Biokraftstoff senkt vor allem den CO2-Anteil." },
   { id: "bestand", runde: 8, art: "spiel",
     frage: "Warum bleibt ein aufgeräumter Strand nicht lange sauber?",
     antworten: [
@@ -1398,17 +1422,6 @@ const START_SPLASH = [
   "Vorbeugen schlägt Aufräumen."
 ];
 
-const FAKT_KATEGORIEN = {
-  nordsee:    { name: "Nordsee",      farbe: "#6CB8E8" },
-  wattenmeer: { name: "Wattenmeer",   farbe: "#7FD1B9" },
-  bedroht:    { name: "Bedroht",      farbe: "#F2867A" },
-  entdeckt:   { name: "Neu entdeckt", farbe: "#B9A3F0" },
-  rueckkehr:  { name: "Rückkehr",     farbe: "#FFD166" },
-  weltmeer:   { name: "Weltmeer",     farbe: "#A9D3EE" },
-  muell:      { name: "Meeresmüll",   farbe: "#F4A261" },
-  klima:      { name: "Klima & Meer", farbe: "#F7A8C8" }
-};
-
 // Fakten für den Ladebildschirm. Jeder Fakt hat eine überprüfbare Quelle (Name + Link), die im
 // Ladebildschirm unter dem Text und im Pop-up „Quellen“ erscheint.
 // Aufbau: titel = die Kernaussage (kurz, mit der wichtigsten Zahl), text = ein bis zwei kurze
@@ -1417,172 +1430,172 @@ const FAKT_KATEGORIEN = {
 // Erst wenn alle Fakten einmal dran waren, wird neu gemischt (siehe naechsterFakt).
 const MEERESFAKTEN = [
   {
-    id: "schweinswal-ostsee", kategorie: "bedroht",
+    id: "schweinswal-ostsee",
     titel: "Nur noch rund 500 Schweinswale in der Ostsee",
     text: "Deutschlands einziger heimischer Wal ist dort akut vom Aussterben bedroht. Viele sterben als Beifang in Stellnetzen.",
     quelle: { name: "Deutsche Umwelthilfe, 2021",
       url: "https://www.duh.de/presse/pressemitteilungen/pressemitteilung/ostsee-schweinswal-vom-aussterben-bedroht-umweltschuetzer-starten-petition-gegen-stellnetze-in-meere/" }
   },
   {
-    id: "schweinswal-nordsee", kategorie: "nordsee",
+    id: "schweinswal-nordsee",
     titel: "Knapp 28.000 Schweinswale in der Nordsee",
     text: "So viele schätzten Fachleute 2019 nach Zählflügen. Am Sylter Außenriff ging der Bestand zuvor stark zurück.",
     quelle: { name: "Bundesamt für Naturschutz, Monitoringbericht 2019",
       url: "https://www.bfn.de/sites/default/files/2022-05/2019-monitoringbericht-schweinswale.pdf" }
   },
   {
-    id: "seehund", kategorie: "wattenmeer",
+    id: "seehund",
     titel: "Seehunde: tiefster Stand seit 2010",
     text: "2023 zählten Fachleute im Wattenmeer 22.621 Tiere, der dritte Rückgang in Folge. Die Ursache ist noch unklar.",
     quelle: { name: "ORF nach Gemeinsamem Wattenmeersekretariat, 2023", url: "https://orf.at/stories/3338410/" }
   },
   {
-    id: "auster", kategorie: "rueckkehr",
+    id: "auster",
     titel: "Eine Auster filtert bis zu 240 Liter am Tag",
     text: "In der Nordsee war sie durch Überfischung fast ausgestorben. Heute wird sie wieder angesiedelt, etwa im Borkum Riffgrund.",
     quelle: { name: "Bundesamt für Naturschutz, Faltblatt 2022",
       url: "https://www.bfn.de/sites/default/files/2022-08/2022-faltblatt-die-wiederansiedlung-der-europaeischen-auster-bfn.pdf" }
   },
   {
-    id: "rochen", kategorie: "bedroht",
+    id: "rochen",
     titel: "Fast alle Haie und Rochen sind bedroht",
     text: "Von zehn heimischen Arten ist nur der Kleingefleckte Katzenhai nicht gefährdet. Hauptursache ist Beifang.",
     quelle: { name: "Umwelt im Unterricht (Bundesumweltministerium)",
       url: "https://www.umwelt-im-unterricht.de/hintergrund/gefaehrdete-arten-rochen-und-haie-in-deutschen-meeren/" }
   },
   {
-    id: "eissturmvogel", kategorie: "nordsee",
+    id: "eissturmvogel",
     titel: "89 % der Eissturmvögel haben Plastik im Magen",
     text: "Untersucht wurden tote Vögel von der Nordseeküste (2019–2023). Bei 48 % war es über 0,1 g, Ziel sind höchstens 10 %.",
     quelle: { name: "Umweltbundesamt, Indikator Kunststoffmüll in der Nordsee",
       url: "https://www.umweltbundesamt.de/daten/umweltindikatoren/indikator-kunststoffmuell-in-der-nordsee" }
   },
   {
-    id: "zugvoegel", kategorie: "wattenmeer",
+    id: "zugvoegel",
     titel: "Bis zu 12 Millionen Zugvögel rasten im Watt",
     text: "Und das jedes Jahr. Das Wattenmeer ist seit 2009 UNESCO-Weltnaturerbe und Heimat von rund 10.000 Arten.",
     quelle: { name: "Landesportal Schleswig-Holstein",
       url: "https://www.schleswig-holstein.de/DE/landesportal/land-und-leute/landschaft-natur/wattenmeer" }
   },
   {
-    id: "stoer", kategorie: "bedroht",
+    id: "stoer",
     titel: "Der Stör wurde bis zu 5,4 Meter lang",
     text: "In Deutschland gilt er seit den 1970er-Jahren als ausgestorben. Seit 2008 werden Jungstöre in Elbe und Havel ausgesetzt.",
     quelle: { name: "Leibniz-Institut für Gewässerökologie (IGB), 2015", url: "https://idw-online.de/de/news630239" }
   },
   {
-    id: "ocean-census", kategorie: "entdeckt",
+    id: "ocean-census",
     titel: "866 neue Meeresarten entdeckt",
     text: "Das meldete Ocean Census 2025, darunter ein Hai. Bekannt sind erst rund 10 % des Lebens im Meer.",
     quelle: { name: "University of Essex, 2025",
       url: "https://www.essex.ac.uk/news/2025/04/14/ocean-census-and-university-of-essex-discover-866-new-species" }
   },
   {
-    id: "korallen", kategorie: "weltmeer",
+    id: "korallen",
     titel: "84 % der Korallenriffe leiden unter Hitze",
     text: "Die vierte weltweite Korallenbleiche läuft seit 2023 und hat Riffe in 82 Ländern und Gebieten erfasst.",
     quelle: { name: "NOAA und International Coral Reef Initiative, 2025",
       url: "https://maritime-executive.com/article/unprecedented-bleaching-event-affects-84-percent-of-world-s-corals" }
   },
   {
-    id: "hochsee", kategorie: "weltmeer",
+    id: "hochsee",
     titel: "Erstmals Schutz für die Hohe See",
     text: "Seit Januar 2026 gilt das UN-Hochseeabkommen. Es erlaubt Schutzgebiete in Meeren, die keinem Staat gehören.",
     quelle: { name: "SeafoodSource, 2025",
       url: "https://www.seafoodsource.com/news/environment-sustainability/high-seas-treaty-crosses-ratification-threshold-enters-force-in-january-2026" }
   },
   {
-    id: "thunfisch", kategorie: "rueckkehr",
+    id: "thunfisch",
     titel: "Der Blauflossenthunfisch ist zurück",
     text: "Über 50 Jahre war er in den nordischen Meeren selten. Heute taucht er wieder auf, Satellitensender verfolgen seine Wege.",
     quelle: { name: "Aarestrup et al., Scientific Reports 2022", url: "https://doi.org/10.1038/s41598-022-15819-x" }
   },
   // ----- Erweiterung: Meeresmüll, Klima, Wattenmeer -----
   {
-    id: "plastik-eintrag", kategorie: "muell",
+    id: "plastik-eintrag",
     titel: "Bis zu 12,7 Millionen Tonnen Plastik ins Meer",
     text: "So viel Plastikmüll gelangte 2010 schätzungsweise aus 192 Küstenländern ins Meer, in nur einem Jahr.",
     quelle: { name: "Jambeck et al., Science 2015", url: "https://doi.org/10.1126/science.1260352" }
   },
   {
-    id: "geisternetze", kategorie: "muell",
+    id: "geisternetze",
     titel: "Fast die Hälfte ist altes Fischernetz",
     text: "Mindestens 46 % des Großen Pazifischen Müllteppichs sind verlorene Netze, sogenannte Geisternetze.",
     quelle: { name: "Lebreton et al., Scientific Reports 2018", url: "https://doi.org/10.1038/s41598-018-22939-w" }
   },
   {
-    id: "tiefsee-tuete", kategorie: "muell",
+    id: "tiefsee-tuete",
     titel: "Eine Plastiktüte in 10.898 Metern Tiefe",
     text: "Ein Tauchroboter filmte sie im Marianengraben. 89 % des gefundenen Tiefseeplastiks waren Einwegprodukte.",
     quelle: { name: "Chiba et al., Marine Policy 2018", url: "https://doi.org/10.1016/j.marpol.2018.03.022" }
   },
   {
-    id: "spuelsaum", kategorie: "muell",
+    id: "spuelsaum",
     titel: "Rund 400 Müllteile auf 100 m Strand",
     text: "So viel liegt im Mittel an der Nordsee, an der Ostsee rund 70. Mindestens 70 % davon sind Kunststoff.",
     quelle: { name: "Umweltbundesamt, Runder Tisch Meeresmüll",
       url: "https://www.umweltbundesamt.de/presse/pressemitteilungen/runder-tisch-gegen-meeresmuell-geht-in-die-zweite" }
   },
   {
-    id: "reifenabrieb", kategorie: "muell",
+    id: "reifenabrieb",
     titel: "Reifenabrieb: Mikroplastik-Quelle Nr. 1",
     text: "In Deutschland bis zu 100.000 Tonnen im Jahr. Über Regenwasser und Flüsse gelangt er bis ins Meer.",
     quelle: { name: "Fraunhofer UMSICHT, 2024", url: "https://idw-online.de/de/news826927" }
   },
   {
-    id: "sauerstoff", kategorie: "weltmeer",
+    id: "sauerstoff",
     titel: "Jeder zweite Atemzug kommt aus dem Meer",
     text: "Etwa die Hälfte des Sauerstoffs der Erde stammt aus dem Meer, vor allem von winzigem Plankton.",
     quelle: { name: "NOAA Ocean Service", url: "https://oceanservice.noaa.gov/facts/ocean-oxygen.html" }
   },
   {
-    id: "versauerung", kategorie: "klima",
+    id: "versauerung",
     titel: "Das Meer ist rund 30 % saurer geworden",
     text: "Es schluckt etwa 30 % des CO₂ aus der Luft. Muscheln und Korallen fällt der Bau ihrer Kalkschalen dadurch schwerer.",
     quelle: { name: "NOAA, Ocean Acidification",
       url: "https://www.noaa.gov/education/resource-collections/ocean-coasts/ocean-acidification" }
   },
   {
-    id: "ozeanwaerme", kategorie: "klima",
+    id: "ozeanwaerme",
     titel: "90 % der Extra-Wärme steckt im Meer",
     text: "Das Meer hat fast die gesamte zusätzliche Wärme des Treibhauseffekts aufgenommen, vor allem in den oberen 700 m.",
     quelle: { name: "NASA, Vital Signs: Ocean Warming", url: "https://climate.nasa.gov/vital-signs/ocean-warming/" }
   },
   {
-    id: "seegras", kategorie: "klima",
+    id: "seegras",
     titel: "Seegras bindet CO₂ bis zu 35-mal schneller",
     text: "Schneller als tropischer Regenwald, pro Fläche. Auf 0,2 % des Meeresbodens speichert es 10 % des Kohlenstoffs im Meer.",
     quelle: { name: "UN-Umweltprogramm (UNEP)",
       url: "https://www.unep.org/news-and-stories/story/seagrass-secret-weapon-fight-against-global-heating" }
   },
   {
-    id: "watt-weltrekord", kategorie: "wattenmeer",
+    id: "watt-weltrekord",
     titel: "Das größte Watt der Welt liegt vor unserer Küste",
     text: "Nirgends gibt es mehr zusammenhängendes Sand- und Schlickwatt. Die Natur läuft hier weitgehend ungestört ab.",
     quelle: { name: "UNESCO-Welterbezentrum", url: "https://whc.unesco.org/en/list/1314" }
   },
   {
-    id: "kegelrobbe", kategorie: "rueckkehr",
+    id: "kegelrobbe",
     titel: "Rekord: 11.515 Kegelrobben gezählt",
     text: "So viele lebten 2024 im Wattenmeer und auf Helgoland, 9 % mehr als im Vorjahr. Sie ist Deutschlands größtes Raubtier.",
     quelle: { name: "Gemeinsames Wattenmeersekretariat, 2024", url: "https://waddensea-worldheritage.org/node/2239" }
   },
   {
-    id: "schutzgebiete", kategorie: "nordsee",
+    id: "schutzgebiete",
     titel: "45 % unserer Meere sind Schutzgebiete",
     text: "In der Nordsee sind es etwa 43 %, in der Ostsee etwa 51 % (Stand April 2024).",
     quelle: { name: "Bundesamt für Naturschutz, Hintergrundpapier 2026",
       url: "https://www.bfn.de/sites/default/files/2026-01/2026%2001%2016%20Hintergrund%20Meere_Schutzgebiete_aktualisiert_pac.pdf" }
   },
   {
-    id: "kabeljau", kategorie: "nordsee",
+    id: "kabeljau",
     titel: "Der Kabeljau flieht nach Norden",
     text: "Das wärmere Wasser vertreibt ihn, wärmeliebende Arten wandern ein. Im Süden seines Gebiets ist er fast verschwunden.",
     quelle: { name: "Umweltbundesamt, Monitoringbericht Klimaanpassung",
       url: "https://www.umweltbundesamt.de/monitoring-zur-das/handlungsfelder/fischerei/fi-i-1/indikator" }
   },
   {
-    id: "tiefsee-gesehen", kategorie: "entdeckt",
+    id: "tiefsee-gesehen",
     titel: "Weniger als 0,001 % der Tiefsee gesehen",
     text: "Mehr haben Menschen bisher nicht vom Tiefseeboden beobachtet: eine Fläche etwa so groß wie Rhode Island.",
     quelle: { name: "NPR nach Bell et al., Science Advances 2025",
@@ -1614,7 +1627,7 @@ function neuerZustand(zufall) {
     strandmuell: MUELL_START,
     eintrag: null,             // erwarteter Eintrag in der aktuellen Runde
     umgesetzt: {},             // id der Maßnahme → Liste der Runden
-    effekte: [],               // { quelle, massnahme, start, ende, wirkung, popup, gemeldet }
+    effekte: [],               // { quelle, massnahme, start, ende, wirkung, gemeldet }
     ereignisPlan: ereignisPlanErstellen(zufall || Math.random),
     ereignis: null,            // Ereignis der aktuellen Runde
     foerderaufruf: null,       // offener EU-Förderaufruf
@@ -1699,7 +1712,7 @@ function aktuellesLevel(runde) {
 function aktiveWirkung(z, runde) {
   const w = {
     eintragStrand: 1, eintragMeer: 1, eintragLand: 1,
-    druckWasser: 0, druckFischerei: 0, druckKlima: 0,
+    druckWasser: 0, druckFischerei: 0, druckKlima: 0, druckFlug: 0,
     tourismus: 0, wirtschaft: 0, artenvielfalt: 0, akzeptanz: 0,
     reinigung: 0, einnahmen: 0
   };
@@ -1742,7 +1755,8 @@ function belastungenBerechnen(w, muell, eintrag, k) {
                       MUELL_DRUCK.bestand * Math.min(1, muell / MUELL_START)),
     wasser:    Math.max(0, Math.round(DRUCK_START.wasser + w.druckWasser + wachstum)),
     fischerei: Math.max(0, DRUCK_START.fischerei + w.druckFischerei),
-    klima:     Math.max(0, DRUCK_START.klima + w.druckKlima)
+    klima:     Math.max(0, DRUCK_START.klima + w.druckKlima),
+    flug:      Math.max(0, DRUCK_START.flug + w.druckFlug)
   };
 }
 
@@ -1751,7 +1765,7 @@ function richtwerteBerechnen(z, w, muellNeu, eintrag) {
   const k = z.kennzahlen;
   const b = belastungenBerechnen(w, muellNeu, eintrag, k);
   const s = sauberkeit(muellNeu);
-  const summe = b.muell + b.wasser + b.fischerei + b.klima;
+  const summe = b.muell + b.wasser + b.fischerei + b.klima + b.flug;
   // Überlaufener Ort: Ab TOURISMUS_GRENZE sinkt die Akzeptanz mit jedem Punkt mehr Gäste
   const ueberlaufen = UEBERLAUFEN * Math.max(0, k.tourismus - TOURISMUS_GRENZE);
   return {
@@ -2185,7 +2199,7 @@ function ereignisAusloesen(z) {
     z.effekte.push({
       quelle: ereignis.titel, massnahme: null,
       start: z.runde, ende: z.runde + e.dauer,
-      wirkung: e.wirkung, popup: null, gemeldet: true
+      wirkung: e.wirkung, gemeldet: true
     });
   });
   if (folge.foerderaufruf) z.foerderaufruf = folge.foerderaufruf;
@@ -2234,7 +2248,7 @@ function rundeAbschliessen(z, auswahl) {
       z.effekte.push({
         quelle: m.name, massnahme: m.id,
         start: start, ende: e.dauer ? start + e.dauer : null,
-        wirkung: e.wirkung, popup: e.popup || null, gemeldet: false
+        wirkung: e.wirkung, gemeldet: false
       });
     });
     if (!z.umgesetzt[m.id]) z.umgesetzt[m.id] = [];
@@ -2247,10 +2261,7 @@ function rundeAbschliessen(z, auswahl) {
   z.effekte.forEach(function (e) {
     if (e.start === r && !e.gemeldet) {
       e.gemeldet = true;
-      bericht.neuWirksam.push({
-        titel: e.popup ? e.popup.titel : e.quelle,
-        text: e.popup ? e.popup.text : wirkungBeschreiben(e.wirkung)
-      });
+      bericht.neuWirksam.push({ titel: e.quelle, text: wirkungBeschreiben(e.wirkung) });
     }
     if (e.ende === r) bericht.ausgelaufen.push({ titel: e.quelle, text: wirkungBeschreiben(e.wirkung) });
   });
@@ -3054,7 +3065,7 @@ function markerAnzeigen() {
 // Müllsymbole an Strand und Land = Strandmüll und Eintrag, gebündelt an den Verursachern (Glas bei der
 // Industrie, Essensreste bei den Hotels, Plastik an Flussmündung und Kiosk), Müll im Fluss und
 // schwimmender Plastikmüll = Eintrag, Fische = Artenvielfalt.
-// Beschriftet sind nur Fabrik, große Hotels und der Kiosk; die Legende öffnet sich über ihrem Knopf links unten.
+// Beschriftet sind nur Fabrik, große Hotels, Kiosk und Flughafen; die Legende öffnet sich über ihrem Knopf links unten.
 const KARTE_B = 800;
 const KARTE_H = 320;
 const STRAND_BREITE = 22;
@@ -3328,7 +3339,7 @@ function meerGlitzerSvg(sicht) {
 }
 
 // Wiese: weiche, etwas dunklere Grasflecken und kleine grüne Grasbüschel im Binnenland
-// (hinter der Dünenkante). Hotels, Fabrik und Fluss bleiben frei.
+// (hinter der Dünenkante). Hotels, Fabrik, Flughafen und Fluss bleiben frei.
 function wiesenSvg() {
   const r = zufallsfolge(83);
   let s = '<g filter="url(#kaWeich)" fill="#A9BC7C">';
@@ -3343,6 +3354,7 @@ function wiesenSvg() {
     const y = 6 + r() * (kuestenlinie(x) - 26);
     if (x > 118 && x < 218) continue;                              // Fluss
     if (x > 420 && x < 760 && y > 14) continue;                    // Ort und Fabrik
+    if (imRechteck(x, y, [FLUGHAFEN.flaeche])) continue;
     let d = "";
     for (let j = 0; j < 3; j++) {
       const neigung = (j - 1) * 1.6 + (r() - 0.5);
@@ -3360,8 +3372,7 @@ function wiesenSvg() {
 const BAEUME = [
   // x, y (Fuß), Größe, Art
   [22, 44, 1.25, "laub"], [52, 27, 1.05, "kiefer"], [80, 66, 1.35, "laub"], [104, 36, 1, "laub"], [38, 88, 0.95, "kiefer"],
-  [224, 26, 1.05, "kiefer"], [294, 78, 1.25, "laub"], [340, 30, 1, "laub"],
-  [786, 28, 1.1, "kiefer"], [772, 56, 0.95, "laub"]
+  [224, 26, 1.05, "kiefer"], [294, 78, 1.25, "laub"], [340, 30, 1, "laub"], [792, 96, 0.95, "laub"]
 ];
 
 function baumSvg(x, y, g, art) {
@@ -3444,13 +3455,14 @@ function baeumeSvg() {
 }
 
 // Strandhafer auf der Dünenkante: kleine Büschel aus drei bis fünf Halmen (Farben wie im Titelbild).
-// Hotels, Fabrik und Fluss bleiben frei.
+// Hotels, Fabrik, Flughafen und Fluss bleiben frei.
 function strandhaferSvg() {
   const r = zufallsfolge(47);
   const farben = ["#A8A05E", "#8D8A4B", "#B4A86A", "#6E7442"];
   const frei = function (x, y) {
     if (x > 120 && x < 230) return false;                        // Fluss und Mündung
     if (x > 420 && x < 770 && y < 104) return false;             // Ort, Fabrik, Steg
+    if (imRechteck(x, y, [FLUGHAFEN.flaeche])) return false;
     return true;
   };
   let s = '<g fill="none" stroke-linecap="round" opacity="0.85">';
@@ -4044,7 +4056,7 @@ function muellSymbolSvg(form, x, y, winkel, groesse, schwimmt) {
 function muellSperrflaechen(z) {
   const flaechen = [
     [612, 26, 74, 54], [434, 16, 76, 76], [508, 72, 44, 33],     // Fabrik, Hotel, Kiosk
-    [730, 90, 22, 80], [647, 76, 10, 34]                           // Hafensteg, Abwasserrohr
+    [730, 90, 22, 80], [647, 76, 10, 34], FLUGHAFEN.flaeche        // Hafensteg, Abwasserrohr, Flughafen
   ];
   if (istUmgesetzt(z, "gewerbe")) {
     flaechen.push([684, 46, 58, 38], [374, 14, 76, 72], [516, 34, 36, 38], [548, 16, 36, 38]);
@@ -4400,20 +4412,108 @@ function windradSvg(x, y, nummer, groesse) {
   return s + '<circle cx="0" cy="' + n + '" r="1.1" fill="#DDE3E6" stroke="#8C9AA4" stroke-width="0.25"/></g>';
 }
 
-// Forschungsboje: gelber Schwimmkörper mit rotem Band, kleiner Mast mit Antenne und Licht, Wellenring
-function bojeSvg(x, y) {
-  return '<ellipse cx="' + x + '" cy="' + (y + 4) + '" rx="8" ry="2" fill="none" stroke="#FFFFFF" stroke-opacity="0.5" stroke-width="0.8"/>' +
-    '<ellipse cx="' + (x + 2.5) + '" cy="' + (y + 4.4) + '" rx="6" ry="1.5" fill="#0B2238" opacity="0.18"/>' +
-    '<path d="M' + x + "," + (y - 4) + " V" + (y - 15) + '" stroke="#5E5A52" stroke-width="1"/>' +
-    '<path d="M' + (x - 2.4) + "," + (y - 11) + " H" + (x + 2.4) + '" stroke="#5E5A52" stroke-width="0.7"/>' +
-    '<circle cx="' + x + '" cy="' + (y - 15.6) + '" r="1.2" fill="#E8662A"/>' +
-    '<path d="M' + (x - 5.6) + "," + y + " A5.6,4.6 0 0 1 " + (x + 5.6) + "," + y + " Q" + x + "," + (y + 5) + " " + (x - 5.6) + "," + y + ' Z" fill="#E2A92B"/>' +
-    '<path d="M' + (x - 5.5) + "," + (y + 0.6) + " Q" + x + "," + (y + 5) + " " + (x + 5.5) + "," + (y + 0.6) + " L" + (x + 5) + "," + (y + 2.4) +
-    " Q" + x + "," + (y + 6) + " " + (x - 5) + "," + (y + 2.4) + ' Z" fill="#C8382E"/>' +
-    '<path d="M' + (x + 1) + "," + (y - 4.4) + " A5.6,4.6 0 0 1 " + (x + 5.6) + "," + y + " Q" + (x + 3.5) + "," + (y + 2.6) + " " + (x + 1.2) + "," + (y + 3) +
-    ' Z" fill="#000000" opacity="0.14"/>' +
-    '<path d="M' + (x - 3.4) + "," + (y - 2.4) + " Q" + (x - 2) + "," + (y - 3.8) + " " + x + "," + (y - 4) +
-    '" fill="none" stroke="#FFFFFF" stroke-opacity="0.6" stroke-width="0.8" stroke-linecap="round"/>';
+// ---------- Flughafen ----------
+// Regionalflughafen rechts oben im Kartenkern: Dort ist er auf jedem Bildschirm sichtbar und liegt nie unter dem
+// Maßnahmen-Fenster. Die Startbahn läuft schräg über den Fabriken, darunter liegen Vorfeld, Tower und Terminal.
+// „Flugverkehr ausbauen“: mehr Flugzeuge auf dem Vorfeld und doppelt so viele Starts.
+// „Biokraftstoff für den Flughafen“: grüner Tank neben dem Terminal.
+const FLUGHAFEN = {
+  bahn: [[702, 6], [796, 22]],       // Mittellinie der Startbahn von West nach Ost
+  bahnBreite: 12,
+  flugzeug: 0.85,                    // Größe der Flugzeuge (Spannweite etwa 13)
+  vorfeld: { x: 744, y: 28, b: 54, h: 18 },
+  flaeche: [698, 0, 102, 64]         // bleibt frei von Müll, Gras und Bäumen (x, y, Breite, Höhe)
+};
+
+// Flugzeug von oben, Nase in Richtung +x, etwa 17 lang und 15 breit
+function flugzeugSvg(x, y, winkel, groesse) {
+  const kante = ' stroke="#8C9AA4" stroke-width="0.35" stroke-linejoin="round"';
+  return '<g transform="translate(' + x.toFixed(1) + "," + y.toFixed(1) + ") rotate(" + winkel + ") scale(" + (groesse || 1) + ')">' +
+    '<path d="M1.6,-0.9 L-2.6,-7.6 L-4.4,-7.6 L-2.4,-0.9 Z M1.6,0.9 L-2.6,7.6 L-4.4,7.6 L-2.4,0.9 Z" fill="#DDE3E7"' + kante + "/>" +
+    '<path d="M-5.6,-0.6 L-7.6,-3.4 L-8.6,-3.4 L-7.6,-0.6 Z M-5.6,0.6 L-7.6,3.4 L-8.6,3.4 L-7.6,0.6 Z" fill="#DDE3E7"' + kante + "/>" +
+    '<rect x="-0.6" y="-4.7" width="2.6" height="1.3" rx="0.6" fill="#9AA7B0"/><rect x="-0.6" y="3.4" width="2.6" height="1.3" rx="0.6" fill="#9AA7B0"/>' +
+    '<path d="M8.2,0 C8.2,-1 7,-1.3 5.6,-1.3 L-7.4,-1 C-8.4,-0.8 -8.8,-0.3 -8.8,0 C-8.8,0.3 -8.4,0.8 -7.4,1 L5.6,1.3 C7,1.3 8.2,1 8.2,0 Z" fill="#F7F9FA"' + kante + "/>" +
+    '<path d="M6.5,-0.75 Q7.5,0 6.5,0.75" fill="none" stroke="#2F5F86" stroke-width="0.6"/>' +
+    '<path d="M-6.4,0 H-8.5" stroke="#E8662A" stroke-width="1.1" stroke-linecap="round"/>' +
+    "</g>";
+}
+
+// Boden: Grasstreifen, Startbahn mit Markierungen, Rollweg und Vorfeld. Liegt unter Rauch und Gebäuden.
+function flughafenBodenSvg() {
+  const p0 = FLUGHAFEN.bahn[0];
+  const p1 = FLUGHAFEN.bahn[1];
+  const d = richtung(p0, p1);
+  // Punkt auf der Bahn: t = 0 (West) bis 1 (Ost), q = Abstand quer zur Mittellinie
+  const punkt = function (t, q) {
+    return [p0[0] + (p1[0] - p0[0]) * t - d[1] * q, p0[1] + (p1[1] - p0[1]) * t + d[0] * q];
+  };
+  const streifen = function (t0, t1, q0, q1) { return vieleck([punkt(t0, q0), punkt(t1, q0), punkt(t1, q1), punkt(t0, q1)]); };
+  const linie = function (a, b) { return "M" + a[0].toFixed(1) + "," + a[1].toFixed(1) + " L" + b[0].toFixed(1) + "," + b[1].toFixed(1) + " "; };
+  const halb = FLUGHAFEN.bahnBreite / 2;
+  const v = FLUGHAFEN.vorfeld;
+  let s = '<path d="' + streifen(-0.04, 1.03, -halb - 3, halb + 3) + '" fill="#B9C792" opacity="0.75"/>';
+  // Rollweg von der Bahn zum Vorfeld, dann Vorfeld und Bahn
+  s += '<path d="' + linie(punkt(0.72, 0), [v.x + 26, v.y + 2]) + '" stroke="#7C858B" stroke-width="4" stroke-linecap="round"/>';
+  s += '<rect x="' + v.x + '" y="' + v.y + '" width="' + v.b + '" height="' + v.h + '" rx="2" fill="#A9B1B6"/>';
+  s += '<path d="' + streifen(0, 1, -halb, halb) + '" fill="#6B747A"/>';
+  let weiss = linie(punkt(0.02, -halb + 0.9), punkt(0.98, -halb + 0.9)) + linie(punkt(0.02, halb - 0.9), punkt(0.98, halb - 0.9));
+  [-3.6, -1.2, 1.2, 3.6].forEach(function (q) {
+    weiss += linie(punkt(0.02, q), punkt(0.07, q)) + linie(punkt(0.93, q), punkt(0.98, q));
+  });
+  s += '<path d="' + weiss + '" stroke="#FFFFFF" stroke-opacity="0.85" stroke-width="0.5"/>';
+  s += '<path d="' + linie(punkt(0.1, 0), punkt(0.9, 0)) + '" stroke="#FFFFFF" stroke-width="0.6" stroke-dasharray="4 3"/>';
+  // gelbe Führungslinien zu den Abstellplätzen
+  s += '<path d="M' + (v.x + 4) + "," + (v.y + 3) + " H" + (v.x + v.b - 4) + '" stroke="#E2C14A" stroke-width="0.5"/>';
+  return s;
+}
+
+// Gebäude und abgestellte Flugzeuge als Einträge für die Gebäudeliste der Karte (nach Unterkante sortiert)
+function flughafenGebaeude(z) {
+  const v = FLUGHAFEN.vorfeld;
+  const flugzeuge = istUmgesetzt(z, "flugverkehr") ? [758, 773, 788] : [758];
+  const liste = [{ unten: v.y + v.h, svg: flugzeuge.map(function (x) { return flugzeugSvg(x, v.y + 9, 90, FLUGHAFEN.flugzeug); }).join("") }];
+  // Tower: schmaler Schaft mit verglaster Kanzel und Antenne
+  let tower = quaderSvg(744, 38, 4, 24, 3, { front: "#DDE3E6", seite: "#B6C0C6", dach: "#EEF1F2" });
+  tower += quaderSvg(742.4, 33.6, 7.2, 4.4, 4, { front: "#2F5F86", seite: "#244B6B", dach: "#E9EDEF" }) +
+    '<path d="M743,35 H749" stroke="#9CC7E0" stroke-width="0.6"/>' +
+    '<path d="M747.2,31.5 V27.5" stroke="#5E5A52" stroke-width="0.5"/>';
+  // Terminal: Glasfront, blaues Schild, Eingang
+  const tx = 752;
+  const oben = 50;
+  let terminal = quaderSvg(tx, oben, 34, 12, 9, { front: "#EEF2F3", seite: "#C3CDD2", dach: "#F7F9FA" });
+  terminal += '<rect x="' + (tx + 1.5) + '" y="' + (oben + 5.6) + '" width="31" height="4.4" fill="url(#kaGlas)" stroke="#6F8796" stroke-opacity="0.6" stroke-width="0.4"/>';
+  let pfosten = "";
+  for (let px = tx + 5.5; px < tx + 32; px += 4) pfosten += "M" + px + "," + (oben + 5.6) + " V" + (oben + 10) + " ";
+  terminal += '<path d="' + pfosten + '" stroke="#6F8796" stroke-opacity="0.7" stroke-width="0.4"/>' +
+    '<rect x="' + (tx + 14.5) + '" y="' + (oben + 7.4) + '" width="5" height="4.6" fill="#3D4F5E"/>' +
+    '<rect x="' + (tx + 5) + '" y="' + (oben + 1.1) + '" width="24" height="3.6" rx="0.8" fill="#1D4F8C"/>' +
+    '<text x="' + (tx + 17) + '" y="' + (oben + 3.85) + '" text-anchor="middle" font-size="2.9" font-weight="700" ' +
+    'letter-spacing="0.4" fill="#ffffff">FLUGHAFEN</text>';
+  liste.push({ unten: 62, svg: tower }, { unten: 62, svg: terminal });
+  if (istUmgesetzt(z, "biokraftstoff")) liste.push({ unten: 62, svg: tankSvg(790, 62) });
+  return liste;
+}
+
+// Grüner Tank für nachhaltigen Flugkraftstoff mit weißem Blatt. (x, unten) = linke Kante am Boden
+function tankSvg(x, unten) {
+  return '<rect x="' + x + '" y="' + (unten - 8) + '" width="7" height="8" fill="#3E8E5A"/>' +
+    '<rect x="' + (x + 4.4) + '" y="' + (unten - 8) + '" width="2.6" height="8" fill="#000000" opacity="0.16"/>' +
+    '<ellipse cx="' + (x + 3.5) + '" cy="' + (unten - 8) + '" rx="3.5" ry="1.3" fill="#6FB386"/>' +
+    '<path d="M' + (x + 2) + "," + (unten - 2.4) + " Q" + (x + 2.2) + "," + (unten - 5.6) + " " + (x + 5) + "," + (unten - 6) +
+    " Q" + (x + 4.8) + "," + (unten - 2.8) + " " + (x + 2) + "," + (unten - 2.4) + ' Z" fill="#FFFFFF"/>';
+}
+
+// Startendes Flugzeug: rollt von Osten über die Bahn, hebt ab, steigt nach Westen und wird dabei größer (näher)
+// und blasser. Mit ausgebautem Flugverkehr startet doppelt so oft eine Maschine.
+function abflugSvg(z) {
+  const p0 = FLUGHAFEN.bahn[0];
+  const p1 = FLUGHAFEN.bahn[1];
+  const winkel = Math.atan2(p0[1] - p1[1], p0[0] - p1[0]) * 180 / Math.PI;
+  const bahn = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
+  const dauer = istUmgesetzt(z, "flugverkehr") ? 10 : 20;
+  return '<g transform="translate(' + p1[0] + "," + p1[1] + ") rotate(" + winkel.toFixed(1) + ')">' +
+    '<g class="ka-abflug" style="--bahn:' + bahn.toFixed(1) + "px;--steigen:" + (bahn + 90).toFixed(1) + "px;" + animStil(dauer) + '">' +
+    flugzeugSvg(0, 0, 0, FLUGHAFEN.flugzeug) + "</g></g>";
 }
 
 // Hinweisschild „Müll in den Eimer“: gelbe Raute mit weißem Rand auf einem Pfosten, darauf eine Figur,
@@ -4620,6 +4720,7 @@ function seekarteSvg(z, sicht) {
   s += wiesenSvg();
   s += strandhaferSvg();
   s += baeumeSvg();
+  s += flughafenBodenSvg();
 
   // Brutzone am Strand: rot gestrichelter Bereich links der Flussmündung, mit Schild.
   // Das Schild steht links, damit Müllfänger und Infopunkte am Strand frei bleiben.
@@ -4684,12 +4785,9 @@ function seekarteSvg(z, sicht) {
   s += '<line x1="652" y1="76" x2="652" y2="' + yRohrEnde + '" stroke="#4D5B66" stroke-width="3.4" stroke-linecap="round"/>' +
     '<line x1="652" y1="76" x2="652" y2="' + yRohrEnde + '" stroke="#A9B3BA" stroke-width="1.4" stroke-linecap="round"/>';
 
-  // Rauch steigt aus den Schornsteinen, solange das CO2-Gesetz noch nicht wirkt.
-  // Er liegt unter den Gebäuden und quillt so oben aus dem Schornstein heraus.
-  if (!wirksam("co2")) {
-    s += rauchSvg(schornsteinSpitze(616, 46, 62, 30), 1, 0);
-    if (gewerbe) s += rauchSvg(schornsteinSpitze(688, 56, 46, 24), 0.75, 1.3);
-  }
+  // Rauch steigt aus den Schornsteinen. Er liegt unter den Gebäuden und quillt so oben aus dem Schornstein heraus.
+  s += rauchSvg(schornsteinSpitze(616, 46, 62, 30), 1, 0);
+  if (gewerbe) s += rauchSvg(schornsteinSpitze(688, 56, 46, 24), 0.75, 1.3);
 
   // Gebäude mit weichem Schatten, von hinten nach vorne gezeichnet (nach Unterkante),
   // damit vordere Gebäude die hinteren überdecken
@@ -4703,6 +4801,7 @@ function seekarteSvg(z, sicht) {
   // Fabrik mit Schornstein; mit „Gewerbegebiet erweitern“ eine zweite, kleinere Fabrik rechts daneben
   gebaeude.push({ unten: 76, svg: fabrikSvg(616, 46, 62, 30, 4, 7.6) });
   if (gewerbe) gebaeude.push({ unten: 80, svg: fabrikSvg(688, 56, 46, 24, 3, 6.2) });
+  Array.prototype.push.apply(gebaeude, flughafenGebaeude(z));
   s += '<g filter="url(#kaSchatten)">' + gebaeude.sort(function (a, b) { return a.unten - b.unten; }).map(function (g) {
     return g.svg;
   }).join("") + "</g>";
@@ -4737,8 +4836,8 @@ function seekarteSvg(z, sicht) {
     hinweisSchildOrte().forEach(function (o) { s += hinweisSchildSvg(o.x, o.y); });
   }
 
-  // Forschungsboje
-  if (istUmgesetzt(z, "forschung")) s += bojeSvg(420, 192);      // außerhalb des Windparks
+  // Startendes Flugzeug über allem anderen
+  s += abflugSvg(z);
 
   // Treibgut im Wasser (Eintrag): Plastikflaschen und -tüten nahe dem Strand
   s += treibgutSvg(treibgutAnzahl(z));
@@ -4776,6 +4875,8 @@ function seekarteAnzeigen() {
   const eintraege = [
     [legendenSvg(legendeGebaeude(hotelGrossSvg(0, 0)), "-2 -56 62 58"), "Hotel", true],
     [legendenSvg(legendeGebaeude(kioskSvg(0, 0)), "-3 -24 34 25"), "Strandkiosk", true],
+    [legendenSvg(flugzeugSvg(0, 0, -25, 1), "-10 -9 20 18"), "Flughafen", true],
+    [legendenSvg(tankSvg(0, 0), "-2 -10 11 11"), "Biokraftstoff-Tank", istUmgesetzt(z, "biokraftstoff")],
     [legendenSymbol("flasche", -20, 1.1), "Plastikmüll", arten.plastik],
     [legendenSymbol("scherbe", -15, 1.05), "Glas", arten.glas],
     [legendenSymbol("apfel", 0, 1.1), "Essensreste", arten.essen],
@@ -4847,7 +4948,8 @@ function einfuehrungSeiten() {
       titel: "Willkommen, " + escapeHtml(spielerName) + "!",
       html:
         "<p>Du bist <strong>Küstenmanager:in</strong> einer Region an der Nordsee, direkt am Wattenmeer.</p>" +
-        "<p>Der Strand und das Meer sind hier stark mit Müll belastet. Außerdem setzen Abwasser und Fischerei den Tieren zu.</p>"
+        "<p>Der Strand und das Meer sind hier stark mit Müll belastet. Außerdem setzen Abwasser, Fischerei und der Lärm des " +
+        "Flughafens den Tieren zu.</p>"
     },
     {
       titel: "Dein Ziel: ein guter Umweltzustand!",
@@ -4948,7 +5050,7 @@ function zielBalkenAnimieren(inhalt) {
 
 // Minikarte: herangezoomter Ausschnitt der Karte (x, y, Breite, Höhe; Seitenverhältnis wie die Karte)
 // um die Flussmündung mit Strand, Fluss und Treibgut, wo zu Spielbeginn viel Müll liegt.
-// Der Müll im Ausschnitt verschwindet nach und nach von links nach rechts, drei verteilte Teile bleiben liegen.
+// Der Müll im Ausschnitt verschwindet ab 0,8 s nach und nach von links nach rechts, drei verteilte Teile bleiben liegen.
 const MINIKARTE = [160, 70, 250, 100];
 
 function minikarteAufraeumen(inhalt) {
@@ -4970,7 +5072,7 @@ function minikarteAufraeumen(inhalt) {
   const ruhig = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   weg.forEach(function (t, i) {
     t.el.style.transition = "opacity 0.6s ease, transform 0.6s ease";
-    t.el.style.transitionDelay = ruhig ? "0s" : (1 + i * 4 / weg.length).toFixed(2) + "s";
+    t.el.style.transitionDelay = ruhig ? "0s" : (0.8 + i * 4 / weg.length).toFixed(2) + "s";
   });
   // zwei Bilder warten, damit der volle Ist-Zustand erst gezeichnet ist
   requestAnimationFrame(function () {
@@ -5967,13 +6069,9 @@ function ladeNaechsterFakt() {
 }
 
 function ladeFaktZeigen(f) {
-  const kat = FAKT_KATEGORIEN[f.kategorie];
   const karte = el("ladeKarte");
   karte.classList.remove("fakt-ein");
   void karte.offsetWidth;                          // Einblendung neu starten
-  const chip = el("ladeKategorie");
-  chip.textContent = kat.name;
-  chip.style.setProperty("--kat", kat.farbe);
   el("ladeTitel").textContent = f.titel;
   el("ladeText").textContent = f.text;
   const quelle = el("ladeQuelle");
@@ -6180,6 +6278,10 @@ function quellenZeigen() {
     "<p>Arten und Aussehen (" + escapeHtml(FISCH_ARTEN.map(function (a) { return a.name; }).join(", ")) + ") nach: " +
     '<a href="https://www.schutzstation-wattenmeer.de/wissen/tiere/fische/" target="_blank" rel="noopener noreferrer">' +
     "Schutzstation Wattenmeer, Fische der Nordsee</a></p>";
+  html += "<h3>Flughafen und Flugverkehr</h3><ul class=\"liste-kompakt\">" + QUELLEN_FLUGVERKEHR.map(function (q) {
+    return '<li>' + escapeHtml(q.thema) + ': <a href="' + escapeHtml(q.url) + '" target="_blank" rel="noopener noreferrer">' +
+      escapeHtml(q.name) + "</a></li>";
+  }).join("") + "</ul>";
   html += '<p class="klein">Die Fakten zeigen den Stand der jeweiligen Quelle. Zahlen zu Beständen ändern ' +
     "sich mit jeder neuen Zählung.</p>";
   el("quellenInhalt").innerHTML = html;
@@ -7015,7 +7117,7 @@ if (typeof module !== "undefined" && module.exports) {
     angebot: angebot, kostenBerechnen: kostenBerechnen, quizFuerRunde: quizFuerRunde,
     abschlussFragen: abschlussFragen, quizAntwortWerten: quizAntwortWerten, FRAGEN: FRAGEN, INFOPUNKTE: INFOPUNKTE,
     istUmgesetzt: istUmgesetzt, einnahmenBerechnen: einnahmenBerechnen,
-    MEERESFAKTEN: MEERESFAKTEN, FAKT_KATEGORIEN: FAKT_KATEGORIEN, LADEBILDSCHIRM: LADEBILDSCHIRM,
+    MEERESFAKTEN: MEERESFAKTEN, LADEBILDSCHIRM: LADEBILDSCHIRM,
     ladeGesamtFortschritt: ladeGesamtFortschritt, ladePhase: ladePhase,
     naechsterFakt: naechsterFakt, faktenZiehen: faktenZiehen
   };

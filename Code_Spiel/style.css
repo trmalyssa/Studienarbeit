@@ -370,7 +370,7 @@ button {
 .karten-hinweis.warnung { color: var(--rot); }
 
 /* ===== Seekarte: Bewegung =====
-   Wenige, ruhige Bewegungen wie im Titelbild: Fische, Rauch, Abwasserfahne, Flussströmung, Windräder.
+   Wenige, ruhige Bewegungen wie im Titelbild: Fische, Rauch, Abwasserfahne, Flussströmung, Windräder, Flugzeug.
    Dauer und Startpunkt setzt script.js pro Teil (animStil), damit beim Neuzeichnen nichts springt.
    Bei „Bewegung reduzieren“ schaltet die Regel am Ende der Datei alles ab. */
 .seekarte .ka-fisch {
@@ -419,6 +419,21 @@ button {
   transform-box: fill-box;
   transform-origin: center;
   animation: ka-drehen 5s linear infinite;
+}
+
+/* Flugzeug: wartet am Ostende der Bahn, rollt los, hebt ab und steigt nach Westen; beim Steigen wird es größer
+   (näher am Betrachter) und blasser. Bei „Bewegung reduzieren“ steht es am Bahnende. */
+.seekarte .ka-abflug {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ka-abflug 20s ease-in infinite;
+}
+
+@keyframes ka-abflug {
+  0%, 30% { transform: translateX(0) scale(1); opacity: 0; }
+  36%     { transform: translateX(0) scale(1); opacity: 1; }
+  70%     { transform: translateX(var(--bahn)) scale(1.1); opacity: 1; }
+  100%    { transform: translateX(var(--steigen)) scale(2); opacity: 0; }
 }
 
 /* Nagelrochen: „fliegt“ mit langsamen Flügelschlägen */
@@ -2073,30 +2088,7 @@ button {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-.fakt-kategorie {
-  --kat: #9CCBE5;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 3px 13px 3px 10px;
-  font-size: 0.92rem;
-  font-weight: 600;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
-}
-
-.fakt-kategorie::before {
-  content: "";
-  width: 10px;
-  height: 10px;
-  background: var(--kat);
-  border-radius: 50%;
-}
-
 .fakt-titel {
-  margin-top: 16px;
   font-size: 1.35rem;
   font-weight: 600;
   line-height: 1.25;
