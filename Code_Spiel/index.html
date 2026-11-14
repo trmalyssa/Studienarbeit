@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="style.css?v=24">
+  <link rel="stylesheet" href="style.css?v=25">
 </head>
 <body>
 
@@ -65,18 +65,16 @@
 
   <!-- ===== Spielfläche =====
        Die Karte füllt den Bildschirm unter der Kopfleiste. Darüber liegen: links oben der Zustand der Region
-       (kompakt, auf- und zuklappbar), oben mittig ein Hinweis, was als Nächstes zu tun ist, links unten der
-       Knopf für die Legende und rechts unten das Maßnahmen-Fenster (auf- und zuklappbar) mit „Runde beenden“.
+       (kompakt, auf- und zuklappbar) und rechts unten das Maßnahmen-Fenster (auf- und zuklappbar) mit
+       „Runde beenden“. In Runde 1 erklärt der Otter auf der Karte, was als Nächstes zu tun ist.
        Auf schmalen Bildschirmen steht alles untereinander. -->
   <main id="layout">
     <section class="karten-rahmen" aria-label="Karte deiner Küstenregion">
       <div id="seekarte" class="seekarte" role="img"
            aria-label="Karte der Küstenregion mit Strand, Fluss, Ort, Hafen und Meer. Sie zeigt Müll, Fische und Wasserqualität."></div>
-      <!-- Infopunkte und Personen mit Sprechblasen liegen als Knöpfe über der Karte -->
+      <!-- Infopunkte, Personen und Otter mit Sprechblasen liegen über der Karte -->
       <div id="personen" class="personen-ebene"></div>
     </section>
-
-    <p id="anhoerungHinweis" class="karten-hinweis" aria-live="polite"></p>
 
     <section id="kennzahlen" class="hud-fenster zustand-fenster" aria-label="Zustand der Region">
       <button id="zustandKlappe" class="fenster-kopf" type="button" aria-expanded="true" aria-controls="zustandInhalt">
@@ -91,15 +89,6 @@
       <div id="kennzahlenKurz" class="kennzahlen-kurz" hidden></div>
     </section>
 
-    <div class="legenden-ecke">
-      <section id="legendeInhalt" class="hud-fenster legenden-tafel" aria-labelledby="legendeTitel" hidden>
-        <h2 id="legendeTitel">Legende</h2>
-        <ul id="kartenLegende" class="legende"></ul>
-      </section>
-      <button id="legendeKnopf" class="legende-knopf" type="button" aria-expanded="false" aria-controls="legendeInhalt"
-              aria-label="Legende anzeigen" title="Legende">i</button>
-    </div>
-
     <section id="entscheidungen" class="hud-fenster massnahmen-fenster" aria-label="Maßnahmen der Runde">
       <button id="massnahmenKlappe" class="fenster-kopf" type="button" aria-expanded="true" aria-controls="massnahmenInhalt">
         <span class="fenster-titel">Maßnahmen der Runde</span>
@@ -113,7 +102,7 @@
       </div>
       <div class="fenster-fuss">
         <div id="auswahlUebersicht" class="auswahl-uebersicht" aria-live="polite"></div>
-        <button id="naechsteRunde" class="haupt-knopf" type="button" aria-describedby="anhoerungHinweis">Runde beenden</button>
+        <button id="naechsteRunde" class="haupt-knopf" type="button">Runde beenden</button>
       </div>
     </section>
   </main>
@@ -452,6 +441,6 @@
     </div>
   </div>
 
-  <script src="script.js?v=25"></script>
+  <script src="script.js?v=26"></script>
 </body>
 </html>

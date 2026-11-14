@@ -4,7 +4,7 @@
 
 /* ===== Grundwerte (zentral änderbar) ===== */
 :root {
-  --layout-version: 13;       /* script.js prüft diesen Wert, damit HTML, CSS und JS zusammenpassen */
+  --layout-version: 14;       /* script.js prüft diesen Wert, damit HTML, CSS und JS zusammenpassen */
   --tinte: #12304A;          /* Linien und Text wie auf einer Seekarte */
   --tinte-2: #3E5A70;        /* zweitrangiger Text */
   --tinte-3: #687F91;        /* Hinweise */
@@ -18,7 +18,6 @@
   --gelb: #E2A92B;
   --orange: #E8662A;         /* Rettungsweste: Hauptaktion */
   --orange-dunkel: #C9531C;
-  --magenta: #B0307A;        /* Sperrgebiet auf Seekarten */
   --blau: #1D4F8C;
   --kopfhoehe: 68px;
   --zustand-breite: 250px;   /* Zustand der Region, links oben über der Karte */
@@ -304,8 +303,7 @@ button {
 .kopf-knopf:hover { background: rgba(255, 255, 255, 0.12); }
 
 /* ===== Hauptlayout: Karte füllt den Bildschirm unter der Kopfleiste ===== */
-/* Darüber liegen Hinweis (oben mittig), Zustand der Region (links oben), Legendenknopf (links unten)
-   und Maßnahmen-Fenster (rechts unten). */
+/* Darüber liegen Zustand der Region (links oben) und Maßnahmen-Fenster (rechts unten). */
 #layout {
   position: fixed;
   inset: var(--kopfhoehe) 0 0 0;
@@ -345,38 +343,24 @@ button {
   border-radius: 10px;
 }
 
-/* Was als Nächstes zu tun ist: Hinweis oben mittig zwischen Zustand (links) und Maßnahmen-Fenster (rechts) */
-.karten-hinweis {
-  position: absolute;
-  top: 12px;
-  left: calc(var(--zustand-breite) + 2 * var(--abstand) +
-    (100% - var(--zustand-breite) - var(--fenster-breite) - 4 * var(--abstand)) / 2);
-  z-index: 4;
-  width: max-content;
-  max-width: min(560px, calc(100% - var(--zustand-breite) - var(--fenster-breite) - 6 * var(--abstand)));
-  padding: 8px 18px;
-  font-size: 0.9rem;
-  line-height: 1.4;
-  text-align: center;
-  color: var(--tinte);
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 18px;
-  box-shadow: 0 4px 14px rgba(11, 34, 56, 0.2);
-  transform: translateX(-50%);
-  pointer-events: none;
-}
-
-.karten-hinweis:empty { display: none; }
-.karten-hinweis.warnung { color: var(--rot); }
-
 /* ===== Seekarte: Bewegung =====
-   Wenige, ruhige Bewegungen wie im Titelbild: Fische, Rauch, Abwasserfahne, Flussströmung, Windräder, Flugzeug.
+   Wenige, ruhige Bewegungen wie im Titelbild: Fische, Landtiere, Rauch, Abwasserfahne, Flussströmung, Windräder,
+   Flugzeug.
    Dauer und Startpunkt setzt script.js pro Teil (animStil), damit beim Neuzeichnen nichts springt.
    Bei „Bewegung reduzieren“ schaltet die Regel am Ende der Datei alles ab. */
-.seekarte .ka-fisch {
+.seekarte .ka-fisch,
+.seekarte .ka-landtier {
   transform-box: fill-box;
   transform-origin: center;
-  animation: ka-fisch-schwimmen 18s ease-in-out infinite;
+  animation: ka-hin-und-her 18s ease-in-out infinite;
+}
+
+/* Kaninchen und Hasen hoppeln beim Laufen */
+.seekarte .ka-hoppeln { animation: ka-hoppeln 0.9s ease-in-out infinite; }
+
+@keyframes ka-hoppeln {
+  0%, 55%, 100% { transform: translateY(0); }
+  25%           { transform: translateY(-1.6px); }
 }
 
 .seekarte .ka-fisch-schwanz {
@@ -421,8 +405,9 @@ button {
   animation: ka-drehen 5s linear infinite;
 }
 
-/* Flugzeug: wartet am Ostende der Bahn, rollt los, hebt ab und steigt nach Westen; beim Steigen wird es größer
-   (näher am Betrachter) und blasser. Bei „Bewegung reduzieren“ steht es am Bahnende. */
+/* Flugzeug: wartet am Ostende der Bahn, rollt nach Westen, hebt ab und steigt nach links oben (21° wie die
+   Strecke von --rollen nach --steigen-x/-y); beim Steigen wird es größer (näher am Betrachter) und blasser.
+   Bei „Bewegung reduzieren“ steht es am Bahnende. */
 .seekarte .ka-abflug {
   transform-box: fill-box;
   transform-origin: center;
@@ -430,10 +415,10 @@ button {
 }
 
 @keyframes ka-abflug {
-  0%, 30% { transform: translateX(0) scale(1); opacity: 0; }
-  36%     { transform: translateX(0) scale(1); opacity: 1; }
-  70%     { transform: translateX(var(--bahn)) scale(1.1); opacity: 1; }
-  100%    { transform: translateX(var(--steigen)) scale(2); opacity: 0; }
+  0%, 30% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 0; }
+  36%     { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+  66%     { transform: translate(var(--rollen), 0) rotate(0deg) scale(1); opacity: 1; }
+  100%    { transform: translate(var(--steigen-x), var(--steigen-y)) rotate(21deg) scale(1.6); opacity: 0; }
 }
 
 /* Nagelrochen: „fliegt“ mit langsamen Flügelschlägen */
@@ -456,8 +441,8 @@ button {
   to   { transform: scaleY(0.8); }
 }
 
-/* Fisch schwimmt geradeaus (Kopf voran), wendet, schwimmt zurück und wendet wieder */
-@keyframes ka-fisch-schwimmen {
+/* Fisch oder Landtier bewegt sich geradeaus (Kopf voran), wendet, kommt zurück und wendet wieder */
+@keyframes ka-hin-und-her {
   0%   { transform: translateX(0) scaleX(1); }
   45%  { transform: translateX(var(--weg)) scaleX(1); }
   50%  { transform: translateX(var(--weg)) scaleX(-1); }
@@ -582,10 +567,51 @@ button {
 
 .otter-figur {
   display: block;
-  width: calc(var(--figur) * 1.9);
-  height: calc(var(--figur) * 1.56);
+  width: calc(var(--figur) * 2.6);
+  height: calc(var(--figur) * 2.14);
   animation: schaukeln 3.2s ease-in-out infinite;
 }
+
+/* Runde 1: Der Otter erklärt in einer großen Sprechblase rechts neben sich, was als Nächstes zu tun ist */
+.person.otter.erklaert {
+  cursor: default;
+  pointer-events: none;
+}
+
+.otter-sprechblase {
+  position: absolute;
+  top: 40%;
+  left: calc(100% + 12px);
+  width: max-content;
+  max-width: min(280px, 26vw);
+  margin: 0;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--tinte);
+  background: #fff;
+  border: 1.5px solid var(--tinte);
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(11, 34, 56, 0.2);
+  transform: translateY(-50%);
+}
+
+.otter-sprechblase::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: -6px;
+  width: 9px;
+  height: 9px;
+  margin-top: -4.5px;
+  background: #fff;
+  border-left: 1.5px solid var(--tinte);
+  border-bottom: 1.5px solid var(--tinte);
+  transform: rotate(45deg);
+}
+
+.otter-sprechblase:empty { display: none; }
+.otter-sprechblase.warnung { color: var(--rot); }
 
 .person.otter .person-blase {
   color: var(--orange);
@@ -728,66 +754,6 @@ button {
   display: block;
   width: 100%;
   height: 100%;
-}
-
-.legende {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  margin: 8px 0 0;
-  padding: 0;
-  font-size: 0.8rem;
-  color: var(--tinte-2);
-  list-style: none;
-}
-
-.legende li {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-/* Legendenzeichen aus CSS */
-.lg {
-  display: inline-block;
-  flex: none;
-}
-
-/* Symbole in der Legende (SVG aus script.js) */
-.lg-symbol {
-  flex: none;
-  width: 20px;
-  height: 15px;
-}
-
-.lg-wasser {
-  width: 22px;
-  height: 9px;
-  background: linear-gradient(90deg, #8AA492, #3F84B5);
-  border-radius: 2px;
-}
-
-/* unregelmäßige Fahne wie auf der Karte */
-.lg-abwasser {
-  width: 16px;
-  height: 11px;
-  background: #8A6A3B;
-  border-radius: 30% 70% 55% 45% / 25% 45% 75% 60%;
-  opacity: 0.55;
-}
-
-.lg-schutz {
-  width: 16px;
-  height: 10px;
-  border: 1.5px dashed var(--magenta);
-}
-
-.lg-brut {
-  width: 16px;
-  height: 10px;
-  background: rgba(200, 56, 46, 0.1);
-  border: 1.5px dashed var(--rot);
-  border-radius: 2px;
 }
 
 /* ===== Strandmüll: Pop-up „neuer Müll pro Runde“ ===== */
@@ -962,63 +928,6 @@ button {
   height: 8px;
   border-radius: 50%;
 }
-
-/* Legende: kleiner Knopf links unten, öffnet die Legende darüber */
-.legenden-ecke {
-  position: absolute;
-  left: var(--abstand);
-  bottom: var(--abstand);
-  z-index: 6;
-}
-
-.legende-knopf {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  padding: 0;
-  font-family: Georgia, serif;
-  font-size: 1.25rem;
-  font-style: italic;
-  font-weight: 700;
-  color: #111;
-  background: #fff;
-  border: 1px solid var(--linie);
-  border-radius: 8px;
-  box-shadow: 0 4px 14px rgba(11, 34, 56, 0.25);
-  cursor: pointer;
-}
-
-.legende-knopf:hover { background: var(--papier); }
-
-.legende-knopf:focus-visible {
-  outline: 3px solid var(--orange);
-  outline-offset: 2px;
-}
-
-/* neues Symbol seit dem letzten Öffnen */
-.legende-knopf.neu::after {
-  content: "";
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  width: 11px;
-  height: 11px;
-  background: var(--orange);
-  border: 2px solid #fff;
-  border-radius: 50%;
-}
-
-.legenden-tafel {
-  position: absolute;
-  left: 0;
-  bottom: 48px;
-  width: min(320px, calc(100vw - 2 * var(--abstand)));
-  padding: 12px 16px 14px;
-}
-
-.legenden-tafel[hidden] { display: none; }
 
 .kennzahlen-liste {
   display: grid;
@@ -3039,6 +2948,25 @@ details[open] > summary .bericht-pfeil { transform: rotate(180deg); }
 @media (max-width: 860px) {
   .person-name,
   .marker-name { display: none; }
+  /* Sprechblase des Otters über ihm statt daneben, Spitze nach unten */
+  .otter-sprechblase {
+    top: auto;
+    bottom: 100%;
+    left: 50%;
+    max-width: 60vw;
+    margin-bottom: 8px;
+    font-size: 0.75rem;
+    transform: translateX(-50%);
+  }
+  .otter-sprechblase::after {
+    top: auto;
+    bottom: -6px;
+    left: 50%;
+    margin: 0 0 0 -4.5px;
+    border-left: none;
+    border-right: 1.5px solid var(--tinte);
+    transform: rotate(45deg);
+  }
   :root { --kopfhoehe: auto; }
   #kopfleiste {
     position: static;
@@ -3053,7 +2981,7 @@ details[open] > summary .bericht-pfeil { transform: rotate(180deg); }
     margin-right: 0;
   }
   .kopf-knopf { margin-left: auto; }
-  /* Karte oben (etwas höher als ihr Kern), darunter Hinweis, Zustand, Maßnahmen, Legende */
+  /* Karte oben (etwas höher als ihr Kern), darunter Zustand und Maßnahmen */
   #layout {
     position: static;
     display: flex;
@@ -3070,31 +2998,14 @@ details[open] > summary .bericht-pfeil { transform: rotate(180deg); }
     overflow: hidden;
     border-radius: 10px;
   }
-  .karten-hinweis {
-    position: static;
-    order: 2;
-    width: auto;
-    max-width: none;
-    text-align: left;
-    border-radius: 8px;
-    transform: none;
-  }
   .zustand-fenster,
-  .massnahmen-fenster,
-  .legenden-ecke,
-  .legenden-tafel {
+  .massnahmen-fenster {
     position: static;
     width: auto;
     max-height: none;
   }
   .zustand-fenster { order: 3; }
   .massnahmen-fenster { order: 4; }
-  .legenden-ecke {
-    display: flex;
-    flex-direction: column-reverse;
-    gap: 8px;
-    order: 5;
-  }
   .massnahmen-liste { overflow: visible; }
   .marke-name { display: inline; }
   .bilanz { grid-template-columns: repeat(2, minmax(0, 1fr)); }
