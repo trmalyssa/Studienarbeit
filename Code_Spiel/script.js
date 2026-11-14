@@ -4986,8 +4986,6 @@ function seekarteAnzeigen() {
   const z = zustand;
   kartenSicht = sichtBerechnen();
   el("seekarte").innerHTML = seekarteSvg(z, kartenSicht);
-
-
 }
 
 // ==========================================================
