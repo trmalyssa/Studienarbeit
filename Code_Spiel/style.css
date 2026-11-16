@@ -4,7 +4,7 @@
 
 /* ===== Grundwerte (zentral änderbar) ===== */
 :root {
-  --layout-version: 14;       /* script.js prüft diesen Wert, damit HTML, CSS und JS zusammenpassen */
+  --layout-version: 15;       /* script.js prüft diesen Wert, damit HTML, CSS und JS zusammenpassen */
   --tinte: #12304A;          /* Linien und Text wie auf einer Seekarte */
   --tinte-2: #3E5A70;        /* zweitrangiger Text */
   --tinte-3: #687F91;        /* Hinweise */
@@ -562,23 +562,23 @@ button {
   border-radius: 3px;
 }
 
-/* Otter: taucht rechts der Mitte im Meer auf; seine Sprechblase ist weiß mit „!“ (freiwillig, kein Anliegen) */
-.person.otter { animation: auftauchen 0.9s ease-out both; }
+/* Kegelrobbe: taucht links unten in der Ecke des Meeres auf; ihre Sprechblase ist weiß mit „!“ (freiwillig, kein Anliegen) */
+.person.robbe { animation: auftauchen 0.9s ease-out both; }
 
-.otter-figur {
+.robbe-figur {
   display: block;
   width: calc(var(--figur) * 2.6);
   height: calc(var(--figur) * 2.14);
   animation: schaukeln 3.2s ease-in-out infinite;
 }
 
-/* Runde 1: Der Otter erklärt in einer großen Sprechblase rechts neben sich, was als Nächstes zu tun ist */
-.person.otter.erklaert {
+/* Runde 1: Die Kegelrobbe erklärt in einer großen Sprechblase rechts neben sich, was als Nächstes zu tun ist */
+.person.robbe.erklaert {
   cursor: default;
   pointer-events: none;
 }
 
-.otter-sprechblase {
+.robbe-sprechblase {
   position: absolute;
   top: 40%;
   left: calc(100% + 12px);
@@ -596,7 +596,7 @@ button {
   transform: translateY(-50%);
 }
 
-.otter-sprechblase::after {
+.robbe-sprechblase::after {
   content: "";
   position: absolute;
   top: 50%;
@@ -610,20 +610,20 @@ button {
   transform: rotate(45deg);
 }
 
-.otter-sprechblase:empty { display: none; }
-.otter-sprechblase.warnung { color: var(--rot); }
+.robbe-sprechblase:empty { display: none; }
+.robbe-sprechblase.warnung { color: var(--rot); }
 
-.person.otter .person-blase {
+.person.robbe .person-blase {
   color: var(--orange);
   background: #fff;
 }
 
-.person.otter.ungelesen:hover .person-blase {
+.person.robbe.ungelesen:hover .person-blase {
   color: #fff;
   background: var(--orange);
 }
 
-.person.otter.gelesen .person-blase { color: var(--gruen); }
+.person.robbe.gelesen .person-blase { color: var(--gruen); }
 
 @keyframes auftauchen {
   from { opacity: 0; transform: translate(-50%, -80%); }
@@ -635,15 +635,15 @@ button {
   50%      { transform: translateY(1.5px) rotate(-2deg); }
 }
 
-.anliegen-figur .otter-figur {
+.anliegen-figur .robbe-figur {
   width: 40px;
   height: 33px;
   animation: none;
 }
 
-.otter-satz { font-size: 1.02rem; }
+.robbe-satz { font-size: 1.02rem; }
 
-.otter-liste {
+.robbe-liste {
   display: grid;
   gap: 6px;
   margin: 10px 0 12px;
@@ -651,7 +651,7 @@ button {
   list-style: none;
 }
 
-.otter-liste li {
+.robbe-liste li {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -662,7 +662,7 @@ button {
   border-radius: 3px;
 }
 
-.otter-soll {
+.robbe-soll {
   margin-left: auto;
   font-size: 0.85rem;
   color: var(--tinte-2);
@@ -2273,6 +2273,9 @@ button {
 
 .fuss-notiz { margin: 0; }
 
+/* Rundenbericht: „Weiter“ bleibt rechts, auch wenn der Scroll-Hinweis ausgeblendet ist */
+#berichtWeiter { margin-left: auto; }
+
 .info-tabelle tr.summe-zeile td {
   font-weight: 700;
   border-top: 1.5px solid var(--tinte);
@@ -2948,24 +2951,23 @@ details[open] > summary .bericht-pfeil { transform: rotate(180deg); }
 @media (max-width: 860px) {
   .person-name,
   .marker-name { display: none; }
-  /* Sprechblase des Otters über ihm statt daneben, Spitze nach unten */
-  .otter-sprechblase {
+  /* Sprechblase der Kegelrobbe über ihr statt daneben, linksbündig (sie steht am linken Rand), Spitze nach unten */
+  .robbe-sprechblase {
     top: auto;
     bottom: 100%;
-    left: 50%;
+    left: 0;
     max-width: 60vw;
     margin-bottom: 8px;
     font-size: 0.75rem;
-    transform: translateX(-50%);
+    transform: none;
   }
-  .otter-sprechblase::after {
+  .robbe-sprechblase::after {
     top: auto;
     bottom: -6px;
-    left: 50%;
-    margin: 0 0 0 -4.5px;
+    left: 18px;
+    margin: 0;
     border-left: none;
     border-right: 1.5px solid var(--tinte);
-    transform: rotate(45deg);
   }
   :root { --kopfhoehe: auto; }
   #kopfleiste {
