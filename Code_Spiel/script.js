@@ -139,10 +139,11 @@ const BEREICH_STIL = {
   land:   { farbe: "#4E7A2A" }
 };
 
-// Otter: taucht in diesen Runden im Meer auf und meldet kurz den Zwischenstand. Freiwillig, ohne Strafe.
-// Er schwimmt rechts der Mitte im Meer, abseits von Windpark und Fischschwärmen.
-const OTTER_RUNDEN = [3, 6, 9];
-const OTTER_ORT = { x: 60, y: 94 };    // Fußpunkt der Figur in Prozent des Kartenkerns
+// Kegelrobbe: taucht in diesen Runden im Meer auf und meldet kurz den Zwischenstand. Freiwillig, ohne Strafe.
+// In Runde 1 erklärt sie in einer Sprechblase, was als Nächstes zu tun ist.
+// Sie liegt links unten in der Ecke des sichtbaren Meeres (siehe robbeOrt).
+const ROBBE_RUNDEN = [3, 6, 9];
+const ROBBE_RAND = { links: 48, unten: 10 };    // Abstand des Fußpunkts zur Ecke in Bildschirmpunkten
 
 // Wissen: Anteil am Endergebnis
 const WISSEN_ANTEIL = 0.2;        // Endergebnis = 80 % Nachhaltigkeit + 20 % Wissen
@@ -1639,7 +1640,7 @@ function neuerZustand(zufall) {
     anhoerung: { gesamt: 0, zuSchnell: 0 },   // Zähler für die Auswertung (Zuhören)
     gesagt: [],                // bereits geäußerte Aussagen, z. B. "meer:netze"
     infopunkteGelesen: [],     // ids der geöffneten Infopunkte
-    otterGelesen: [],          // Runden, in denen der Otter angeklickt wurde
+    robbeGelesen: [],          // Runden, in denen die Kegelrobbe angeklickt wurde
     muellBilanz: null,         // Müllbilanz der letzten Runde (für das Strandmüll-Pop-up)
     quiz: { richtig: 0, gestellt: 0, ergebnisse: [] },
     beendet: false
@@ -2107,7 +2108,7 @@ function anliegenErstellen(z) {
     const neu = passend.filter(function (a) { return z.gesagt.indexOf(region + ":" + a.id) < 0; });
     const auswahl = (neu.length ? neu : passend).slice().sort(function (a, b) { return b.prio - a.prio; })[0];
     z.gesagt.push(region + ":" + auswahl.id);
-    return { region: region, aussage: auswahl.id, text: auswahl.text, gelesen: false, zuSchnell: false };
+    return { region: region, text: auswahl.text, gelesen: false, zuSchnell: false };
   });
 }
 
@@ -2219,16 +2220,16 @@ function rundeAbschliessen(z, auswahl) {
   const bericht = {
     runde: r, entscheidungen: [],
     neuWirksam: [], ausgelaufen: [], foerderungen: [],
-    ereignis: null, anhoerung: []
+    ereignis: null
   };
 
   // 0. Anhörung: Wer Anliegen überflogen hat, verliert Akzeptanz
   z.anliegen.forEach(function (a) {
-    const p = PERSONEN[a.region];
     z.anhoerung.gesamt += 1;
-    if (a.zuSchnell) z.anhoerung.zuSchnell += 1;
-    if (a.zuSchnell) z.akzeptanz = begrenzen(z.akzeptanz - ANHOERUNG_STRAFE, 0, 100);
-    bericht.anhoerung.push({ person: p, region: a.region, zuSchnell: a.zuSchnell });
+    if (a.zuSchnell) {
+      z.anhoerung.zuSchnell += 1;
+      z.akzeptanz = begrenzen(z.akzeptanz - ANHOERUNG_STRAFE, 0, 100);
+    }
   });
 
   // 1. Maßnahmen der drei Säulen verbuchen
@@ -2566,8 +2567,9 @@ function bereichSymbolSvg(region) {
 // ---------- Maßnahmen-Fenster ----------
 // Liegt rechts unten über der Karte und lässt sich auf- und zuklappen. Drei Reiter (Ökologie, Ökonomie,
 // Soziales) mit Symbol und Haken, sobald entschieden ist. Die Ökologie-Maßnahmen gelten jede Runde für einen
-// Bereich; das steht als Etikett im Reiter Ökologie. Zu Rundenbeginn ist das Fenster zugeklappt, solange
-// Pflicht-Infopunkte offen sind (die Karte bleibt frei), und klappt auf, sobald sie gelesen sind.
+// Bereich; das steht als Etikett im Reiter Ökologie. Mit „Runde beenden“ klappt das Fenster zu und bleibt zu
+// Beginn jeder Runde zugeklappt (die Karte bleibt frei). Nur in Runde 1 klappt es von selbst auf, sobald die
+// Pflicht-Infopunkte gelesen sind.
 const massnahmenFenster = { spiel: null, runde: 0, offen: true, reiter: "oeko" };
 
 const SAEULEN_SYMBOLE = {
@@ -2620,12 +2622,12 @@ function massnahmenAnzeigen() {
   const runde = Math.min(z.runde, RUNDEN);
   const region = regionDerRunde(runde);
 
-  // neue Runde oder neues Spiel: Reiter Ökologie, zugeklappt solange Pflicht-Infopunkte offen sind
+  // neue Runde oder neues Spiel: Reiter Ökologie, zugeklappt
   if (massnahmenFenster.spiel !== z || massnahmenFenster.runde !== z.runde) {
     massnahmenFenster.spiel = z;
     massnahmenFenster.runde = z.runde;
     massnahmenFenster.reiter = "oeko";
-    massnahmenFensterSetzen(!pflichtInfosOffen(z).length);
+    massnahmenFensterSetzen(false);
   }
 
   // Hinweis auf offenen Förderaufruf (nur mit Sonderereignissen)
@@ -2883,10 +2885,10 @@ function rundenKnopfAnzeigen() {
   knopf.disabled = !rundeBereit(z);
   knopf.textContent = z.beendet ? "Spiel beendet"
     : z.runde === RUNDEN ? "Letzte Runde beenden" : "Runde " + z.runde + " beenden";
-  otterSprechblaseAktualisieren();
+  robbeSprechblaseAktualisieren();
 }
 
-// Was als Nächstes zu tun ist; in Runde 1 sagt es der Otter in seiner Sprechblase
+// Was als Nächstes zu tun ist; in Runde 1 sagt es die Kegelrobbe in ihrer Sprechblase
 function rundenHinweis(z) {
   const pflicht = pflichtInfosOffen(z);
   const offen = offeneAnliegen(z);
@@ -2917,9 +2919,9 @@ function rundenHinweis(z) {
     : "Alles entschieden." };
 }
 
-// Sprechblase des Otters in Runde 1 (sie gibt es nur dann, siehe markerAnzeigen)
-function otterSprechblaseAktualisieren() {
-  const blase = el("otterSprechblase");
+// Sprechblase der Kegelrobbe in Runde 1 (sie gibt es nur dann, siehe markerAnzeigen)
+function robbeSprechblaseAktualisieren() {
+  const blase = el("robbeSprechblase");
   if (!blase) return;
   const hinweis = rundenHinweis(zustand);
   blase.textContent = hinweis.text;
@@ -3035,22 +3037,22 @@ function markerAnzeigen() {
       function () { infopunktOeffnen(p.id); }));
   });
 
-  // Otter: in Runde 1 erklärt er in einer Sprechblase, was als Nächstes zu tun ist;
-  // in den OTTER_RUNDEN meldet er den Zwischenstand (freiwillig, auch vor den Infopunkten anklickbar)
+  // Kegelrobbe: in Runde 1 erklärt sie in einer Sprechblase, was als Nächstes zu tun ist;
+  // in den ROBBE_RUNDEN meldet sie den Zwischenstand (freiwillig, auch vor den Infopunkten anklickbar)
   if (z.runde === 1 && !z.beendet) {
-    const otter = elementBauen("div", "person otter erklaert");
-    platzieren(otter, OTTER_ORT);
-    otter.innerHTML = '<p id="otterSprechblase" class="otter-sprechblase" aria-live="polite"></p>' + otterSvg() +
-      '<span class="person-name" aria-hidden="true">Otter</span>';
-    ebene.appendChild(otter);
-    otterSprechblaseAktualisieren();
-  } else if (otterDa(z)) {
-    const gelesen = z.otterGelesen.indexOf(z.runde) >= 0;
-    ebene.appendChild(kartenKnopf("person otter " + (gelesen ? "gelesen" : "ungelesen"), OTTER_ORT,
-      gelesen ? "Otter: Zwischenstand noch einmal ansehen" : "Otter: Zwischenstand ansehen",
-      '<span class="person-blase" aria-hidden="true">' + (gelesen ? "✓" : "!") + "</span>" + otterSvg() +
-      '<span class="person-name" aria-hidden="true">Otter</span>',
-      otterOeffnen));
+    const robbe = elementBauen("div", "person robbe erklaert");
+    platzieren(robbe, robbeOrt());
+    robbe.innerHTML = '<p id="robbeSprechblase" class="robbe-sprechblase" aria-live="polite"></p>' + robbeSvg() +
+      '<span class="person-name" aria-hidden="true">Kegelrobbe</span>';
+    ebene.appendChild(robbe);
+    robbeSprechblaseAktualisieren();
+  } else if (robbeDa(z)) {
+    const gelesen = z.robbeGelesen.indexOf(z.runde) >= 0;
+    ebene.appendChild(kartenKnopf("person robbe " + (gelesen ? "gelesen" : "ungelesen"), robbeOrt(),
+      gelesen ? "Kegelrobbe: Zwischenstand noch einmal ansehen" : "Kegelrobbe: Zwischenstand ansehen",
+      '<span class="person-blase" aria-hidden="true">' + (gelesen ? "✓" : "!") + "</span>" + robbeSvg() +
+      '<span class="person-name" aria-hidden="true">Kegelrobbe</span>',
+      robbeOeffnen));
   }
 
   // Personen erst, wenn die Pflicht-Infopunkte gelesen sind
@@ -3121,6 +3123,23 @@ function kartenPosition(ort) {
     left: ((ort.x / 100 * KARTE_B - kartenSicht.x) / kartenSicht.b * 100).toFixed(2) + "%",
     top: ((ort.y / 100 * KARTE_H - kartenSicht.y) / kartenSicht.h * 100).toFixed(2) + "%"
   };
+}
+
+// Fußpunkt der Kegelrobbe in Prozent des Kerns: links unten in der Ecke der sichtbaren Karte (dort liegt nur Meer;
+// der Zustand der Region steht links oben, das Maßnahmen-Fenster rechts).
+function robbeOrt() {
+  const mass = el("seekarte").clientWidth / kartenSicht.b || 1;     // Bildschirmpunkte pro Karteneinheit
+  return {
+    x: (kartenSicht.x + ROBBE_RAND.links / mass) / KARTE_B * 100,
+    y: (kartenSicht.y + kartenSicht.h - ROBBE_RAND.unten / mass) / KARTE_H * 100
+  };
+}
+
+// Fläche der Kegelrobbe mit Name im Kartenmaß (x, y, Breite, Höhe): Fische und Treibgut bleiben dort frei
+function robbeFlaeche() {
+  const mass = el("seekarte").clientWidth / kartenSicht.b || 1;
+  const ort = robbeOrt();
+  return [ort.x / 100 * KARTE_B - 42 / mass, ort.y / 100 * KARTE_H - 80 / mass, 84 / mass, 80 / mass];
 }
 
 // Feste Zufallszahl zu einer Stelle: Verzierungen am Rand bleiben beim Ändern der Fenstergröße liegen
@@ -3668,7 +3687,10 @@ function fischSvg(art, x, y, richtung, nummer) {
 
 // Alle Fische zur aktuellen Artenvielfalt. Jedes Tier hat einen festen Platz (gleiche Zufallsfolge),
 // damit nichts springt, wenn die Karte neu gezeichnet wird. Bodenfische schwimmen weiter unten.
+// Um die Kegelrobbe bleibt eine halbe Fischlänge Abstand.
 function fischeSvg(artenvielfalt) {
+  const r0 = robbeFlaeche();
+  const robbe = [[r0[0] - 14, r0[1] - 8, r0[2] + 28, r0[3] + 16]];
   const tiere = [];
   FISCH_ARTEN.forEach(function (art, artNummer) {
     const anzahl = tierAnzahl(art, artenvielfalt);
@@ -3679,7 +3701,7 @@ function fischeSvg(artenvielfalt) {
       for (let versuch = 0; versuch < 25; versuch++) {
         x = 50 + r() * 690;
         y = art.boden ? 252 + r() * 50 : 208 + r() * 78;
-        const frei = !(Math.abs(x - OTTER_ORT.x * 8) < 46 && y > 244) &&        // Otter
+        const frei = !imRechteck(x, y, robbe) &&
           !tiere.some(function (t) { return Math.abs(t.x - x) < 34 && Math.abs(t.y - y) < 14; });
         if (frei) break;
       }
@@ -3692,7 +3714,7 @@ function fischeSvg(artenvielfalt) {
 }
 
 // ---------- Landtiere ----------
-// Typische Tiere im Grünland hinter den Dünen. Wie bei den Fischen kommen mit steigender Artenvielfalt mehr Tiere
+// Typische Tiere im Grünland. Wie bei den Fischen kommen mit steigender Artenvielfalt mehr Tiere
 // und weitere Arten dazu: Wildkaninchen und Feldhase sind von Anfang an da, später der Austernfischer, der auf
 // Wiesen und am Strand brütet, und Rehe. Seitenansicht, Kopf links, Füße auf y = 0.
 // anzahl = Stufen [ab Artenvielfalt, Tiere]; hoppelt = bewegt sich in kleinen Sprüngen; schatten = Breite des Schattens
@@ -3764,21 +3786,25 @@ function landtierSvg(art, x, y, richtung, nummer) {
     (art.hoppelt ? '<g class="ka-hoppeln" style="' + animStil(0.9, r()) + '">' + form + "</g>" : form) + "</g></g>";
 }
 
+// Bereich der Landtiere (Fußpunkte, Kartenmaß): im Landesinneren, weit weg von Strand, Dünen und Ort.
+// rechts endet er deutlich vor den Hotels (auch vor dem zweiten Hotel mit „Gewerbegebiet erweitern“).
+const LANDTIER_BEREICH = { links: 16, rechts: 320, oben: 16, unten: 52 };
+
 // Alle Landtiere zur aktuellen Artenvielfalt auf festen Plätzen im Grünland (gleiche Zufallsfolge = nichts springt).
-// Fluss, Ort, Fabriken, Flughafen, Bäume, Infopunkte und Personen bleiben frei.
+// Fluss, Bäume, Infopunkte und Personen bleiben frei.
 function landtiereSvg(z) {
   const sperre = muellSperrflaechen(z);
   const fluss = flussMitte(20, istUmgesetzt(z, "aue"));
+  const bereich = LANDTIER_BEREICH;
   const tiere = [];
   LANDTIER_ARTEN.forEach(function (art, artNummer) {
     const anzahl = tierAnzahl(art, z.kennzahlen.artenvielfalt);
     for (let n = 0; n < anzahl; n++) {
       const r = zufallsfolge(500 + artNummer * 37 + n * 11);
-      for (let versuch = 0; versuch < 60; versuch++) {
-        const x = 16 + r() * (KARTE_B - 32);
-        const y = 14 + r() * (kuestenlinie(x) - 30);
-        const frei = !imRechteck(x, y, sperre) && !(x > 420 && x < 770 && y > 14) &&
-          abstandZumFluss(x, y, fluss) > 12 &&
+      for (let versuch = 0; versuch < 120; versuch++) {
+        const x = bereich.links + r() * (bereich.rechts - bereich.links);
+        const y = bereich.oben + r() * (bereich.unten - bereich.oben);
+        const frei = !imRechteck(x, y, sperre) && abstandZumFluss(x, y, fluss) > 12 &&
           !BAEUME.some(function (b) { return Math.abs(b[0] - x) < 16 && Math.abs(b[1] - y) < 12; }) &&
           !tiere.some(function (t) { return Math.abs(t.x - x) < 30 && Math.abs(t.y - y) < 12; });
         if (frei) {
@@ -4346,7 +4372,7 @@ function flussMuellSvg(z, muellfaengerWirkt) {
 }
 
 // Treibgut: schwimmende Plastikflaschen und -tüten mit kleinen Wellen, gleichmäßig über das ganze Meer vom Strand
-// bis zum unteren Kartenrand verteilt; die Anzahl folgt dem Eintrag. Hafen, Boote und Otter bleiben frei.
+// bis zum unteren Kartenrand verteilt; die Anzahl folgt dem Eintrag. Hafen, Boote und Kegelrobbe bleiben frei.
 const TREIBGUT_MAX = 24;
 const TREIBGUT_FORMEN = ["flasche", "tuete", "flasche", "tuete", "verpackung", "flasche"];
 
@@ -4354,7 +4380,7 @@ function treibgutSvg(z) {
   const anzahl = Math.min(TREIBGUT_MAX, Math.round(z.eintrag.gesamt / 4));
   const sperre = muellSperrflaechen(z).concat([
     [672, 112, 128, 160],                                         // Hafen mit Steg, Kutter und Kreuzfahrtschiffen
-    [OTTER_ORT.x * 8 - 36, OTTER_ORT.y * 3.2 - 60, 72, 64]       // Otter
+    robbeFlaeche()
   ]);
   if (istUmgesetzt(z, "quoten")) sperre.push([262, 186, 56, 26], [740, 286, 50, 28]);   // Kutter auf See
   const r = zufallsfolge(31);
@@ -5290,17 +5316,6 @@ function berichtZeigen(bericht) {
     '<p class="klein">Jede Kennzahl bewegt sich pro Runde höchstens ' + MAX_AENDERUNG +
     " Punkte auf ihren Richtwert zu. Der Richtwert ergibt sich aus dem Zustand der Region.</p></section>";
 
-  // Anhörung
-  if (bericht.anhoerung.length) {
-    html += '<section class="bericht-block"><h3>Anhörung</h3><ul class="liste-kompakt">';
-    bericht.anhoerung.forEach(function (a) {
-      html += "<li>" + a.person.name + " (" + bereichName(a.region) + "): " + (a.zuSchnell
-        ? '<span class="trend-schlecht">nur überflogen, Akzeptanz −' + ANHOERUNG_STRAFE + "</span>"
-        : "aufmerksam angehört") + "</li>";
-    });
-    html += "</ul></section>";
-  }
-
   // Neu wirksam / ausgelaufen / Förderungen
   if (bericht.neuWirksam.length || bericht.ausgelaufen.length || bericht.foerderungen.length) {
     html += '<section class="bericht-block"><h3>Wirkungen und Förderungen</h3><ul class="liste-kompakt">';
@@ -5318,12 +5333,29 @@ function berichtZeigen(bericht) {
 
   el("berichtTitel").textContent = "Bericht zu Runde " + bericht.runde;
   el("berichtInhalt").innerHTML = html;
-  el("berichtInhalt").scrollTop = 0;
   el("berichtWeiter").textContent = zustand.beendet
     ? "Zum Abschlussquiz"
     : "Weiter zu Runde " + zustand.runde;
+  el("berichtWeiter").disabled = true;
+  el("berichtScrollHinweis").hidden = false;
   popupOeffnen("popupBericht");
+  // erst nach dem Öffnen nach oben scrollen: Im verborgenen Pop-up bliebe die Position der Vorrunde stehen
+  el("berichtInhalt").scrollTop = 0;
+  berichtGelesenPruefen();
+  // Solange „Weiter“ gesperrt ist, liegt der Fokus auf dem Bericht: Pfeiltasten und Bild-ab scrollen ihn
+  if (el("berichtWeiter").disabled) el("berichtInhalt").focus();
   berichtAnimieren(el("berichtInhalt"));
+}
+
+// „Weiter“ im Rundenbericht wird erst frei, wenn bis zum Ende gescrollt wurde (passt der Bericht ganz ins
+// Fenster, sofort). Einmal frei, bleibt der Knopf frei, auch wenn danach eine Erklärung aufgeklappt wird.
+function berichtGelesenPruefen() {
+  const inhalt = el("berichtInhalt");
+  const knopf = el("berichtWeiter");
+  if (!knopf.disabled || el("popupBericht").classList.contains("versteckt")) return;
+  if (inhalt.scrollTop + inhalt.clientHeight < inhalt.scrollHeight - 4) return;
+  knopf.disabled = false;
+  el("berichtScrollHinweis").hidden = true;
 }
 
 // ---------- Rundenbericht: animierte Balken ----------
@@ -5548,33 +5580,46 @@ function anliegenSchliessen() {
   rundenKnopfAnzeigen();
 }
 
-// ---------- Otter: kurzer Zwischenstand in Runde 3, 6 und 9 ----------
-function otterDa(z) {
-  return !z.beendet && OTTER_RUNDEN.indexOf(z.runde) >= 0;
+// ---------- Kegelrobbe: kurzer Zwischenstand in Runde 3, 6 und 9 ----------
+function robbeDa(z) {
+  return !z.beendet && ROBBE_RUNDEN.indexOf(z.runde) >= 0;
 }
 
-// Seeotter im Stil der Karte: flache Farben, dunkle Kontur, schaut aus dem Wasser
-function otterSvg() {
+// Kegelrobbe im Stil der Karte: flache Farben, dunkle Kontur, schaut seitlich aus dem Wasser (Kopf rechts, zur Karte hin).
+// Typische Merkmale: lange Schnauze ohne Stirnabsatz (daher der „kegelförmige“ Kopf), graues Fell mit dunklen
+// Flecken, keine Ohrmuscheln, Schnurrhaare. Damit sie freundlich wirkt: großer runder Kopf, große Augen mit
+// Lichtpunkten, rosa Wangen, ein Lächeln und eine winkende Vorderflosse.
+function robbeSvg() {
   const tinte = "#12304A";
-  const fell = "#8A5A3B";
-  const hell = "#D9B48C";
-  return '<svg class="otter-figur" viewBox="0 0 34 28" aria-hidden="true" focusable="false">' +
-    // Ohren
-    '<circle cx="11.2" cy="5" r="1.7" fill="' + fell + '" stroke="' + tinte + '" stroke-width="1.2"/>' +
-    '<circle cx="22.8" cy="5" r="1.7" fill="' + fell + '" stroke="' + tinte + '" stroke-width="1.2"/>' +
-    // Körper
-    '<path d="M9 26 C8 17 10.5 11.5 17 11.5 C23.5 11.5 26 17 25 26" fill="' + fell + '" stroke="' + tinte + '" stroke-width="1.4"/>' +
-    '<path d="M12.6 26 C12.6 19.5 14.2 16.6 17 16.6 C19.8 16.6 21.4 19.5 21.4 26 Z" fill="' + hell + '"/>' +
-    // Kopf
-    '<ellipse cx="17" cy="9" rx="6.8" ry="5.9" fill="' + fell + '" stroke="' + tinte + '" stroke-width="1.4"/>' +
-    '<ellipse cx="17" cy="11" rx="3.6" ry="2.5" fill="' + hell + '"/>' +
-    '<ellipse cx="17" cy="9.9" rx="1.25" ry="0.85" fill="' + tinte + '"/>' +
-    '<circle cx="14.2" cy="7.6" r="0.95" fill="' + tinte + '"/>' +
-    '<circle cx="19.8" cy="7.6" r="0.95" fill="' + tinte + '"/>' +
-    '<path d="M13.2 11 H9.6 M13.2 12 L9.9 13 M20.8 11 H24.4 M20.8 12 L24.1 13" stroke="' + tinte + '" stroke-width="0.6" stroke-linecap="round"/>' +
-    // Pfoten
-    '<ellipse cx="14.3" cy="18.2" rx="1.7" ry="1.25" fill="#6E4329" stroke="' + tinte + '" stroke-width="0.9"/>' +
-    '<ellipse cx="19.7" cy="18.2" rx="1.7" ry="1.25" fill="#6E4329" stroke="' + tinte + '" stroke-width="0.9"/>' +
+  const fell = "#8C99A2";
+  const dunkel = "#66737C";
+  const hell = "#D3DADE";
+  return '<svg class="robbe-figur" viewBox="0 0 34 28" aria-hidden="true" focusable="false">' +
+    // Kopf und Körper in einem Umriss: Rücken, Hinterkopf, Stirn, Schnauze, Kinn, Kehle
+    '<path d="M6.5 26 C6.2 21 7 15.5 9.4 11.8 C11 8.2 13.6 4.6 18 4 C21.8 3.5 24.8 5.4 26.4 7.8 ' +
+    'C27.6 9.2 29 10 29.6 11.2 C30.2 12.5 29.3 13.8 27.8 14 C25.8 14.3 23.8 14.3 22.2 14.6 ' +
+    'C21.2 17.4 21 21.4 21.4 26 Z" fill="' + fell + '" stroke="' + tinte + '" stroke-width="1.4" stroke-linejoin="round"/>' +
+    // Schatten am Rücken, helle Kehle und helle Schnauze
+    '<path d="M9.8 12 C7.6 15.6 6.9 21 7.1 26 H9.2 C9 21 9.6 16.4 11.6 12.8 Z" fill="' + dunkel + '" opacity="0.45"/>' +
+    '<path d="M21.8 15 C20.4 18 20 22 20.2 26 H17.2 C17.2 21.4 18.2 17.4 20.4 14.8 Z" fill="' + hell + '"/>' +
+    '<ellipse cx="26.6" cy="11.8" rx="2.9" ry="1.9" fill="' + hell + '"/>' +
+    // weiche Flecken im Fell
+    '<g fill="' + dunkel + '" opacity="0.55">' +
+    '<ellipse cx="11.2" cy="14.4" rx="1.2" ry="0.8"/><ellipse cx="9.6" cy="19" rx="1" ry="1.3"/>' +
+    '<ellipse cx="13.6" cy="21" rx="1.3" ry="0.9"/><ellipse cx="15.2" cy="8.6" rx="0.9" ry="0.6"/></g>' +
+    // großes Auge mit zwei Lichtpunkten, rosa Wange
+    '<circle cx="21.2" cy="8.6" r="1.8" fill="' + tinte + '"/>' +
+    '<circle cx="20.6" cy="7.9" r="0.65" fill="#FFFFFF"/><circle cx="21.9" cy="9.4" r="0.3" fill="#FFFFFF"/>' +
+    '<ellipse cx="23.4" cy="11.6" rx="1.3" ry="0.8" fill="#F2A39B" opacity="0.75"/>' +
+    // Nase, Lächeln, Schnurrhaare
+    '<ellipse cx="28.9" cy="11" rx="0.95" ry="0.7" fill="' + tinte + '"/>' +
+    '<path d="M25.4 13 Q26.6 14 27.9 13" fill="none" stroke="' + tinte + '" stroke-width="0.55" stroke-linecap="round"/>' +
+    '<g fill="' + tinte + '" opacity="0.6"><circle cx="26" cy="11.4" r="0.22"/><circle cx="26.9" cy="11.9" r="0.22"/>' +
+    '<circle cx="26.1" cy="12.3" r="0.22"/></g>' +
+    '<path d="M27.6 12.1 L31.6 11.3 M27.8 12.7 L31.4 13.4" stroke="' + tinte + '" stroke-width="0.35" stroke-linecap="round" opacity="0.6"/>' +
+    // winkende Vorderflosse
+    '<path d="M20.4 21.6 C21.4 19.2 23 17.2 24.6 16.8 C25.6 16.8 25.4 18.6 23.8 20.4 C22.8 21.6 21.6 22.2 20.4 21.6 Z" fill="' +
+    dunkel + '" stroke="' + tinte + '" stroke-width="0.9" stroke-linejoin="round"/>' +
     // Wasserlinie
     '<path d="M1 24.5 Q5 22.5 9 24.5 T17 24.5 T25 24.5 T33 24.5 V28 H1 Z" fill="#FFFFFF" fill-opacity="0.35"/>' +
     '<path d="M1 24.5 Q5 22.5 9 24.5 T17 24.5 T25 24.5 T33 24.5" fill="none" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round"/>' +
@@ -5583,7 +5628,7 @@ function otterSvg() {
 
 // Zwischenstand aus der letzten Momentaufnahme: Welche Kennzahlen liegen hinter dem Kurs?
 // Gleicher Maßstab wie die Wertung (kursGrad), aber nur in Worten und ohne Fachbegriffe.
-function otterStand(s) {
+function robbeStand(s) {
   const kennzahlen = Object.keys(KENNZAHL_NAMEN).map(function (id) {
     const soll = kursSoll(id, s.runde);
     const muell = id === "strandmuell";
@@ -5609,10 +5654,10 @@ function otterStand(s) {
     titel = "Kurskorrektur nötig";
     satz = "Mehrere Kennzahlen hängen hinterher. In diesem Tempo wird es knapp:";
   }
-  let html = '<p class="otter-satz">' + satz + "</p>";
+  let html = '<p class="robbe-satz">' + satz + "</p>";
   if (hinten.length) {
-    html += '<ul class="otter-liste">' + hinten.slice(0, 3).map(function (k) {
-      return "<li><strong>" + k.name + "</strong> " + k.wert + '<span class="otter-soll">jetzt nötig: ' + k.soll + "</span></li>";
+    html += '<ul class="robbe-liste">' + hinten.slice(0, 3).map(function (k) {
+      return "<li><strong>" + k.name + "</strong> " + k.wert + '<span class="robbe-soll">jetzt nötig: ' + k.soll + "</span></li>";
     }).join("") + "</ul>";
     if (imPlan.length) {
       html += '<p class="klein">Im Plan: ' + namenListe(imPlan.map(function (k) { return k.name; })) + ".</p>";
@@ -5621,21 +5666,21 @@ function otterStand(s) {
   return { titel: titel, html: html };
 }
 
-function otterOeffnen() {
+function robbeOeffnen() {
   const z = zustand;
-  if (!otterDa(z)) return;
+  if (!robbeDa(z)) return;
   const s = z.verlauf[z.verlauf.length - 1];
-  const stand = otterStand(s);
-  el("otterFigur").innerHTML = otterSvg();
-  el("otterTitel").textContent = stand.titel;
-  el("otterUntertitel").textContent = "Der Otter meldet deinen Stand nach Runde " + s.runde + ".";
-  el("otterInhalt").innerHTML = stand.html;
-  if (z.otterGelesen.indexOf(z.runde) < 0) z.otterGelesen.push(z.runde);
-  popupOeffnen("popupOtter");
+  const stand = robbeStand(s);
+  el("robbeFigur").innerHTML = robbeSvg();
+  el("robbeTitel").textContent = stand.titel;
+  el("robbeUntertitel").textContent = "Die Kegelrobbe meldet deinen Stand nach Runde " + s.runde + ".";
+  el("robbeInhalt").innerHTML = stand.html;
+  if (z.robbeGelesen.indexOf(z.runde) < 0) z.robbeGelesen.push(z.runde);
+  popupOeffnen("popupRobbe");
 }
 
-function otterSchliessen() {
-  popupSchliessen("popupOtter");
+function robbeSchliessen() {
+  popupSchliessen("popupRobbe");
   markerAnzeigen();
 }
 
@@ -5698,7 +5743,7 @@ function bewertungHtml() {
 
   html += "<h3>Nachhaltigkeitsscore: den Kurs halten</h3>" +
     "<p>Jede Kennzahl hat in jeder Runde einen <strong>Sollwert</strong>. Wie weit du davon entfernt bist, zeigen " +
-    "der Rundenbericht und der Otter in den Runden " + namenListe(OTTER_RUNDEN.map(String)) + ". " +
+    "der Rundenbericht und die Kegelrobbe in den Runden " + namenListe(ROBBE_RUNDEN.map(String)) + ". " +
     "Der Sollkurs steigt anfangs flach, weil Maßnahmen verzögert wirken, und endet bei den Mindestwerten des guten " +
     "Umweltzustands. Wer auf oder über dem Sollwert liegt, bekommt die volle Punktzahl. Liegt eine Kennzahl darunter, " +
     "sinkt ihre Punktzahl bis auf null, sobald sie " + KURS_TOLERANZ + " Punkte (beim Strandmüll: Müllpunkte) hinter dem " +
@@ -5929,10 +5974,11 @@ function zurueckstellen(saeule) {
   auswahlAktualisieren();
 }
 
-// Rundenende: erst das Quiz der Runde, dann der Bericht
+// Rundenende: Maßnahmen-Fenster zuklappen, dann das Quiz der Runde, dann der Bericht
 function rundeBeenden() {
   const z = zustand;
   if (!rundeBereit(z)) return;
+  massnahmenFensterSetzen(false);
   const abschliessen = function () {
     const bericht = rundeAbschliessen(zustand, zustand.auswahl);
     alleAnzeigen();
@@ -7086,6 +7132,11 @@ function kartenGroesseAnpassen() {
 
 function oberflaecheVerbinden() {
   window.addEventListener("resize", kartenGroesseAnpassen);
+  // Rundenbericht: „Weiter“ erst am Ende des Berichts. Auch nach Größenänderung oder Zuklappen einer
+  // Erklärung prüfen, denn dann passt der Bericht vielleicht ganz ins Fenster (toggle steigt nicht auf: capture).
+  el("berichtInhalt").addEventListener("scroll", berichtGelesenPruefen);
+  el("berichtInhalt").addEventListener("toggle", berichtGelesenPruefen, true);
+  window.addEventListener("resize", berichtGelesenPruefen);
   // Knopf → Aktion
   const aktionen = {
     startNeuesSpiel: namePopupOeffnen,
@@ -7102,7 +7153,7 @@ function oberflaecheVerbinden() {
     infoKnopf: budgetZeigen,
     muellInfoKnopf: muellPopupZeigen,
     anliegenOk: anliegenSchliessen,
-    otterOk: otterSchliessen,
+    robbeOk: robbeSchliessen,
     beendenKnopf: function () { popupOeffnen("popupBeenden"); },   // unvollständige Spiele kommen nicht ins Leaderboard
     beendenOk: zumStartbildschirm,
     auswertungLeaderboard: leaderboardOeffnen,
@@ -7143,11 +7194,11 @@ const BENOETIGTE_ELEMENTE = ["zustandKlappe", "zustandInhalt", "kennzahlenKurz",
   "quizWeiter", "massnahmenListe", "personen", "muellInfoKnopf",
   "popupMuell", "muellInhalt", "muellSchliessen", "entscheidungen", "startSzene", "startBilder", "ladebildschirm",
   "ladeKarte", "ladeFuellung", "ladeBalken", "ladeMarken", "ladeWeiter", "startVollbild", "popupQuellen", "popupUeber", "bildNachweis", "ueberBewertung", "startSonne", "startWolken", "startMeer", "startWindsack", "startHalme",
-  "popupOtter", "otterOk", "otterInhalt"];
+  "popupRobbe", "robbeOk", "robbeInhalt", "berichtScrollHinweis"];
 
 function versionPruefen() {
   const fehlend = BENOETIGTE_ELEMENTE.filter(function (id) { return !document.getElementById(id); });
-  const cssNeu = getComputedStyle(document.documentElement).getPropertyValue("--layout-version").trim() === "14";
+  const cssNeu = getComputedStyle(document.documentElement).getPropertyValue("--layout-version").trim() === "15";
   if (!fehlend.length && cssNeu) return true;
   const hinweis = document.createElement("div");
   hinweis.setAttribute("role", "alert");

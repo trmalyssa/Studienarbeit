@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="style.css?v=25">
+  <link rel="stylesheet" href="style.css?v=26">
 </head>
 <body>
 
@@ -66,13 +66,13 @@
   <!-- ===== Spielfläche =====
        Die Karte füllt den Bildschirm unter der Kopfleiste. Darüber liegen: links oben der Zustand der Region
        (kompakt, auf- und zuklappbar) und rechts unten das Maßnahmen-Fenster (auf- und zuklappbar) mit
-       „Runde beenden“. In Runde 1 erklärt der Otter auf der Karte, was als Nächstes zu tun ist.
+       „Runde beenden“. In Runde 1 erklärt die Kegelrobbe auf der Karte, was als Nächstes zu tun ist.
        Auf schmalen Bildschirmen steht alles untereinander. -->
   <main id="layout">
     <section class="karten-rahmen" aria-label="Karte deiner Küstenregion">
       <div id="seekarte" class="seekarte" role="img"
            aria-label="Karte der Küstenregion mit Strand, Fluss, Ort, Hafen und Meer. Sie zeigt Müll, Fische und Wasserqualität."></div>
-      <!-- Infopunkte, Personen und Otter mit Sprechblasen liegen über der Karte -->
+      <!-- Infopunkte, Personen und Kegelrobbe mit Sprechblasen liegen über der Karte -->
       <div id="personen" class="personen-ebene"></div>
     </section>
 
@@ -279,12 +279,13 @@
     </div>
   </div>
 
-  <!-- ===== Pop-up: Rundenbericht ===== -->
+  <!-- ===== Pop-up: Rundenbericht (weiter erst, wenn bis zum Ende gescrollt wurde) ===== -->
   <div class="overlay versteckt" id="popupBericht" role="dialog" aria-modal="true" aria-labelledby="berichtTitel">
     <div class="popup popup-breit">
       <div class="popup-kopf"><h2 id="berichtTitel"></h2></div>
-      <div class="popup-inhalt" id="berichtInhalt"></div>
-      <div class="popup-fuss">
+      <div class="popup-inhalt" id="berichtInhalt" tabindex="0" aria-label="Inhalt des Rundenberichts"></div>
+      <div class="popup-fuss popup-fuss-verteilt">
+        <p id="berichtScrollHinweis" class="klein fuss-notiz">Scrolle bis zum Ende des Berichts, um weiterzuspielen.</p>
         <button id="berichtWeiter" class="knopf-primaer" type="button" data-fokus>Weiter</button>
       </div>
     </div>
@@ -357,19 +358,19 @@
     </div>
   </div>
 
-  <!-- ===== Pop-up: Otter mit dem Zwischenstand (Runde 3, 6 und 9, freiwillig) ===== -->
-  <div class="overlay versteckt" id="popupOtter" role="dialog" aria-modal="true" aria-labelledby="otterTitel">
+  <!-- ===== Pop-up: Kegelrobbe mit dem Zwischenstand (Runde 3, 6 und 9, freiwillig) ===== -->
+  <div class="overlay versteckt" id="popupRobbe" role="dialog" aria-modal="true" aria-labelledby="robbeTitel">
     <div class="popup popup-anliegen">
       <div class="popup-kopf anliegen-kopf">
-        <span id="otterFigur" class="anliegen-figur" aria-hidden="true"></span>
+        <span id="robbeFigur" class="anliegen-figur" aria-hidden="true"></span>
         <div>
-          <h2 id="otterTitel"></h2>
-          <p id="otterUntertitel" class="tafel-zusatz"></p>
+          <h2 id="robbeTitel"></h2>
+          <p id="robbeUntertitel" class="tafel-zusatz"></p>
         </div>
       </div>
-      <div class="popup-inhalt" id="otterInhalt"></div>
+      <div class="popup-inhalt" id="robbeInhalt"></div>
       <div class="popup-fuss">
-        <button id="otterOk" class="knopf-primaer" type="button" data-fokus>Danke, Otter</button>
+        <button id="robbeOk" class="knopf-primaer" type="button" data-fokus>Danke, Kegelrobbe</button>
       </div>
     </div>
   </div>
@@ -441,6 +442,6 @@
     </div>
   </div>
 
-  <script src="script.js?v=26"></script>
+  <script src="script.js?v=27"></script>
 </body>
 </html>
